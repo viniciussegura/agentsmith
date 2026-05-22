@@ -26,3 +26,15 @@
 - AI PR bodies note the model(s) used.
 - No token or time figures in git — they cannot be reliably sourced and go stale.
   Track spend in tooling (`/cost`, `rtk gain`) instead.
+
+## #git-branch-workflow Feature branch workflow
+
+We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutorials/comparing-workflows/feature-branch-workflow).
+
+- All work happens on feature branches.
+  Changes land on `main` via squash-merges.
+- **One session, one branch.**
+  Within a conversation / session, all work continues on the branch the session is operating on.
+  An AI assistant must not create or switch to a new branch mid-session unless the user explicitly approves the new branch.
+  Layered, unrelated work on a single branch is fine.
+  Whenever a new branch is created, the conversation/session name should reflect the new branch.
