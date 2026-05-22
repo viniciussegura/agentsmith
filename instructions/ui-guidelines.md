@@ -17,14 +17,14 @@ The user should be able to point at the tab-owned region without clicking.
 
 ## #ui-canonical-states Canonical state primitives
 
-The codebase should handle 4 canonical state primitives in a consistent way:
+Handle the 4 canonical state primitives in a consistent way:
 
 1. Loading
 2. Error
 3. Information
 4. Empty
 
-This can be translated into shared components with those states and different representations:
+Provide shared components for these states, with different representations:
 
 1. Inline -- used along text, cells, lists, input fields, etc.
 2. Panel -- used to fill the available space and display the message centered.

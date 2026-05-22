@@ -22,5 +22,5 @@ For example, the observation of *error-proneness* is of negative nature, while t
 
 ## #front-error Error messages
 
-Whenever an error message is displayed, we should strive to make it as human-readable as possible.
+Make every error message as human-readable as possible.
 Additional information for reporting should be available, but initially hidden under a "show more details" or "copy details to clipboard".
