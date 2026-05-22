@@ -28,23 +28,24 @@ Record it the moment it is incurred.
 ## #swe-entity Entity model upkeep
 
 Core entities handled by the solution (sometimes called core concepts or core abstractions) should be documented in `docs/entity-model.md`.
-This file should present a human-readable description of the current model in use by code, using TypeScript documentation.
-This description should reflect how the model should be understood by users, it is **NOT** a documentation of how the model is implemented (_e.g._ not a database schema).
-Every change to the entities schema **MUST** be accompanied by an updated entity model.
+This file presents a human-readable description of the current model, expressed as pure TypeScript types and interfaces.
+The description reflects how users should understand the model.
+It is **NOT** documentation of how the model is implemented (_e.g._ not a database schema).
+Every change to the entity schema **MUST** be accompanied by an updated entity model.
 
 ## #swe-api-first API first
 
-Since API is the contract between providers and consumers, we should take it into special consideration.
-We should design a consistent API, following the best practices for REST API design.
+The API is the contract between providers and consumers, so treat it with special care.
+Design a consistent API following REST API best practices.
 
-The same entity should **not** have multiple versions depending on the endpoint.
-We should thrive to keep a small number of entity variation:
+The same entity must **not** have multiple shapes across endpoints.
+Keep entity variations to a small, fixed set:
 
-1. EntityRef: when it is referenced by another entity and we only need a small set of information for display (_e.g._ only `id` and `name`, to be displayed by the UI)
-2. EntityShort: when a list of entities are provided, to reduce the JSON size.
-3. Entity: when a single instance is requested, can return the complete available information.
-4. EntityPOST / EntityPATCH: used specifically in these endpoints, may have optional fields.
+1. `EntityRef`: when referenced by another entity and only a small set of fields is needed for display (_e.g._ `id` and `name` for the UI).
+2. `EntityShort`: when returned in a list, to reduce JSON size.
+3. `Entity`: when a single instance is requested; may return the complete available information.
+4. `EntityPOST` / `EntityPATCH`: used only in those endpoints; may have optional fields.
 
-Additionally, when returning an instance, the data structure should **not** have optional fields.
-The field may be nullable, but never optional.
-This aids in detecting backend issues earlier, so it always clear when an information should have been returned.
+When returning an instance, the data structure must **not** have optional fields.
+A field may be nullable, but never optional.
+This surfaces backend issues earlier: it is always clear when a value should have been returned.
