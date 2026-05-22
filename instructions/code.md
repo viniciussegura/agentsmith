@@ -1,10 +1,8 @@
-# Code standards instructions
+# Code standards
 
 ## #code-markdown Markdown formatting
 
-- **One sentence per line.**
-  Hard-wrap only at sentence boundaries (a `.`, `?`, or `!` followed by a space and a capital letter, or by end-of-line).
-  Do not wrap by column count.
-- Lists, tables, fenced code blocks, frontmatter, and inline HTML are left alone.
-- When editing any `.md` file, apply the rule to any paragraph you touch.
-- Rendered output is unchanged — this is a diff-friendliness convention, not a rendering change.
+- One sentence per line; hard-wrap only at sentence boundaries, never by column count.
+- Leave lists, tables, fenced code blocks, frontmatter, and inline HTML untouched.
+- When editing a `.md`, apply this to any paragraph you touch.
+- Diff-friendliness only — rendered output is unchanged.

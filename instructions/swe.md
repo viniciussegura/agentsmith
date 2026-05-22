@@ -1,34 +1,26 @@
-# Software engineering instructions
+# Software engineering
 
 ## #swe-environment Environment and secrets
 
-- Environment variables are documented in `.env.example` at the repo root.
+- Env vars are documented in `.env.example` (committed); `.env` is gitignored and loaded automatically by the code.
 - Never commit real secrets.
-  `.env` is gitignored; `.env.example` is committed.
-- The code should read `.env` automatically.
-- **Personal email addresses must never appear in committed files.**
-  When a file requires an author / committer email, use the email configured in `git config user.email`.
-  AI assistants must not substitute a personal email address even if one is visible in the conversation context (`<userEmail>`, memory files, chat history).
-  When in doubt, run `git config user.email` first and use that value.
+- Personal email addresses must never appear in committed files.
+  When a file needs an author or committer email, use the value from `git config user.email`.
+  Do not substitute a personal email seen in conversation context, memory, or chat history.
+  When unsure, run `git config user.email` and use that.
 
 ## #swe-reuse Reuse before creation
 
-Before creating a new component, search the existing codebase for one with the same name or purpose.
+Before creating a component, search the codebase for one with the same name or purpose.
 Two components with the same name in different directories is a bug.
+Serve one concept from a single shared implementation across pages or endpoints rather than duplicating it.
 
-The focus should be on the core concept and feature, not in the instantiation.
-For example, a code that shows a list of the X concept in many different pages (frontend) or endpoints (backend), should strive to have a single shared implementation to serve all locations.
+## #swe-future-work Future work
 
-## #swe-future-work Future work and directions
+Deferred or out-of-scope work goes in `docs/future-work/<YYYY-MM-DD>-<slug>.md`, stating what it is, why it matters, and any constraints or dependencies.
+Record it when the decision to defer is made, not later.
 
-Any deferred work, future direction, or out-of-scope idea worth keeping is registered as its own file under `docs/future-work/`.
-The filename pattern is `<YYYY-MM-DD>-<issue-slug>.md`, where `<YYYY-MM-DD>` is the date the entry is created and `<issue-slug>` is a short kebab-case identifier.
-Each file states what the work is, why it matters, and any known constraints or dependencies.
-Deferred scope is recorded here as soon as the decision to defer is made, not left implicit in conversation or commit messages.
+## #swe-technical-debts Technical debt
 
-## #swe-technical-debts Technical debts
-
-Every consciously accepted shortcut, simplification, or known limitation is registered as its own file under `docs/technical-debts/`.
-The filename pattern is `<YYYY-MM-DD>-<issue-slug>.md`, identical in form to the future-work convention.
-Each file states the debt, the context and reason it was accepted, the cost or risk it carries, and a sketch of how it would be remediated.
-Debt is recorded at the moment it is incurred, not retroactively.
+Each accepted shortcut or known limitation goes in `docs/technical-debts/<YYYY-MM-DD>-<slug>.md`, stating the debt, why it was accepted, its cost or risk, and a remediation sketch.
+Record it the moment it is incurred.
