@@ -1,0 +1,20 @@
+{
+  "name": "agentsmith",
+  "version": "0.1.0",
+  "description": "Canonical agent instructions and a generator that forges AGENTS.md for any project.",
+  "type": "module",
+  "bin": {
+    "agentsmith": "bin/cli.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "build": "node bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "instructions/",
+    "manifest.json"
+  ],
+  "license": "MIT"
+}

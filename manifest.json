@@ -1,0 +1,11 @@
+{
+  "source": "github.com/viniciussegura/agentsmith",
+  "preamble": "instructions/main.md",
+  "modules": [
+    "instructions/git.md",
+    "instructions/swe.md",
+    "instructions/code.md",
+    "instructions/ai.md"
+  ],
+  "output": "AGENTS.md"
+}
