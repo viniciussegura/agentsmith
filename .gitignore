@@ -1,0 +1,7 @@
+node_modules/
+
+# Build artifact: the forged AGENTS.md is generated, never committed here.
+/AGENTS.md
+
+# caveman /compress backups
+*.original.md
