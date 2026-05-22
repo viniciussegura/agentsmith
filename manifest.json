@@ -2,10 +2,12 @@
   "source": "https://github.com/viniciussegura/agentsmith",
   "preamble": "instructions/main.md",
   "modules": [
+    "instructions/ai.md",
+    "instructions/code.md",
+    "instructions/front.md",
     "instructions/git.md",
     "instructions/swe.md",
-    "instructions/code.md",
-    "instructions/ai.md"
+    "instructions/ui-guidelines.md"
   ],
   "output": "AGENTS.md"
 }

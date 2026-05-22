@@ -1,5 +1,23 @@
 # Software engineering
 
+## #swe-agile Agile software development
+
+We should focus on a [Agile software development](https://en.wikipedia.org/wiki/Agile_software_development).
+Especially on these principles:
+
+- **Early and continuous delivery of valuable software + Deliver working software frequently + Working software is the primary measure of progress**
+  We should strive to find the MVPs - minimum viable project for the most valuable product.
+  We should iterate fast and test solutions quickly.
+- **Welcome changing requirements, even in late development**
+  Few things are set in stone and we should revisit assumptions at any time.
+- **Close, daily cooperation between business people and developers**
+  Software is ultimately done for people and by people.
+  We should pay attention to the stakeholders and users, keeping aligned with the work done by developers.
+- **Continuous attention to technical excellence and good design + Simplicity—the art of maximizing the amount of work not done—is essential**
+  Code standards and architecture should only be as complicated as needed, not more.
+- **Reflection on how to become more effective, and adjusts accordingly**
+  If an idea of how to become more effective arises, it should be shared and considered for implementation.
+
 ## #swe-environment Environment and secrets
 
 - Env vars are documented in `.env.example` (committed); `.env` is gitignored and loaded automatically by the code.
