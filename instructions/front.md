@@ -9,14 +9,12 @@ Type labels remain appropriate as *qualifiers* (e.g. a `PageTitle`'s entity-type
 
 ## #front-nielsen-heuristics Usability Heuristics
 
-The UI design should follow the best design heuristics.
-For example, [10 Usability Heuristics for User Interface Design from Nielsen](https://www.nngroup.com/articles/ten-usability-heuristics/):
-
-Many times, design alternatives may present a trade-off between heuristics, and this should be pointed out.
+The UI design should follow established usability heuristics, for example [Nielsen's 10 Usability Heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/).
+Design alternatives often present a trade-off between heuristics; point out the trade-off when it arises.
 
 ## #front-cdn Cognitive dimensions of notations
 
-In addition to #front-nielsen-heuristics, another vocabulary that may be used for analyzing design alternatives is [Cognitive dimensions of notations](https://en.wikipedia.org/wiki/Cognitive_dimensions_of_notations):
+In addition to #front-nielsen-heuristics, another vocabulary for analyzing design alternatives is [Cognitive dimensions of notations](https://en.wikipedia.org/wiki/Cognitive_dimensions_of_notations).
 
 Similar to #front-nielsen-heuristics, when analyzing design alternatives, a trade-off between dimensions may ensue.
 Moreover, pay attention that not all dimensions have positive meanings, *i.e.* the observance/non-observance of a dimension may be of a positive or negative nature.
@@ -24,5 +22,5 @@ For example, the observation of *error-proneness* is of negative nature, while t
 
 ## #front-error Error messages
 
-Whenever an error message is displayed, we should strive to make it as human-readable possible.
+Whenever an error message is displayed, we should strive to make it as human-readable as possible.
 Additional information for reporting should be available, but initially hidden under a "show more details" or "copy details to clipboard".
