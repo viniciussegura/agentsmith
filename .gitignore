@@ -1,4 +1,5 @@
 node_modules/
+.claude/
 
 # Build artifact: the forged AGENTS.md is generated, never committed here.
 /AGENTS.md
