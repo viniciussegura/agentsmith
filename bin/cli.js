@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { generate } from '../src/generate.js';
@@ -9,10 +10,27 @@ const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(join(pkgRoot, 'manifest.json'), 'utf8'));
 const read = (rel) => readFileSync(join(pkgRoot, rel), 'utf8');
 
+// Stamp the header with the source revision. Describes the instruction repo
+// (pkgRoot), not the consumer's project. Silently skipped outside a git repo.
+function sourceRevision() {
+  const git = (args) => execFileSync('git', args, { cwd: pkgRoot }).toString().trim();
+  try {
+    const commit = git(['rev-parse', '--short', 'HEAD']);
+    const date = git(['log', '-1', '--format=%cd', '--date=short']);
+    const dirty = git(['status', '--porcelain']) !== '';
+    return { commit: dirty ? `${commit}-dirty` : commit, date };
+  } catch {
+    return {};
+  }
+}
+
+const { commit, date } = sourceRevision();
 const output = generate({
   preamble: read(manifest.preamble),
   modules: manifest.modules.map(read),
   source: manifest.source,
+  commit,
+  date,
 });
 
 const args = process.argv.slice(2);

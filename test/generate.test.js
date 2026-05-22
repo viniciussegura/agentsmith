@@ -30,6 +30,27 @@ test('prepends a do-not-edit header naming the source', () => {
   assert.match(header, /github\.com\/example\/agentsmith/, 'header names the source');
 });
 
+test('header records the source commit and date when provided', () => {
+  const out = generate({
+    preamble: 'P',
+    modules: ['M'],
+    source: 'github.com/example/agentsmith',
+    commit: 'abc1234',
+    date: '2026-05-22',
+  });
+
+  const header = out.slice(0, out.indexOf('P'));
+  assert.match(header, /abc1234/, 'header names the source commit');
+  assert.match(header, /2026-05-22/, 'header names the source date');
+});
+
+test('header omits the revision line when no commit is provided', () => {
+  const out = generate({ preamble: 'P', modules: ['M'], source: 's' });
+
+  const header = out.slice(0, out.indexOf('P'));
+  assert.doesNotMatch(header, /revision/i, 'no revision line without a commit');
+});
+
 test('separates blocks with a blank line so markdown does not collide', () => {
   const out = generate({
     preamble: 'P',
