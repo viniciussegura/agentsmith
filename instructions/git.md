@@ -18,10 +18,11 @@
 | AI | `🤖 feat(backend): Added cursor pagination to the list API` |
 | Human | `docs: Split README into docs/getting-started.md` |
 
-## #git-usage Usage reporting
+## #git-usage Authorship reporting
 
 - AI commits add a trailer after `Co-Authored-By:`: `Usage: model=<model-id>` (e.g. `claude-opus-4-7[1m]`).
   Multiple models: `model=opus-4.7; subagents=sonnet-4.6 x3`.
   The `Co-Authored-By:` line names the same (or dominant) model.
-- AI PR bodies end with a `## Usage` section aggregating model(s), total tokens, and wall-clock time.
-  Use only real numbers from tooling (`/cost`, `rtk gain`); omit a field rather than estimate it.
+- AI PR bodies note the model(s) used.
+- No token or time figures in git — they cannot be reliably sourced and go stale.
+  Track spend in tooling (`/cost`, `rtk gain`) instead.

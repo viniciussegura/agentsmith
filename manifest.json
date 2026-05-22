@@ -1,5 +1,5 @@
 {
-  "source": "github.com/viniciussegura/agentsmith",
+  "source": "https://github.com/viniciussegura/agentsmith",
   "preamble": "instructions/main.md",
   "modules": [
     "instructions/git.md",
