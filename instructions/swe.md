@@ -49,3 +49,55 @@ Keep entity variations to a small, fixed set:
 When returning an instance, the data structure must **not** have optional fields.
 A field may be nullable, but never optional.
 This surfaces backend issues earlier: it is always clear when a value should have been returned.
+
+Worked example — one entity through its variations, `Ref ⊂ Short ⊂ Entity`:
+
+```typescript
+interface UserRef {
+  id: string;
+  name: string;
+}
+
+interface UserShort {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null; // nullable on responses, never optional
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  createdAt: string;
+}
+
+interface UserPOST {
+  name: string;
+  email: string;
+  bio?: string; // optional allowed on request bodies only
+}
+
+// UserRef appears INSIDE another entity, never fetched on its own:
+interface Task {
+  id: string;
+  title: string;
+  assignee: UserRef;
+}
+```
+
+Each variation maps to a call site:
+
+| Endpoint | Request body | Response |
+|---|---|---|
+| `GET /users` | — | `UserShort[]` |
+| `GET /users/:id` | — | `User` |
+| `POST /users` | `UserPOST` | `User` |
+| `PATCH /users/:id` | `UserPATCH` | `User` |
+| `GET /tasks/:id` | — | `Task` (embeds `assignee: UserRef`) |
+
+- `EntityRef` has no endpoint of its own — it only fills a nested slot.
+- Lists return `EntityShort`, single fetches return the full `Entity`; the same entity never changes shape at one call type.
+- Write endpoints accept `POST` / `PATCH` bodies and return the full `Entity`, so the client gets server-set fields (`id`, `createdAt`) back.
