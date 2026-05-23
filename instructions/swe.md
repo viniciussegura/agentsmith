@@ -118,3 +118,9 @@ Each variation maps to a call site:
 - `EntityRef` has no endpoint of its own — it only fills a nested slot.
 - Lists return `EntityShort`, single fetches return the full `Entity`; the same entity never changes shape at one call type.
 - Write endpoints accept `POST` / `PATCH` bodies and return the full `Entity`, so the client gets server-set fields (`id`, `createdAt`) back.
+
+## #swe-docs-drift Documentation drift
+
+Before opening or updating a PR, check for documentation drift — any doc the change has made stale.
+Fix it in the same PR, before opening or updating.
+This includes — but is not limited to — the entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, and files under `docs/`.
