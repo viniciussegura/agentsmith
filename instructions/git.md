@@ -4,7 +4,7 @@
 
 - Conventional Commits: `<type>(<scope>): <subject>`, where `<type>` is one of `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `perf`, `ci`, `build`.
 - `<subject>` is sentence case, past tense (what was done).
-- Prefix AI-authored commits and PR titles with `🤖 ` — a marker that keeps history honest about who wrote what.
+- Prefix AI-authored commits and PR titles with `🤖 ` -- a marker that keeps history honest about who wrote what.
 
 | Author | Subject |
 |---|---|
@@ -17,7 +17,7 @@
   Multiple models: `model=opus-4.7; subagents=sonnet-4.6 x3`.
   The `Co-Authored-By:` line names the same (or dominant) model.
 - AI PR bodies note the model(s) used.
-- No token or time figures in git — they cannot be reliably sourced and go stale.
+- No token or time figures in git -- they cannot be reliably sourced and go stale.
   Track spend in tooling (`/cost`, `rtk gain`) instead.
 
 ## #git-branch-workflow Branch workflow
@@ -29,7 +29,7 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
 - A branch's scope is its logical unit, which may be wider than one feature.
   Implementing a feature often surfaces related issues; fixing them on the same branch is expected.
   A branch may also bundle deliberately, _e.g._ a "release revision" collecting several fixes.
-  Layered work on one branch is fine — it squashes into a single commit by design.
+  Layered work on one branch is fine -- it squashes into a single commit by design.
 - **One session, one branch.**
   Within a conversation / session, all work continues on the branch the session is operating on.
   An AI assistant must **not** create or switch to a new branch mid-session unless the user explicitly approves it.
