@@ -1,5 +1,7 @@
 # UI Guidelines
 
+Concrete, implementable UI patterns. The principles behind them: `#front-nielsen-heuristics`, `#front-cdn`, `#front-display-labels`.
+
 ## #ui-header-visibility Breadcrumb and page title stay in the viewport
 
 **Rule.** On every routed page, the breadcrumb trail and the page title MUST remain visible as the user scrolls.

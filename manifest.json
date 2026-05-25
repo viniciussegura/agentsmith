@@ -4,9 +4,9 @@
   "modules": [
     "instructions/ai.md",
     "instructions/code.md",
-    "instructions/front.md",
     "instructions/git.md",
     "instructions/swe.md",
+    "instructions/front.md",
     "instructions/ui-guidelines.md"
   ],
   "output": "AGENTS.md"

@@ -1,5 +1,7 @@
 # Front-end instructions
 
+Abstract front-end and HCI principles. Concrete, implementable patterns live in the `#ui-*` rules.
+
 ## #front-display-labels Display labels
 
 Wherever an entity instance is represented in the UI the visible text resolves to that entity's natural name.
