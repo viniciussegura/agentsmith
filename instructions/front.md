@@ -7,7 +7,7 @@ Concrete, implementable patterns live in the `#ui-*` rules.
 
 Wherever an entity instance is represented in the UI the visible text resolves to that entity's natural name.
 Static type labels and internal IDs are **not** acceptable substitutes.
-While the name is loading, render a skeleton placeholder or an em-dash -- never a fallback string of the entity type.
+While the name is loading, render a skeleton placeholder or an em-dash glyph (`—`), never a fallback string of the entity type.
 Type labels remain appropriate as *qualifiers* (e.g. a `PageTitle`'s entity-type prefix above the name, or a column header "Task"); the rule covers slots where the *instance* is what should appear.
 
 ## #front-nielsen-heuristics Usability Heuristics
@@ -25,5 +25,5 @@ For example, the observation of *error-proneness* is of negative nature, while t
 
 ## #front-display-messages Display messages
 
-Make every display message (specially information, warning, and error messages) as human-readable as possible.
+Make every display message (especially information, warning, and error messages) as human-readable as possible.
 Additional information for reporting should be available (_e.g._ call stack for errors, raw return from backend), but initially hidden under a "show more details" or "copy details to clipboard".

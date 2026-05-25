@@ -32,12 +32,12 @@ Provide shared components for these states, with different representations:
 2. Panel -- used to fill the available space and display the message centered.
 3. Card -- used to have a designated (wide) space displayed with other components.
 
-The component may have the following features: 
+The component may have the following features:
 
 - `title`: highlight text to be displayed, should be short and straight-to-the-point
-- `subtitle`: (optional) additional text to be displayed, can provide more information abouth what happened.
+- `subtitle`: (optional) additional text to be displayed, can provide more information about what happened.
   May be a little longer, but not with all details
-- `actions`: (optional)  call to possible actions given the message.
+- `actions`: (optional) calls to the available actions given the message.
   For each action, it should be provided:
   - `label`: text to be displayed.
   - `callback`: callback to be called when action is triggered.
