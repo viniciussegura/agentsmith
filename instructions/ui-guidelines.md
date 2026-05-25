@@ -1,6 +1,7 @@
 # UI Guidelines
 
-Concrete, implementable UI patterns. The principles behind them: `#front-nielsen-heuristics`, `#front-cdn`, `#front-display-labels`.
+Concrete, implementable UI patterns.
+The principles behind them: `#front-nielsen-heuristics`, `#front-cdn`, `#front-display-labels`.
 
 ## #ui-header-visibility Breadcrumb and page title stay in the viewport
 
@@ -19,12 +20,11 @@ The user should be able to point at the tab-owned region without clicking.
 
 ## #ui-canonical-states Canonical state primitives
 
-Handle the 4 canonical state primitives in a consistent way:
+Handle the 3 canonical state primitives in a consistent way:
 
-1. Loading
-2. Error
-3. Information
-4. Empty
+1. Loading -- transient state
+2. Success/Information/Warning/Error -- terminal state
+3. Empty -- terminal state with no data
 
 Provide shared components for these states, with different representations:
 
@@ -32,11 +32,26 @@ Provide shared components for these states, with different representations:
 2. Panel -- used to fill the available space and display the message centered.
 3. Card -- used to have a designated (wide) space displayed with other components.
 
-The component may have the following features: `title` / `subtitle` / `actionLabel` / `onAction` / `actionIcon`.
+The component may have the following features: 
+
+- `title`: highlight text to be displayed, should be short and straight-to-the-point
+- `subtitle`: (optional) additional text to be displayed, can provide more information abouth what happened.
+  May be a little longer, but not with all details
+- `actions`: (optional)  call to possible actions given the message.
+  For each action, it should be provided:
+  - `label`: text to be displayed.
+  - `callback`: callback to be called when action is triggered.
+  - `icon`: (optional) icon to be displayed next to the action
+  - `type`: (optional) type of action, mapped to the button types available in the UI system (_e.g._ primary, secondary, ghost).
+- `additionalInformation`: (optional) information to be displayed under a "show more information" button, usually expanding the component to show it.
+- `errorObj`: (only for error type, mandatory) additional error object to be copied to clipboard providing additional details about the error to the **developer**.
+  Should contain both the "raw" error, but also additional information such as timestamp, url that triggered the error, user, additional context, call stack, etc.
+
+These canonical states should follow #front-display-messages instructions.
 
 ## #ui-validation Validation errors stay close to their cause
 
-**Rule.** Render validation errors next to the input that caused them.
+**Rule.** Render validation errors next to the input that caused them, using #ui-canonical-states if not handled by the input itself.
 Do not surface a top-of-form summary banner unless the error is genuinely cross-cutting (touches multiple fields and cannot be pinned to one).
 
 **Why.** When a field is invalid, the user looks at the field, not the top of the form.

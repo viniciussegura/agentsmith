@@ -2,7 +2,8 @@
 
 ## #ai-conversational Communication and token use
 
-- Default to direct, terse, to-the-point communication; drop filler, padding, pleasantries, and hedging. Fragments are fine when the meaning is clear.
+- Default to direct, terse, to-the-point communication; drop filler, padding, pleasantries, and hedging.
+  Fragments are fine when the meaning is clear.
 - Be conscious of token usage: terse agent-to-agent messages, efficient command use, and the cheapest model that fits the task.
 - Signal before starting any task expected to incur heavy token usage.
 

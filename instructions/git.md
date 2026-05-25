@@ -1,12 +1,5 @@
 # Git
 
-## #git-workflow Workflow
-
-- Commit and push granularity is free — as many as the logical units demand.
-- Never rewrite published history.
-  Once pushed (any branch, including feature branches) a commit is append-only: no `git push --force`, no `--force-with-lease`, no rebase or reset of pushed commits.
-  Local-only commits may be amended or reordered until the next push.
-
 ## #git-format Commit and PR title format
 
 - Conventional Commits: `<type>(<scope>): <subject>`, where `<type>` is one of `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `perf`, `ci`, `build`.
@@ -42,3 +35,8 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
   An AI assistant must **not** create or switch to a new branch mid-session unless the user explicitly approves it.
 - A branch name should reflect its unit of work.
   When the tooling allows it, the session name should match the branch.
+- Commit and push granularity is free -- as many as the logical units demand.
+  Pre-merge granularity is free; squash collapses it at merge.
+- **Never** rewrite published history.
+  Once pushed (any branch, including feature branches) a commit is append-only: no `git push --force`, no `--force-with-lease`, no rebase or reset of pushed commits.
+  Local-only commits may be amended or reordered until the next push.

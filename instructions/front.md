@@ -1,6 +1,7 @@
 # Front-end instructions
 
-Abstract front-end and HCI principles. Concrete, implementable patterns live in the `#ui-*` rules.
+Abstract front-end and HCI principles.
+Concrete, implementable patterns live in the `#ui-*` rules.
 
 ## #front-display-labels Display labels
 
@@ -22,7 +23,7 @@ Similar to #front-nielsen-heuristics, when analyzing design alternatives, a trad
 Moreover, pay attention that not all dimensions have positive meanings, *i.e.* the observance/non-observance of a dimension may be of a positive or negative nature.
 For example, the observation of *error-proneness* is of negative nature, while the observation of *consistency* is of positive nature.
 
-## #front-error Error messages
+## #front-display-messages Display messages
 
-Make every error message as human-readable as possible.
-Additional information for reporting should be available, but initially hidden under a "show more details" or "copy details to clipboard".
+Make every display message (specially information, warning, and error messages) as human-readable as possible.
+Additional information for reporting should be available (_e.g._ call stack for errors, raw return from backend), but initially hidden under a "show more details" or "copy details to clipboard".
