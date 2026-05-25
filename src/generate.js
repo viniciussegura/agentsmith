@@ -20,9 +20,30 @@ export function generate({ preamble, modules = [], source, commit, date }) {
     "     Edit the source instructions and re-run the generator. -->",
   ].join("\n");
 
-  const blocks = [preamble, ...modules]
-    .map((block) => String(block).trim())
+  const blocks = [String(preamble), ...modules.map(demoteHeadings)]
+    .map((block) => block.trim())
     .filter(Boolean);
 
   return [header, ...blocks].join("\n\n") + "\n";
+}
+
+/**
+ * Demote every ATX heading one level (`#` -> `##`, up to h5 -> h6) so an
+ * inlined module's own h1 title nests under the preamble's single h1.
+ *
+ * Headings inside fenced code blocks (``` or ~~~) are left untouched.
+ *
+ * @param {string} markdown  A module's source text.
+ * @returns {string} The module with its headings demoted.
+ */
+function demoteHeadings(markdown) {
+  let inFence = false;
+  return String(markdown)
+    .split("\n")
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+      if (inFence) return line;
+      return line.replace(/^(#{1,5})(\s)/, "#$1$2");
+    })
+    .join("\n");
 }

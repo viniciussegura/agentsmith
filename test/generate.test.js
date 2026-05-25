@@ -75,3 +75,27 @@ test('trims trailing whitespace from each block before joining', () => {
   });
   assert.ok(!/\n{3,}/.test(out), 'no runs of 3+ newlines');
 });
+
+test('demotes module headings by one level so only the preamble owns an h1', () => {
+  const out = generate({
+    preamble: '# Agent instructions\n\nIntro.',
+    modules: ['# Software engineering\n\n## #swe-done Definition'],
+    source: 's',
+  });
+
+  assert.match(out, /^# Agent instructions$/m, 'preamble h1 is preserved');
+  assert.match(out, /^## Software engineering$/m, 'module h1 becomes h2');
+  assert.match(out, /^### #swe-done Definition$/m, 'module h2 becomes h3');
+  assert.doesNotMatch(out, /^# Software engineering$/m, 'no module h1 remains');
+});
+
+test('does not demote headings inside fenced code blocks', () => {
+  const out = generate({
+    preamble: 'P',
+    modules: ['# Title\n\n```md\n# Not a heading\n```'],
+    source: 's',
+  });
+
+  assert.match(out, /^## Title$/m, 'real heading demoted');
+  assert.match(out, /^# Not a heading$/m, 'fenced content untouched');
+});
