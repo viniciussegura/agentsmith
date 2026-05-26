@@ -30,6 +30,10 @@ const layout = has('--full') || has('--inline') ? 'full' : 'lean';
 const placement = has('--root') ? 'root' : 'nested';
 const outIdx = args.indexOf('--out');
 const out = outIdx !== -1 ? args[outIdx + 1] : undefined;
+if (outIdx !== -1 && (out === undefined || out.startsWith('--'))) {
+  process.stderr.write('agentsmith: error -- --out requires a path argument\n');
+  process.exit(1);
+}
 
 const { commit, date } = sourceRevision();
 const built = buildOutputs({
