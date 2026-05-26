@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { generate } from '../src/generate.js';
+import { buildOutputs } from '../src/build.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,22 +24,57 @@ function sourceRevision() {
   }
 }
 
+const args = process.argv.slice(2);
+const has = (flag) => args.includes(flag);
+const layout = has('--full') || has('--inline') ? 'full' : 'lean';
+const placement = has('--root') ? 'root' : 'nested';
+const outIdx = args.indexOf('--out');
+const out = outIdx !== -1 ? args[outIdx + 1] : undefined;
+
 const { commit, date } = sourceRevision();
-const output = generate({
+const built = buildOutputs({
   preamble: read(manifest.preamble),
   modules: manifest.modules.map(read),
+  bundles: (manifest.bundles || []).map((b) => ({
+    name: b.name,
+    title: b.title,
+    when: b.when,
+    modules: b.modules.map(read),
+  })),
   source: manifest.source,
   commit,
   date,
+  layout,
+  placement,
+  output: manifest.output,
+  out,
 });
 
-const args = process.argv.slice(2);
-if (args.includes('--stdout')) {
-  process.stdout.write(output);
+if (built.dangling.length) {
+  process.stderr.write(
+    `agentsmith: warning -- unresolved #tag references: ${built.dangling.join(', ')}\n`,
+  );
+}
+
+if (has('--stdout')) {
+  process.stdout.write(built.coreContent);
 } else {
-  const outIdx = args.indexOf('--out');
-  const name = outIdx !== -1 ? args[outIdx + 1] : manifest.output;
-  const dest = resolve(process.cwd(), name); // written into the consumer project
-  writeFileSync(dest, output);
-  process.stderr.write(`agentsmith: wrote ${dest}\n`);
+  const writeOut = (rel, content) => {
+    const dest = resolve(process.cwd(), rel);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, content);
+    process.stderr.write(`agentsmith: wrote ${dest}\n`);
+  };
+
+  writeOut(built.corePath, built.coreContent);
+  for (const bundle of built.bundles) writeOut(bundle.path, bundle.content);
+
+  if (built.stub) {
+    const stubDest = resolve(process.cwd(), built.stub.path);
+    if (existsSync(stubDest)) {
+      process.stderr.write(`agentsmith: kept existing ${stubDest}\n`);
+    } else {
+      writeOut(built.stub.path, built.stub.content);
+    }
+  }
 }
