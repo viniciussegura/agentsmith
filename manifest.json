@@ -5,9 +5,18 @@
     "instructions/ai.md",
     "instructions/code.md",
     "instructions/git.md",
-    "instructions/swe.md",
-    "instructions/front.md",
-    "instructions/ui-guidelines.md"
+    "instructions/swe.md"
+  ],
+  "bundles": [
+    {
+      "name": "frontend",
+      "title": "Front-end instructions",
+      "when": "Front-end or UI work",
+      "modules": [
+        "instructions/front.md",
+        "instructions/ui-guidelines.md"
+      ]
+    }
   ],
   "output": "AGENTS.md"
 }
