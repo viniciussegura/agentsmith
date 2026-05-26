@@ -50,10 +50,10 @@ export function buildOutputs({
     const allModules = [...modules, ...bundles.flatMap((b) => b.modules)];
     coreContent = generate({ preamble, modules: allModules, source, commit, date });
   } else {
-    const index = onDemandIndex(
-      bundles.map((b) => ({ when: b.when, href: hrefFor(b.name) })),
-    );
-    coreContent = generate({ preamble, modules: [...modules, index], source, commit, date });
+    const indexModules = bundles.length
+      ? [onDemandIndex(bundles.map((b) => ({ when: b.when, href: hrefFor(b.name) })))]
+      : [];
+    coreContent = generate({ preamble, modules: [...modules, ...indexModules], source, commit, date });
     bundleFiles = bundles.map((b) => ({
       path: `${BUNDLE_DIR}/${b.name}.md`,
       content: generate({

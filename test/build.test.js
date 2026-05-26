@@ -79,3 +79,42 @@ test('dangling tag references are surfaced', () => {
   });
   assert.ok(out.dangling.includes('core-ghost'));
 });
+
+test('lean with no bundles emits no on-demand index and no bundle files', () => {
+  const out = buildOutputs({ ...base, bundles: [], layout: 'lean', placement: 'nested' });
+  assert.equal(out.bundles.length, 0);
+  assert.doesNotMatch(out.coreContent, /#on-demand/);
+  assert.doesNotMatch(out.coreContent, /On-demand instructions/);
+});
+
+test('out override sets corePath and suppresses the stub', () => {
+  const out = buildOutputs({ ...base, layout: 'lean', placement: 'nested', out: 'custom/AGENTS.md' });
+  assert.equal(out.corePath, 'custom/AGENTS.md');
+  assert.equal(out.stub, null);
+  assert.match(out.coreContent, /\.agentsmith\/agents\/frontend\.md/, 'bundle href still reaches .agentsmith');
+});
+
+test('multi-bundle lean lists every bundle href', () => {
+  const out = buildOutputs({
+    ...base,
+    bundles: [
+      { name: 'frontend', title: 'F', when: 'FE work', modules: ['# F\n\n## #f-a A'] },
+      { name: 'backend', title: 'B', when: 'BE work', modules: ['# B\n\n## #b-a A'] },
+    ],
+    layout: 'lean',
+    placement: 'nested',
+  });
+  assert.equal(out.bundles.length, 2);
+  assert.match(out.coreContent, /agents\/frontend\.md/);
+  assert.match(out.coreContent, /agents\/backend\.md/);
+});
+
+test('bundle title falls back to name when title is absent', () => {
+  const out = buildOutputs({
+    ...base,
+    bundles: [{ name: 'frontend', when: 'FE work', modules: ['# F\n\n## #f-a A'] }],
+    layout: 'lean',
+    placement: 'nested',
+  });
+  assert.match(out.bundles[0].content, /^# frontend$/m);
+});
