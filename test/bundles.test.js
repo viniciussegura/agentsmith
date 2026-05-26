@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { onDemandIndex } from '../src/bundles.js';
+import { danglingTags } from '../src/bundles.js';
 
 test('onDemandIndex renders an h1, the tag, a MUST directive, and one bullet per entry', () => {
   const md = onDemandIndex([
@@ -20,4 +21,28 @@ test('onDemandIndex renders one bullet per entry', () => {
   ]);
   const bullets = md.split('\n').filter((l) => l.startsWith('- '));
   assert.equal(bullets.length, 2);
+});
+
+test('danglingTags reports a referenced tag that is defined nowhere', () => {
+  const result = danglingTags({
+    coreText: '## #swe-done Done\n\nSee #swe-missing for details.',
+    bundleTexts: [],
+  });
+  assert.deepEqual(result, ['swe-missing']);
+});
+
+test('danglingTags resolves a tag defined in a bundle', () => {
+  const result = danglingTags({
+    coreText: 'Follow #front-a11y when building UI.',
+    bundleTexts: ['## #front-a11y Accessibility\n\nTarget WCAG.'],
+  });
+  assert.deepEqual(result, []);
+});
+
+test('danglingTags ignores tokens inside fenced code blocks', () => {
+  const result = danglingTags({
+    coreText: '## #real Tag\n\n```\n#fake-tag should be ignored\n```',
+    bundleTexts: [],
+  });
+  assert.deepEqual(result, []);
 });
