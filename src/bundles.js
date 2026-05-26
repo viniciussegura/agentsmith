@@ -41,7 +41,10 @@ export function danglingTags({ coreText, bundleTexts = [] }) {
       if (inFence) continue;
 
       const def = line.match(/^#{1,6}\s+#([a-z][a-z0-9-]+)\b/i);
-      if (def) defined.add(def[1].toLowerCase());
+      if (def) {
+        defined.add(def[1].toLowerCase());
+        continue;
+      }
 
       for (const m of line.matchAll(/#([a-z][a-z0-9-]+)\b/gi)) {
         referenced.add(m[1].toLowerCase());

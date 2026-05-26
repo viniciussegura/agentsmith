@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { onDemandIndex } from '../src/bundles.js';
-import { danglingTags } from '../src/bundles.js';
+import { onDemandIndex, danglingTags } from '../src/bundles.js';
 
 test('onDemandIndex renders an h1, the tag, a MUST directive, and one bullet per entry', () => {
   const md = onDemandIndex([
