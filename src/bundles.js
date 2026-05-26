@@ -46,7 +46,10 @@ export function danglingTags({ coreText, bundleTexts = [] }) {
         continue;
       }
 
-      for (const m of line.matchAll(/#([a-z][a-z0-9-]+)\b/gi)) {
+      // Strip inline code spans: a tag mentioned in backticks (a `#tag`
+      // placeholder, a `#ui-*` glob) is prose, not a real cross-reference.
+      const scan = line.replace(/`[^`]*`/g, '');
+      for (const m of scan.matchAll(/#([a-z][a-z0-9-]+)\b/gi)) {
         referenced.add(m[1].toLowerCase());
       }
     }

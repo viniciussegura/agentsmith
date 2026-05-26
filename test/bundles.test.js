@@ -45,3 +45,11 @@ test('danglingTags ignores tokens inside fenced code blocks', () => {
   });
   assert.deepEqual(result, []);
 });
+
+test('danglingTags ignores tag mentions inside inline backtick spans', () => {
+  const result = danglingTags({
+    coreText: 'The `#ui-*` glob and `#tag` placeholder are prose, not references.',
+    bundleTexts: [],
+  });
+  assert.deepEqual(result, [], 'backtick-wrapped mentions are not real references');
+});
