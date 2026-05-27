@@ -38,7 +38,7 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
   Layered work on one branch is fine -- it squashes into a single commit by design.
 - **One session, one branch.**
   Within a conversation / session, all work continues on the branch the session is operating on.
-  An AI assistant must **not** create or switch to a new branch mid-session unless the user explicitly approves it.
+  An AI assistant **MUST NOT** create or switch to a new branch mid-session unless the user explicitly approves it.
 - A branch name should reflect its unit of work.
   When the tooling allows it, the session name should match the branch.
 - Commit and push granularity is free -- as many as the logical units demand.

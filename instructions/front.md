@@ -6,7 +6,7 @@ Concrete, implementable patterns live in the `#ui-*` rules.
 ## #front-display-labels Display labels
 
 Wherever an entity instance is represented in the UI the visible text resolves to that entity's natural name.
-Static type labels and internal IDs are **not** acceptable substitutes.
+**Never** use static type labels or internal IDs as substitutes.
 While the name is loading, render a skeleton placeholder or an em-dash glyph (`—`), never a fallback string of the entity type.
 Type labels remain appropriate as *qualifiers* (e.g. a `PageTitle`'s entity-type prefix above the name, or a column header "Task"); the rule covers slots where the *instance* is what should appear.
 
@@ -27,4 +27,4 @@ Every interactive element is keyboard-reachable and operable; visible focus is n
 Use semantic HTML first; reach for ARIA only to fill gaps, never to override native semantics.
 Every input has a programmatic label; every meaningful image has alt text; decorative images are marked empty.
 Meet contrast ratios: 4.5:1 for body text, 3:1 for large text and UI affordances.
-Never convey state by color alone -- pair it with text or an icon.
+**Never** convey state by color alone -- pair it with text or an icon.

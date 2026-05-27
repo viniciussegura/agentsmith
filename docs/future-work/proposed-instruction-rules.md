@@ -20,9 +20,8 @@ Each entry carries a drop-in, house-style block once the rule is concrete enough
 | 8 | `#front-i18n` | `front.md` (frontend bundle) | localization | ready |
 | 9 | `#swe-perf` | `swe.md` | performance budgets | ready |
 
-Adopted since last roll: none. Existing rules were tightened (`#swe-reuse` scope, `#swe-api-first` style-neutrality, a normative-voice pass), and the review gained the Lean-split integrity and Normative voice dimensions.
-The rule set is self-consistent: 32 sections, every `#tag` resolves, no dangling references.
-Open polish (a fix to existing rules, not a proposal): a few prohibitions still use partial-bold `must **not**` (swe.md:41,49; git.md:41) or plain `Never` (front.md:30); normalize to `**MUST NOT**` / `**Never**`.
+Adopted since last roll: none. Existing rules were tightened (`#swe-reuse` scope, `#swe-api-first` style-neutrality), the normative voice normalized to bold `**MUST**` / `**MUST NOT**` / `**Never**`, and the review gained the Lean-split integrity and Normative voice dimensions.
+The rule set is self-consistent: 32 sections, every `#tag` resolves, no dangling references, normative voice uniform.
 
 ---
 

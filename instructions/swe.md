@@ -38,7 +38,7 @@ Every change to the entity schema **MUST** be accompanied by an updated entity m
 The API is the contract between providers and consumers, so treat it with special care.
 Design a consistent API following established best practices for its style (REST, GraphQL, gRPC); the entity-variation rules below hold whatever the style.
 
-The same entity must **not** have multiple shapes across endpoints.
+The same entity **MUST NOT** have multiple shapes across endpoints.
 Keep entity variations to a small, fixed set:
 
 1. `EntityRef`: when referenced by another entity and only a small set of fields is needed for display (_e.g._ `id` and `name` for the UI).
@@ -46,7 +46,7 @@ Keep entity variations to a small, fixed set:
 3. `Entity`: when a single instance is requested; may return the complete available information.
 4. `EntityPOST` / `EntityPATCH`: used only in those endpoints; may have optional fields.
 
-When returning an instance, the data structure must **not** have optional fields.
+When returning an instance, the data structure **MUST NOT** have optional fields.
 A field may be nullable, but never optional.
 This surfaces backend issues earlier: it is always clear when a value should have been returned.
 
