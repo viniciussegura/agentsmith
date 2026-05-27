@@ -19,8 +19,9 @@ Each entry carries a drop-in, house-style block once the rule is concrete enough
 | 7 | `#front-i18n` | `front.md` (frontend bundle) | localization | ready |
 | 8 | `#swe-perf` | `swe.md` | performance budgets | ready |
 
-Adopted since last roll (removed from backlog): `#swe-security`, `#front-a11y`, `#swe-done`, `#swe-errors`, `#swe-deps`, `#git-pr-body`.
-The earlier dangling `#swe-ci` reference is resolved by softening `#swe-security` to name no CI tag, so `#swe-ci` is now purely additive and optional, not a fix.
+Adopted since last roll: none -- this round was fixes and tightening to existing rules (#swe-agile, #front-cdn, #swe-done, #swe-security), not new adoptions.
+The `#swe-ci` reference once dangling in #swe-security is resolved (the line is now CI-conditional and names no tag), so `#swe-ci` stays purely additive and optional.
+Note for next roll: display-messages was relocated from the frontend bundle into core as `#swe-display-messages`; the old `#front-display-messages` tag no longer exists.
 
 ---
 
