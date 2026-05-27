@@ -2,20 +2,12 @@
 
 ## #swe-agile Agile software development
 
-Follow [Agile software development](https://en.wikipedia.org/wiki/Agile_software_development), especially these principles:
-
-- **Early and continuous delivery of valuable software + Deliver working software frequently + Working software is the primary measure of progress**
-  Find the MVP -- the minimum viable product that delivers the most value.
-  Iterate fast and test solutions quickly.
-- **Welcome changing requirements, even in late development**
-  Few things are set in stone; revisit assumptions at any time.
-- **Close, daily cooperation between business people and developers**
-  Software is ultimately done for people and by people.
-  Pay attention to stakeholders and users; keep aligned with the work done by developers.
-- **Continuous attention to technical excellence and good design + Simplicity--the art of maximizing the amount of work not done--is essential**
-  Code standards and architecture should only be as complicated as needed, not more.
-- **Reflection on how to become more effective, and adjust accordingly**
-  If an idea of how to become more effective arises, it should be shared and considered for implementation.
+Follow [Agile software development](https://en.wikipedia.org/wiki/Agile_software_development):
+- Ship the smallest slice that delivers real value, then iterate -- working software is the measure of progress, not plans or docs.
+- Treat requirements as provisional: revisit assumptions when evidence changes, even late in the work.
+- Stay aligned with the people the software is for -- check direction with stakeholders and users, don't build in a vacuum.
+- Keep code and architecture only as complex as the problem demands; simplicity (YAGNI) is the default.
+- When you find a way to work more effectively, raise it.
 
 ## #swe-reuse Reuse before creation
 
@@ -130,8 +122,13 @@ This includes -- but is not limited to -- the entity model (#swe-entity), any `R
 Beyond secrets (#swe-environment), treat all external input as untrusted: validate and sanitize at the boundary.
 Never log secrets, tokens, or personal data; redact before logging.
 Parameterize queries; never build SQL or shell commands by string concatenation.
-Run a dependency vulnerability scan in CI (#swe-ci) and clear criticals before merge.
-If there is an authentication and authorization layer, enforce them on every endpoint that exposes data or mutations; deny by default.
+IF CI is available, run a dependency vulnerability scan in CI and clear criticals before merge.
+If there are authentication and authorization layers, enforce them on every endpoint that exposes data or mutations; deny by default.
+
+## #swe-display-messages Display messages
+
+Make every display message (especially information, warning, and error messages) as human-readable as possible.
+Additional information for reporting should be available (_e.g._ call stack for errors, raw return from backend), but initially hidden under a "show more details" or "copy details to clipboard".
 
 ## #swe-errors Error handling and logging
 
@@ -139,7 +136,7 @@ Never silently swallow an error: handle it, or propagate it with context added.
 Fail loud in development; degrade gracefully in production.
 Log at the right level -- `error` for actionable failures, `warn` for recoverable anomalies, `info` for milestones, `debug` for detail.
 Logs are structured and greppable; include a correlation id where requests cross services.
-User-facing error text follows #front-display-messages; internal detail stays in logs and the error object.
+User-facing error text follows #swe-display-messages; internal detail stays in logs and the error object.
 
 ## #swe-deps Dependencies
 
@@ -158,4 +155,4 @@ A change is done only when all of these hold:
 4. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
 5. The change has been self-reviewed against these instructions.
 
-Do not open or update a PR before all four hold.
+Do not open or update a PR before all items hold.

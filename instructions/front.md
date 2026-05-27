@@ -17,16 +17,8 @@ Design alternatives often present a trade-off between heuristics; point out the 
 
 ## #front-cdn Cognitive dimensions of notations
 
-In addition to #front-nielsen-heuristics, another vocabulary for analyzing design alternatives is [Cognitive dimensions of notations](https://en.wikipedia.org/wiki/Cognitive_dimensions_of_notations).
-
-Similar to #front-nielsen-heuristics, when analyzing design alternatives, a trade-off between dimensions may ensue.
-Moreover, pay attention that not all dimensions have positive meanings, *i.e.* the observance/non-observance of a dimension may be of a positive or negative nature.
-For example, the observation of *error-proneness* is of negative nature, while the observation of *consistency* is of positive nature.
-
-## #front-display-messages Display messages
-
-Make every display message (especially information, warning, and error messages) as human-readable as possible.
-Additional information for reporting should be available (_e.g._ call stack for errors, raw return from backend), but initially hidden under a "show more details" or "copy details to clipboard".
+Use [Cognitive dimensions of notations](https://en.wikipedia.org/wiki/Cognitive_dimensions_of_notations) as a second lens alongside #front-nielsen-heuristics when weighing design alternatives.
+Dimensions trade off against each other, and each carries a sign -- some are bad when present (error-proneness), others good (consistency) -- so judge the direction, not just the presence.
 
 ## #front-a11y Accessibility
 
