@@ -15,13 +15,13 @@ Each entry carries a drop-in, house-style block once the rule is concrete enough
 | 3 | `#swe-api-versioning` | `swe.md` | versioning/deprecation absent from #swe-api-first | ready |
 | 4 | `#swe-observability` | `swe.md` | health/metrics/tracing beyond logging | ready |
 | 5 | `#swe-code-review` | `swe.md` | only self-review exists today | ready |
-| 6 | `#swe-migrations` | `swe.md` | schema-change safety | conditional (db) |
-| 7 | `#front-i18n` | `front.md` (frontend bundle) | localization | ready |
-| 8 | `#swe-perf` | `swe.md` | performance budgets | ready |
+| 6 | `#swe-naming` | `swe.md` | naming conventions implied by #code-style/#swe-reuse, never stated | ready |
+| 7 | `#swe-migrations` | `swe.md` | schema-change safety | conditional (db) |
+| 8 | `#front-i18n` | `front.md` (frontend bundle) | localization | ready |
+| 9 | `#swe-perf` | `swe.md` | performance budgets | ready |
 
-Adopted since last roll: none -- this round was fixes and tightening to existing rules (#swe-agile, #front-cdn, #swe-done, #swe-security), not new adoptions.
-The `#swe-ci` reference once dangling in #swe-security is resolved (the line is now CI-conditional and names no tag), so `#swe-ci` stays purely additive and optional.
-Note for next roll: display-messages was relocated from the frontend bundle into core as `#swe-display-messages`; the old `#front-display-messages` tag no longer exists.
+Adopted since last roll: none -- this round broadened `#swe-display-messages`, cleared the last dangling reference (`#ui-canonical-states` now points at `#swe-display-messages`), and normalized the `#swe-security` CI wording. Added `#swe-naming` to the backlog.
+The rule set is currently self-consistent: 32 sections, every `#tag` resolves, no dangling references.
 
 ---
 
@@ -98,7 +98,21 @@ Review correctness, scope, and documentation drift (#swe-docs-drift) -- not styl
 Solo or AI-only work still earns this pass; the author reviews the full diff with fresh eyes before merge.
 ```
 
-## 6. #swe-migrations -- Target: `swe.md` (only if the project owns a database)
+## 6. #swe-naming -- Target: `swe.md`
+
+**Gap.** #code-style favors named identifiers and #swe-reuse keys off names, but no rule states the conventions themselves.
+**Rationale.** A single naming convention per kind keeps the codebase searchable and #swe-reuse enforceable.
+**Status.** Ready -- references #swe-reuse (exists).
+
+```markdown
+## #swe-naming Naming conventions
+
+Names follow one convention per kind, applied consistently: files, identifiers, and the casing each uses are uniform across the codebase.
+A name says what a thing is or does, not how it is built; rename when its purpose drifts.
+Match the surrounding code's existing convention over importing a new one (#swe-reuse).
+```
+
+## 7. #swe-migrations -- Target: `swe.md` (only if the project owns a database)
 
 **Gap.** No rule for versioned, reversible, backward-compatible schema change.
 **Rationale.** Schema changes are a common source of broken deploys and data loss; expand-contract and backup-before-destroy are the safe defaults.
@@ -113,7 +127,7 @@ A destructive migration (dropping a column or table) requires a verified backup 
 Keep the entity model (#swe-entity) in step with the migration.
 ```
 
-## 7. #front-i18n -- Target: `front.md` (frontend bundle)
+## 8. #front-i18n -- Target: `front.md` (frontend bundle)
 
 **Gap.** #front-display-labels covers entity names, but nothing covers localization.
 **Rationale.** Retrofitting i18n after hard-coded text and locale-blind formatting have spread is expensive.
@@ -127,7 +141,7 @@ Format dates, numbers, and currencies by locale rather than assuming one.
 Do not assume text length or direction -- layouts tolerate longer translations and right-to-left scripts.
 ```
 
-## 8. #swe-perf -- Target: `swe.md`
+## 9. #swe-perf -- Target: `swe.md`
 
 **Gap.** No rule on performance expectations or regressions.
 **Rationale.** Without a budget, performance erodes one unmeasured change at a time.
