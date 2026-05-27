@@ -35,12 +35,20 @@ The modules merge into a single `AGENTS.md`, so file names disappear from the ou
 - Cross-reference rules by `#tag`, never by file name.
 - Emit order matters: related domains should be adjacent in `manifest.json`.
 
-## Propose missing instructions
+## Maintain the proposal backlog
 
-Propose new instructions a good software-engineering setting should have but the rule set lacks.
-Maintain a running, prioritized backlog: re-rank it each run, note what moved and why, and mark anything newly closed by recent edits.
-For each proposal give: tag, the gap it closes, and a one-line rationale.
-Recommend the top few to draft next.
+The proposal backlog is a single rolling file: `docs/future-work/proposed-instruction-rules.md`.
+It is the only file this review writes to -- instruction sources are never edited here.
+
+Each run, update it in place:
+
+1. Read the backlog file first.
+2. Drop any proposal already adopted into `instructions/` (check the live `#tag`s in the generated output).
+3. Re-check every remaining proposal: does it still close a real gap? Rewrite stale wording; demote or remove ideas overtaken by recent edits.
+4. Add a proposal for each new gap found this run. For each give: tag, target file, the gap it closes, a one-line rationale, any blocker or condition, and a drop-in house-style block once the rule is concrete enough to draft.
+5. Rebuild the summary table at the top: rank, tag, target, gap, status (ready / blocked on #tag / conditional). List what was adopted-and-removed since the last roll.
+
+In your review reply, summarize what moved, what closed, and recommend the top few to draft next.
 
 ## Output format
 
@@ -49,4 +57,5 @@ Recommend the top few to draft next.
 - Proposals as a ranked table with a "change vs last run" column.
 - End with a recommended next action.
 
-Do not edit files as part of the review unless explicitly asked; review and propose only.
+Do not edit instruction sources as part of the review -- propose only.
+The single file this review writes is the rolling backlog `docs/future-work/proposed-instruction-rules.md`.
