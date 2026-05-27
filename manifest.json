@@ -16,6 +16,14 @@
         "instructions/front.md",
         "instructions/ui-guidelines.md"
       ]
+    },
+    {
+      "name": "backend",
+      "title": "Back-end instructions",
+      "when": "Back-end, API, or service work",
+      "modules": [
+        "instructions/backend.md"
+      ]
     }
   ],
   "output": "AGENTS.md"

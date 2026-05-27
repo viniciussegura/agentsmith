@@ -60,6 +60,12 @@ if (built.dangling.length) {
   );
 }
 
+if (built.crossBoundary.length) {
+  process.stderr.write(
+    `agentsmith: warning -- core references bundle-only #tag(s): ${built.crossBoundary.join(', ')}\n`,
+  );
+}
+
 if (has('--stdout')) {
   process.stdout.write(built.coreContent);
 } else {
