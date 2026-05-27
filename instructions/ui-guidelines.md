@@ -47,7 +47,7 @@ The component may have the following features:
 - `errorObj`: (only for error type, mandatory) additional error object to be copied to clipboard providing additional details about the error to the **developer**.
   Should contain both the "raw" error, but also additional information such as timestamp, url that triggered the error, user, additional context, call stack, etc.
 
-These canonical states should follow #front-display-messages instructions.
+These canonical states should follow #swe-display-messages instructions.
 
 ## #ui-validation Validation errors stay close to their cause
 

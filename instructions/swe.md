@@ -122,13 +122,14 @@ This includes -- but is not limited to -- the entity model (#swe-entity), any `R
 Beyond secrets (#swe-environment), treat all external input as untrusted: validate and sanitize at the boundary.
 Never log secrets, tokens, or personal data; redact before logging.
 Parameterize queries; never build SQL or shell commands by string concatenation.
-IF CI is available, run a dependency vulnerability scan in CI and clear criticals before merge.
+Where CI is available, scan dependencies for known vulnerabilities and clear criticals before merge.
 If there are authentication and authorization layers, enforce them on every endpoint that exposes data or mutations; deny by default.
 
 ## #swe-display-messages Display messages
 
-Make every display message (especially information, warning, and error messages) as human-readable as possible.
-Additional information for reporting should be available (_e.g._ call stack for errors, raw return from backend), but initially hidden under a "show more details" or "copy details to clipboard".
+A message is written for whoever reads it -- a UI end user, another team consuming your service's error response, or a developer reading a log.
+Make every message (especially information, warning, and error messages) as human-readable as possible for that audience.
+Keep deeper reporting detail available (_e.g._ call stack for errors, raw backend response) but initially hidden behind a "show more details" or "copy details to clipboard".
 
 ## #swe-errors Error handling and logging
 
