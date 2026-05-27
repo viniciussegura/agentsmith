@@ -1,29 +1,17 @@
 {
   "source": "https://github.com/viniciussegura/agentsmith",
   "preamble": "instructions/main.md",
-  "modules": [
-    "instructions/ai.md",
-    "instructions/code.md",
-    "instructions/git.md",
-    "instructions/swe.md"
-  ],
-  "bundles": [
+  "sections": [
+    { "name": "core" },
     {
       "name": "frontend",
       "title": "Front-end instructions",
-      "when": "Front-end or UI work",
-      "modules": [
-        "instructions/front.md",
-        "instructions/ui-guidelines.md"
-      ]
+      "when": "Front-end or UI work"
     },
     {
       "name": "backend",
       "title": "Back-end instructions",
-      "when": "Back-end, API, or service work",
-      "modules": [
-        "instructions/backend.md"
-      ]
+      "when": "Back-end, API, or service work"
     }
   ],
   "output": "AGENTS.md"

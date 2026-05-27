@@ -37,13 +37,15 @@ Whether the generated `AGENTS.md` is committed in the consumer repo is the consu
 ## Structure
 
 ```
-instructions/      rule modules (the source of truth)
+instructions/      rule sections (the source of truth)
   main.md          preamble, emitted first
-  ai.md code.md git.md swe.md              core modules, always loaded
-  front.md ui-guidelines.md backend.md     bundle modules, loaded on demand
-manifest.json      preamble, core module order, on-demand bundles, source label
+  core/            ai.md code.md git.md swe.md   always-loaded modules
+  frontend/        front.md ui-guidelines.md     on-demand bundle
+  backend/         backend.md                    on-demand bundle
+manifest.json      preamble, ordered sections (folder + optional when/title), source label
 src/generate.js    pure: (preamble, modules, source) -> AGENTS.md text
 src/build.js       pure: assembles the lean core, bundle files, and root stub
+src/sections.js    pure: splits manifest sections into core vs on-demand bundles
 src/bundles.js     on-demand index + #tag reference-integrity checks
 bin/cli.js         reads sources, writes the files
 test/              tests for the generator
@@ -53,9 +55,10 @@ test/              tests for the generator
 
 - Each rule has a `#tag` (e.g. `#swe-reuse`) usable as a handle in conversation.
 - Rules follow their own `#code-markdown` convention: one sentence per line.
-- To add an always-loaded rule, drop a `.md` in `instructions/` and add its path to `manifest.json` `modules`.
-- To add an on-demand rule, add its file to a bundle's `modules` in `manifest.json` `bundles`, or define a new bundle with `name`, `title`, `when`, and `modules`; the core lists each bundle so the agent loads it when its `when` matches.
-- Order in the output follows `manifest.json`.
+- To add a rule, drop a `.md` into a section folder under `instructions/` (e.g. `core/` or `backend/`); it is picked up automatically.
+- To add a section, create a folder under `instructions/` and add an entry to `manifest.json` `sections`: a `name` (the folder) plus, for an on-demand bundle, a `title` and a `when`; a section with no `when` is always-loaded and inlined into the core.
+- Files in a section load alphabetically; set a section's `modules` to an explicit file list to override that order.
+- Section order in the output follows `manifest.json`.
 
 Set `manifest.json` `source` to your actual repo URL; it appears in the generated file's header.
 

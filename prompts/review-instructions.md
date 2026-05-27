@@ -25,7 +25,7 @@ For each, give a one-line verdict (Strong / Good / Weak / Gaps) followed by spec
 5. **Enforceability** -- which rules are lint-able or CI-checkable, and does the rule set say they are enforced?
 6. **Self-reference integrity** -- every `#tag` referenced exists; every section has a unique tag.
 7. **Coverage** -- what does a good software-engineering setting expect that is missing?
-8. **Lean-split integrity** -- in the default lean layout, core modules load every session and bundles load on demand. A core rule must not reference a bundle-only `#tag` -- it dangles for sessions that never load the bundle; bundle-to-core references are safe. Flag any core-to-bundle reference, citing both tags and their modules.
+8. **Lean-split integrity** -- in the default lean layout, core sections load every session and bundles load on demand. A core rule must not reference a bundle-only `#tag` -- it dangles for sessions that never load the bundle; bundle-to-core references are safe. Flag any core-to-bundle reference, citing both tags and their sections.
 9. **Normative voice** -- strong requirements use a consistent keyword style: bold **MUST** / **MUST NOT** / **Never** for hard rules, plain imperative for directives, and `should` only for genuine recommendations. Flag a rule that mixes soft and hard wording for the same obligation, or the same keyword bolded in one place and plain in another.
 10. Add any other dimension that proves relevant; name it explicitly.
 

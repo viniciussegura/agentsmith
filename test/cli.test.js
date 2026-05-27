@@ -24,6 +24,22 @@ test('default run emits lean core, bundle, and a root stub', () => {
   }
 });
 
+test('folder sections inline the core and emit a file per bundle', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir);
+    const core = readFileSync(join(dir, '.agentsmith/AGENTS.md'), 'utf8');
+    assert.match(core, /#swe-reuse/, 'a core-section rule is inlined');
+    assert.doesNotMatch(core, /#be-api-first/, 'a bundle-section rule is not inlined in the lean core');
+    assert.ok(existsSync(join(dir, '.agentsmith/agents/frontend.md')), 'frontend bundle written');
+    assert.ok(existsSync(join(dir, '.agentsmith/agents/backend.md')), 'backend bundle written');
+    const backend = readFileSync(join(dir, '.agentsmith/agents/backend.md'), 'utf8');
+    assert.match(backend, /#be-api-first/, 'a bundle-section rule lands in its bundle file');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('an existing root AGENTS.md is never clobbered', () => {
   const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
   try {
