@@ -17,15 +17,6 @@ Follow [Agile software development](https://en.wikipedia.org/wiki/Agile_software
 - **Reflection on how to become more effective, and adjust accordingly**
   If an idea of how to become more effective arises, it should be shared and considered for implementation.
 
-## #swe-environment Environment and secrets
-
-- Env vars are documented in `.env.example` (committed); `.env` is gitignored and loaded automatically by the code.
-- **Never** commit real secrets.
-- Personal email addresses must **never** appear in committed files.
-  When a file needs an author or committer email, use the value from `git config user.email`.
-  Do not substitute a personal email seen in conversation context, memory, or chat history.
-  When unsure, run `git config user.email` and use that.
-
 ## #swe-reuse Reuse before creation
 
 Before creating a component, search the codebase for one with the same name or purpose.
@@ -124,3 +115,47 @@ Each variation maps to a call site:
 Before opening or updating a PR, check for documentation drift -- any doc the change has made stale.
 Fix it in the same PR, before opening or updating.
 This includes -- but is not limited to -- the entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, and files under `docs/`.
+
+## #swe-environment Environment and secrets
+
+- Env vars are documented in `.env.example` (committed); `.env` is gitignored and loaded automatically by the code.
+- **Never** commit real secrets.
+- Personal email addresses must **never** appear in committed files.
+  When a file needs an author or committer email, use the value from `git config user.email`.
+  Do not substitute a personal email seen in conversation context, memory, or chat history.
+  When unsure, run `git config user.email` and use that.
+
+## #swe-security Security baseline
+
+Beyond secrets (#swe-environment), treat all external input as untrusted: validate and sanitize at the boundary.
+Never log secrets, tokens, or personal data; redact before logging.
+Parameterize queries; never build SQL or shell commands by string concatenation.
+Run a dependency vulnerability scan in CI (#swe-ci) and clear criticals before merge.
+If there is an authentication and authorization layer, enforce them on every endpoint that exposes data or mutations; deny by default.
+
+## #swe-errors Error handling and logging
+
+Never silently swallow an error: handle it, or propagate it with context added.
+Fail loud in development; degrade gracefully in production.
+Log at the right level -- `error` for actionable failures, `warn` for recoverable anomalies, `info` for milestones, `debug` for detail.
+Logs are structured and greppable; include a correlation id where requests cross services.
+User-facing error text follows #front-display-messages; internal detail stays in logs and the error object.
+
+## #swe-deps Dependencies
+
+Justify every new dependency: prefer the standard library, then a small well-maintained package, then writing it yourself.
+A dependency must be actively maintained and license-compatible.
+Commit the lockfile and pin versions.
+Removing a dependency is a feature -- prune unused ones.
+
+## #swe-done Definition of done
+
+A change is done only when all of these hold:
+
+1. If available, tests for the change pass locally.
+2. Documentation drift is resolved (#swe-docs-drift), including the entity model when the schema changed (#swe-entity).
+3. Unused dependencies are pruned (#swe-deps).
+4. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
+5. The change has been self-reviewed against these instructions.
+
+Do not open or update a PR before all four hold.

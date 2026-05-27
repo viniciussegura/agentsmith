@@ -27,3 +27,12 @@ For example, the observation of *error-proneness* is of negative nature, while t
 
 Make every display message (especially information, warning, and error messages) as human-readable as possible.
 Additional information for reporting should be available (_e.g._ call stack for errors, raw return from backend), but initially hidden under a "show more details" or "copy details to clipboard".
+
+## #front-a11y Accessibility
+
+Target WCAG 2.1 AA.
+Every interactive element is keyboard-reachable and operable; visible focus is never suppressed.
+Use semantic HTML first; reach for ARIA only to fill gaps, never to override native semantics.
+Every input has a programmatic label; every meaningful image has alt text; decorative images are marked empty.
+Meet contrast ratios: 4.5:1 for body text, 3:1 for large text and UI affordances.
+Never convey state by color alone -- pair it with text or an icon.

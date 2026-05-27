@@ -1,6 +1,6 @@
 # Git
 
-## #git-format Commit and PR title format
+## #git-title Commit and PR title format
 
 - Conventional Commits: `<type>(<scope>): <subject>`, where `<type>` is one of `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `perf`, `ci`, `build`.
 - `<subject>` is sentence case, past tense (what was done).
@@ -10,6 +10,12 @@
 |---|---|
 | AI | `🤖 feat(backend): Added cursor pagination to the list API` |
 | Human | `docs: Split README into docs/getting-started.md` |
+
+## #git-pr-body PR description
+
+A PR body states what changed and why, links any spec or plan (#ai-plan) and related issues, and lists how the change was verified.
+AI-authored PRs note the model(s) used (#git-usage).
+Call out anything reviewers should scrutinize, and any follow-up deferred to #swe-future-work.
 
 ## #git-usage Authorship reporting
 
