@@ -1,7 +1,11 @@
 node_modules/
+.claude/
 
 # Build artifact: the forged AGENTS.md is generated, never committed here.
 /AGENTS.md
+
+# Build artifact: lean-layout core and on-demand bundles.
+.agentsmith/
 
 # caveman /compress backups
 *.original.md

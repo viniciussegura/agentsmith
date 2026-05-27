@@ -8,7 +8,7 @@ Write your cross-project rules once here; generate an inlined `AGENTS.md` in any
 
 `@file` imports are a Claude Code feature; Codex, Cursor, Gemini, and others ignore them.
 agentsmith **inlines** every rule into plain text, so the output works in every tool with no import magic and no relative-path resolution to get wrong.
-Runtime token cost is the same either way — imports get expanded into context anyway — so this trades nothing for portability.
+Runtime token cost is the same either way -- imports get expanded into context anyway -- so this trades nothing for portability.
 
 ## Usage
 
@@ -26,10 +26,10 @@ npx github:viniciussegura/agentsmith#v0.1.0
 
 Flags:
 
-- `--out <path>` — write somewhere other than `AGENTS.md`.
-- `--stdout` — print to stdout instead of writing a file.
+- `--out <path>` -- write somewhere other than `AGENTS.md`.
+- `--stdout` -- print to stdout instead of writing a file.
 
-Whether the generated `AGENTS.md` is committed in the consumer repo is the consumer's call — agentsmith only produces the file.
+Whether the generated `AGENTS.md` is committed in the consumer repo is the consumer's call -- agentsmith only produces the file.
 
 ## Structure
 

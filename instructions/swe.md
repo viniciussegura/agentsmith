@@ -1,18 +1,18 @@
 # Software engineering
 
-## #swe-environment Environment and secrets
+## #swe-agile Agile software development
 
-- Env vars are documented in `.env.example` (committed); `.env` is gitignored and loaded automatically by the code.
-- Never commit real secrets.
-- Personal email addresses must never appear in committed files.
-  When a file needs an author or committer email, use the value from `git config user.email`.
-  Do not substitute a personal email seen in conversation context, memory, or chat history.
-  When unsure, run `git config user.email` and use that.
+Follow [Agile software development](https://en.wikipedia.org/wiki/Agile_software_development):
+- Ship the smallest slice that delivers real value, then iterate -- working software is the measure of progress, not plans or docs.
+- Treat requirements as provisional: revisit assumptions when evidence changes, even late in the work.
+- Stay aligned with the people the software is for -- check direction with stakeholders and users, don't build in a vacuum.
+- Keep code and architecture only as complex as the problem demands; simplicity (YAGNI) is the default.
+- When you find a way to work more effectively, raise it.
 
 ## #swe-reuse Reuse before creation
 
 Before creating a component, search the codebase for one with the same name or purpose.
-Two components with the same name in different directories is a bug.
+Two components with the same name and purpose in different directories is a bug.
 Serve one concept from a single shared implementation across pages or endpoints rather than duplicating it.
 
 ## #swe-future-work Future work
@@ -24,3 +24,136 @@ Record it when the decision to defer is made, not later.
 
 Each accepted shortcut or known limitation goes in `docs/technical-debts/<YYYY-MM-DD>-<slug>.md`, stating the debt, why it was accepted, its cost or risk, and a remediation sketch.
 Record it the moment it is incurred.
+
+## #swe-entity Entity model upkeep
+
+Core entities handled by the solution (sometimes called core concepts or core abstractions) are documented in `docs/entity-model.md`.
+This file presents a human-readable description of the current model, expressed as pure TypeScript types and interfaces.
+The description reflects how users should understand the model.
+It is **NOT** documentation of how the model is implemented (_e.g._ not a database schema).
+Every change to the entity schema **MUST** be accompanied by an updated entity model.
+
+## #swe-api-first API first
+
+The API is the contract between providers and consumers, so treat it with special care.
+Design a consistent API following established best practices for its style (REST, GraphQL, gRPC); the entity-variation rules below hold whatever the style.
+
+The same entity **MUST NOT** have multiple shapes across endpoints.
+Keep entity variations to a small, fixed set:
+
+1. `EntityRef`: when referenced by another entity and only a small set of fields is needed for display (_e.g._ `id` and `name` for the UI).
+2. `EntityShort`: when returned in a list, to reduce JSON size.
+3. `Entity`: when a single instance is requested; may return the complete available information.
+4. `EntityPOST` / `EntityPATCH`: used only in those endpoints; may have optional fields.
+
+When returning an instance, the data structure **MUST NOT** have optional fields.
+A field may be nullable, but never optional.
+This surfaces backend issues earlier: it is always clear when a value should have been returned.
+
+Worked example -- one entity through its variations, `Ref ⊂ Short ⊂ Entity`:
+
+```typescript
+interface UserRef {
+  id: string;
+  name: string;
+}
+
+interface UserShort {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null; // nullable on responses, never optional
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  createdAt: string;
+}
+
+interface UserPOST {
+  name: string;
+  email: string;
+  bio?: string; // optional allowed on request bodies only
+}
+
+// UserRef appears INSIDE another entity, never fetched on its own:
+interface Task {
+  id: string;
+  title: string;
+  assignee: UserRef;
+}
+```
+
+Each variation maps to a call site:
+
+| Endpoint | Request body | Response |
+|---|---|---|
+| `GET /users` | -- | `UserShort[]` |
+| `GET /users/:id` | -- | `User` |
+| `POST /users` | `UserPOST` | `User` |
+| `PATCH /users/:id` | `UserPATCH` | `User` |
+| `GET /tasks/:id` | -- | `Task` (embeds `assignee: UserRef`) |
+
+- `EntityRef` has no endpoint of its own -- it only fills a nested slot.
+- Lists return `EntityShort`, single fetches return the full `Entity`; the same entity never changes shape at one call type.
+- Write endpoints accept `POST` / `PATCH` bodies and return the full `Entity`, so the client gets server-set fields (`id`, `createdAt`) back.
+
+## #swe-docs-drift Documentation drift
+
+Before opening or updating a PR, check for documentation drift -- any doc the change has made stale.
+Fix it in the same PR, before opening or updating.
+This includes -- but is not limited to -- the entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, and files under `docs/`.
+
+## #swe-environment Environment and secrets
+
+- Env vars are documented in `.env.example` (committed); `.env` is gitignored and loaded automatically by the code.
+- **Never** commit real secrets.
+- Personal email addresses must **never** appear in committed files.
+  When a file needs an author or committer email, use the value from `git config user.email`.
+  Do not substitute a personal email seen in conversation context, memory, or chat history.
+  When unsure, run `git config user.email` and use that.
+
+## #swe-security Security baseline
+
+Beyond secrets (#swe-environment), treat all external input as untrusted: validate and sanitize at the boundary.
+**Never** log secrets, tokens, or personal data; redact before logging.
+Parameterize queries; **never** build SQL or shell commands by string concatenation.
+Where CI is available, scan dependencies for known vulnerabilities and clear criticals before merge.
+If there are authentication and authorization layers, enforce them on every endpoint that exposes data or mutations; deny by default.
+
+## #swe-display-messages Display messages
+
+A message is written for whoever reads it -- a UI end user, another team consuming your service's error response, or a developer reading a log.
+Make every message (especially information, warning, and error messages) as human-readable as possible for that audience.
+Keep deeper reporting detail available (_e.g._ call stack for errors, raw backend response) but initially hidden behind a "show more details" or "copy details to clipboard".
+
+## #swe-errors Error handling and logging
+
+**Never** silently swallow an error: handle it, or propagate it with context added.
+Fail loud in development; degrade gracefully in production.
+Log at the right level -- `error` for actionable failures, `warn` for recoverable anomalies, `info` for milestones, `debug` for detail.
+Logs are structured and greppable; include a correlation id where requests cross services.
+User-facing error text follows #swe-display-messages; internal detail stays in logs and the error object.
+
+## #swe-deps Dependencies
+
+Justify every new dependency: prefer the standard library, then a small well-maintained package, then writing it yourself.
+A dependency must be actively maintained and license-compatible.
+Commit the lockfile and pin versions.
+Removing a dependency is a feature -- prune unused ones.
+
+## #swe-done Definition of done
+
+A change is done only when all of these hold:
+
+1. If available, tests for the change pass locally.
+2. Documentation drift is resolved (#swe-docs-drift), including the entity model when the schema changed (#swe-entity).
+3. Unused dependencies are pruned (#swe-deps).
+4. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
+5. The change has been self-reviewed against these instructions.
+
+Do not open or update a PR before all items hold.
