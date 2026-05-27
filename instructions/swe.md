@@ -12,7 +12,7 @@ Follow [Agile software development](https://en.wikipedia.org/wiki/Agile_software
 ## #swe-reuse Reuse before creation
 
 Before creating a component, search the codebase for one with the same name or purpose.
-Two components with the same name in different directories is a bug.
+Two components with the same name and purpose in different directories is a bug.
 Serve one concept from a single shared implementation across pages or endpoints rather than duplicating it.
 
 ## #swe-future-work Future work
@@ -27,7 +27,7 @@ Record it the moment it is incurred.
 
 ## #swe-entity Entity model upkeep
 
-Core entities handled by the solution (sometimes called core concepts or core abstractions) should be documented in `docs/entity-model.md`.
+Core entities handled by the solution (sometimes called core concepts or core abstractions) are documented in `docs/entity-model.md`.
 This file presents a human-readable description of the current model, expressed as pure TypeScript types and interfaces.
 The description reflects how users should understand the model.
 It is **NOT** documentation of how the model is implemented (_e.g._ not a database schema).
@@ -36,7 +36,7 @@ Every change to the entity schema **MUST** be accompanied by an updated entity m
 ## #swe-api-first API first
 
 The API is the contract between providers and consumers, so treat it with special care.
-Design a consistent API following REST API best practices.
+Design a consistent API following established best practices for its style (REST, GraphQL, gRPC); the entity-variation rules below hold whatever the style.
 
 The same entity must **not** have multiple shapes across endpoints.
 Keep entity variations to a small, fixed set:
@@ -120,8 +120,8 @@ This includes -- but is not limited to -- the entity model (#swe-entity), any `R
 ## #swe-security Security baseline
 
 Beyond secrets (#swe-environment), treat all external input as untrusted: validate and sanitize at the boundary.
-Never log secrets, tokens, or personal data; redact before logging.
-Parameterize queries; never build SQL or shell commands by string concatenation.
+**Never** log secrets, tokens, or personal data; redact before logging.
+Parameterize queries; **never** build SQL or shell commands by string concatenation.
 Where CI is available, scan dependencies for known vulnerabilities and clear criticals before merge.
 If there are authentication and authorization layers, enforce them on every endpoint that exposes data or mutations; deny by default.
 
@@ -133,7 +133,7 @@ Keep deeper reporting detail available (_e.g._ call stack for errors, raw backen
 
 ## #swe-errors Error handling and logging
 
-Never silently swallow an error: handle it, or propagate it with context added.
+**Never** silently swallow an error: handle it, or propagate it with context added.
 Fail loud in development; degrade gracefully in production.
 Log at the right level -- `error` for actionable failures, `warn` for recoverable anomalies, `info` for milestones, `debug` for detail.
 Logs are structured and greppable; include a correlation id where requests cross services.

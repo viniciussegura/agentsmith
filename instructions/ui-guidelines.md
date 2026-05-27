@@ -5,7 +5,7 @@ The principles behind them: `#front-nielsen-heuristics`, `#front-cdn`, `#front-d
 
 ## #ui-header-visibility Breadcrumb and page title stay in the viewport
 
-**Rule.** On every routed page, the breadcrumb trail and the page title MUST remain visible as the user scrolls.
+**Rule.** On every routed page, the breadcrumb trail and the page title **MUST** remain visible as the user scrolls.
 Scrolling applies to the page *body* only, not the whole window.
 
 **Why.** The breadcrumb and title are the user's sense of location.
@@ -13,7 +13,7 @@ Losing them on scroll breaks the mental map, especially on long lists and deep d
 
 ## #ui-tabs Tab content is visibly distinct from the surrounding page
 
-**Rule.** When a page contains a tab switcher, the region that updates on tab change MUST be visually distinct from the region that does not.
+**Rule.** When a page contains a tab switcher, the region that updates on tab change **MUST** be visually distinct from the region that does not.
 The user should be able to point at the tab-owned region without clicking.
 
 **Why.** Tabs that visually blend into the page make switching tabs feel like nothing happened: the user doesn't know whether their click landed, and doesn't know which part of the screen just changed.
