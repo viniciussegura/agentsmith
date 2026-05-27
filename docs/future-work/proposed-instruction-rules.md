@@ -56,34 +56,6 @@ Conventional Commit titles (#git-title) are validated.
 Keep the same checks available as a local pre-commit hook so failures surface before push.
 ```
 
-## 3. #swe-api-versioning -- Target: `swe.md`
-
-**Gap.** #swe-api-first fixes entity shapes but says nothing about evolving the contract over time.
-**Rationale.** Breaking a released shape silently is the most common way an API betrays its consumers.
-**Status.** Ready -- references #swe-api-first (exists).
-
-```markdown
-## #swe-api-versioning API versioning and deprecation
-
-Version the API contract; a breaking change to a released shape ships under a new version, never by mutating the old one.
-Mark a superseded field or endpoint as deprecated before removal, with a documented migration path for consumers.
-Entity variations (#swe-api-first) stay stable within a version.
-```
-
-## 4. #swe-observability -- Target: `swe.md`
-
-**Gap.** #swe-errors covers logging, but nothing covers metrics, tracing, or health checks.
-**Rationale.** Logs alone do not tell you whether the system is healthy or where a cross-service request failed.
-**Status.** Ready -- references #swe-errors (exists).
-
-```markdown
-## #swe-observability Observability
-
-Beyond logging (#swe-errors), expose the signals needed to see the system's health: key operations emit metrics, and a request crossing services carries one correlation or trace id end to end.
-Provide a health or readiness check for any long-running service.
-Keep signals actionable -- enough to locate a failure, not vanity counters.
-```
-
 ## 5. #swe-code-review -- Target: `swe.md`
 
 **Gap.** #swe-done requires self-review only; no rule covers a second pair of eyes.
@@ -96,20 +68,6 @@ Keep signals actionable -- enough to locate a failure, not vanity counters.
 Before a change squash-merges to `main`, it gets a deliberate review pass against these instructions; self-review (#swe-done) is the floor, not the ceiling.
 Review correctness, scope, and documentation drift (#swe-docs-drift) -- not style a linter already enforces.
 Solo or AI-only work still earns this pass; the author reviews the full diff with fresh eyes before merge.
-```
-
-## 6. #swe-naming -- Target: `swe.md`
-
-**Gap.** #code-style favors named identifiers and #swe-reuse keys off names, but no rule states the conventions themselves.
-**Rationale.** A single naming convention per kind keeps the codebase searchable and #swe-reuse enforceable.
-**Status.** Ready -- references #swe-reuse (exists).
-
-```markdown
-## #swe-naming Naming conventions
-
-Names follow one convention per kind, applied consistently: files, identifiers, and the casing each uses are uniform across the codebase.
-A name says what a thing is or does, not how it is built; rename when its purpose drifts.
-Match the surrounding code's existing convention over importing a new one (#swe-reuse).
 ```
 
 ## 7. #swe-migrations -- Target: `swe.md` (only if the project owns a database)

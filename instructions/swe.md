@@ -15,6 +15,12 @@ Before creating a component, search the codebase for one with the same name or p
 Two components with the same name and purpose in different directories is a bug.
 Serve one concept from a single shared implementation across pages or endpoints rather than duplicating it.
 
+## #swe-naming Naming conventions
+
+Names follow one convention per kind, applied consistently: files, identifiers, and the casing each uses are uniform across the codebase.
+A name says what a thing is or does, not how it is built; rename when its purpose drifts.
+Match the surrounding code's existing convention over importing a new one (#swe-reuse).
+
 ## #swe-future-work Future work
 
 Deferred or out-of-scope work goes in `docs/future-work/<YYYY-MM-DD>-<slug>.md`, stating what it is, why it matters, and any constraints or dependencies.
@@ -25,9 +31,14 @@ Record it when the decision to defer is made, not later.
 Each accepted shortcut or known limitation goes in `docs/technical-debts/<YYYY-MM-DD>-<slug>.md`, stating the debt, why it was accepted, its cost or risk, and a remediation sketch.
 Record it the moment it is incurred.
 
+## #swe-terminology Terminology
+
+Avoid terminology drift.
+A concept that appears across users, UI, services, databases, or any other component **MUST** use the same name everywhere.
+
 ## #swe-entity Entity model upkeep
 
-Core entities handled by the solution (sometimes called core concepts or core abstractions) are documented in `docs/entity-model.md`.
+Core entities (_aka_ core concepts or core abstractions) are documented in `docs/entity-model.md` and follow rule #swe-terminology.
 This file presents a human-readable description of the current model, expressed as pure TypeScript types and interfaces.
 The description reflects how users should understand the model.
 It is **NOT** documentation of how the model is implemented (_e.g._ not a database schema).
@@ -102,6 +113,12 @@ Each variation maps to a call site:
 - Lists return `EntityShort`, single fetches return the full `Entity`; the same entity never changes shape at one call type.
 - Write endpoints accept `POST` / `PATCH` bodies and return the full `Entity`, so the client gets server-set fields (`id`, `createdAt`) back.
 
+## #swe-api-versioning API versioning and deprecation
+
+Version the API contract; a breaking change to a released shape ships under a new version, never by mutating the old one.
+Mark a superseded field or endpoint as deprecated before removal, with a documented migration path for consumers.
+Entity variations (#swe-api-first) stay stable within a version.
+
 ## #swe-docs-drift Documentation drift
 
 Before opening or updating a PR, check for documentation drift -- any doc the change has made stale.
@@ -138,6 +155,12 @@ Fail loud in development; degrade gracefully in production.
 Log at the right level -- `error` for actionable failures, `warn` for recoverable anomalies, `info` for milestones, `debug` for detail.
 Logs are structured and greppable; include a correlation id where requests cross services.
 User-facing error text follows #swe-display-messages; internal detail stays in logs and the error object.
+
+## #swe-observability Observability
+
+Beyond logging (#swe-errors), expose the signals needed to see the system's health: key operations emit metrics, and a request crossing services carries one correlation or trace id end to end.
+Provide a health or readiness check for any long-running service.
+Keep signals actionable -- enough to locate a failure, not vanity counters.
 
 ## #swe-deps Dependencies
 
