@@ -17,9 +17,9 @@ Each entry carries a drop-in, house-style block once the rule is concrete enough
 | 5 | `#front-i18n` | `front.md` (frontend bundle) | localization | ready (low priority) |
 | 6 | `#swe-perf` | `swe.md` | performance budgets | ready (low priority) |
 
-Adopted-and-removed since last roll:
-- `#swe-naming`, `#swe-api-versioning`, `#swe-observability` -- landed in `swe.md` at commit `8d97f91`.
-- The structural "trim the always-loaded core" proposal -- done: the API cluster moved into a new on-demand `backend` bundle (`instructions/backend.md`), and `#swe-api-first` / `#swe-api-versioning` were renamed `#be-api-first` / `#be-api-versioning`.
+Since the last roll: no proposals adopted, no new proposals.
+Tooling changes only: instruction modules were mapped to per-folder sections under `instructions/<name>/` and the manifest collapsed to a unified `sections[]` list (commit `ec84a54`), and the generated-header separator was simplified to a colon (`71e582f`).
+Neither change touches the rule set or its tags.
 
 The rule set is self-consistent: 37 sections (27 core + 10 across the frontend and backend bundles), every `#tag` resolves, no dangling or cross-boundary references.
 
