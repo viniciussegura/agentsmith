@@ -1,6 +1,6 @@
 import { posix as ppath } from 'node:path';
 import { generate } from './generate.js';
-import { onDemandIndex, danglingTags } from './bundles.js';
+import { onDemandIndex, danglingTags, coreToBundleRefs } from './bundles.js';
 
 const BUNDLE_DIR = '.agentsmith/agents';
 
@@ -25,7 +25,7 @@ const STUB = [
  * @param {'nested'|'root'} [opts.placement='nested']
  * @param {string}   [opts.output='AGENTS.md']    Core filename when placement is root.
  * @param {string}   [opts.out]                   Explicit core path override.
- * @returns {{ corePath, coreContent, bundles: {path,content}[], stub: {path,content}|null, dangling: string[] }}
+ * @returns {{ corePath, coreContent, bundles: {path,content}[], stub: {path,content}|null, dangling: string[], crossBoundary: string[] }}
  */
 export function buildOutputs({
   preamble,
@@ -66,12 +66,11 @@ export function buildOutputs({
     }));
   }
 
-  const dangling = danglingTags({
-    coreText: coreContent,
-    bundleTexts: bundleFiles.map((f) => f.content),
-  });
+  const bundleTexts = bundleFiles.map((f) => f.content);
+  const dangling = danglingTags({ coreText: coreContent, bundleTexts });
+  const crossBoundary = coreToBundleRefs({ coreText: coreContent, bundleTexts });
 
   const stub = placement === 'nested' && !out ? { path: 'AGENTS.md', content: STUB } : null;
 
-  return { corePath, coreContent, bundles: bundleFiles, stub, dangling };
+  return { corePath, coreContent, bundles: bundleFiles, stub, dangling, crossBoundary };
 }

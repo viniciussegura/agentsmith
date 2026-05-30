@@ -80,6 +80,28 @@ test('dangling tag references are surfaced', () => {
   assert.ok(out.dangling.includes('core-ghost'));
 });
 
+test('core references to bundle-only tags are surfaced as cross-boundary', () => {
+  const out = buildOutputs({
+    ...base,
+    modules: ['# Core\n\n## #core-x X\n\nSee #front-y for the rest.'],
+    layout: 'lean',
+    placement: 'nested',
+  });
+  assert.ok(out.crossBoundary.includes('front-y'), 'core leaning on a bundle tag is flagged');
+  assert.ok(!out.dangling.includes('front-y'), 'the tag still resolves, so it is not dangling');
+});
+
+test('full layout has no cross-boundary refs since every module is inlined', () => {
+  const out = buildOutputs({
+    ...base,
+    modules: ['# Core\n\n## #core-x X\n\nSee #front-y for the rest.'],
+    layout: 'full',
+    placement: 'root',
+    output: 'AGENTS.md',
+  });
+  assert.deepEqual(out.crossBoundary, [], 'no bundle files means nothing is bundle-only');
+});
+
 test('lean with no bundles emits no on-demand index and no bundle files', () => {
   const out = buildOutputs({ ...base, bundles: [], layout: 'lean', placement: 'nested' });
   assert.equal(out.bundles.length, 0);

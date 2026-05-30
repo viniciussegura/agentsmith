@@ -16,14 +16,14 @@ Every pushback names the specific problem and proposes a path forward.
 
 ## #ai-plan Specs and plans
 
-- Specs live in `docs/specs/`, plans in `docs/plans/`.
+- Specs live in `docs/specs/<YYYY-MM-DD>-<slug>.md`, plans in `docs/plans/<YYYY-MM-DD>-<slug>.md`.
 - Non-trivial changes start with a user-approved spec before a plan is written and executed.
 
 ## #ai-preflight Plan execution preflight
 
 Before executing an approved plan, ask and wait for answers to two questions:
 
-1. **Execution shape** -- sequential in the main thread, or fanned out to parallel subagents? Give a token estimate per option and recommend one.
+1. **Execution shape** -- sequential in the main thread, delegated to parallel subagents, or delegated to sequential subagents? Give a token estimate per option and recommend one.
 2. **Interaction shape** -- pause for checks and questions as they arise, or run non-stop and batch every question and decision at the end?
 
 Answers are scoped to the current plan and not persisted.

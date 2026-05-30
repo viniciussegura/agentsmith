@@ -15,6 +15,12 @@ Before creating a component, search the codebase for one with the same name or p
 Two components with the same name and purpose in different directories is a bug.
 Serve one concept from a single shared implementation across pages or endpoints rather than duplicating it.
 
+## #swe-naming Naming conventions
+
+Each kind of name -- files, identifiers, types -- follows one convention, applied uniformly across the codebase.
+A name says what a thing is or does, not how it is built; rename when its purpose drifts.
+Match the surrounding code's existing convention over importing a new one (#swe-reuse); which word names a concept is governed by #swe-terminology.
+
 ## #swe-future-work Future work
 
 Deferred or out-of-scope work goes in `docs/future-work/<YYYY-MM-DD>-<slug>.md`, stating what it is, why it matters, and any constraints or dependencies.
@@ -25,82 +31,19 @@ Record it when the decision to defer is made, not later.
 Each accepted shortcut or known limitation goes in `docs/technical-debts/<YYYY-MM-DD>-<slug>.md`, stating the debt, why it was accepted, its cost or risk, and a remediation sketch.
 Record it the moment it is incurred.
 
+## #swe-terminology Terminology
+
+Avoid terminology drift.
+A concept that appears across users, UI, services, databases, or any other component **MUST** use the same name everywhere.
+This governs which word names a concept; #swe-naming governs the form that name takes.
+
 ## #swe-entity Entity model upkeep
 
-Core entities handled by the solution (sometimes called core concepts or core abstractions) are documented in `docs/entity-model.md`.
+Core entities (_aka_ core concepts or core abstractions) are documented in `docs/entity-model.md` and follow rule #swe-terminology.
 This file presents a human-readable description of the current model, expressed as pure TypeScript types and interfaces.
 The description reflects how users should understand the model.
 It is **NOT** documentation of how the model is implemented (_e.g._ not a database schema).
 Every change to the entity schema **MUST** be accompanied by an updated entity model.
-
-## #swe-api-first API first
-
-The API is the contract between providers and consumers, so treat it with special care.
-Design a consistent API following established best practices for its style (REST, GraphQL, gRPC); the entity-variation rules below hold whatever the style.
-
-The same entity **MUST NOT** have multiple shapes across endpoints.
-Keep entity variations to a small, fixed set:
-
-1. `EntityRef`: when referenced by another entity and only a small set of fields is needed for display (_e.g._ `id` and `name` for the UI).
-2. `EntityShort`: when returned in a list, to reduce JSON size.
-3. `Entity`: when a single instance is requested; may return the complete available information.
-4. `EntityPOST` / `EntityPATCH`: used only in those endpoints; may have optional fields.
-
-When returning an instance, the data structure **MUST NOT** have optional fields.
-A field may be nullable, but never optional.
-This surfaces backend issues earlier: it is always clear when a value should have been returned.
-
-Worked example -- one entity through its variations, `Ref ⊂ Short ⊂ Entity`:
-
-```typescript
-interface UserRef {
-  id: string;
-  name: string;
-}
-
-interface UserShort {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl: string | null; // nullable on responses, never optional
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl: string | null;
-  bio: string | null;
-  createdAt: string;
-}
-
-interface UserPOST {
-  name: string;
-  email: string;
-  bio?: string; // optional allowed on request bodies only
-}
-
-// UserRef appears INSIDE another entity, never fetched on its own:
-interface Task {
-  id: string;
-  title: string;
-  assignee: UserRef;
-}
-```
-
-Each variation maps to a call site:
-
-| Endpoint | Request body | Response |
-|---|---|---|
-| `GET /users` | -- | `UserShort[]` |
-| `GET /users/:id` | -- | `User` |
-| `POST /users` | `UserPOST` | `User` |
-| `PATCH /users/:id` | `UserPATCH` | `User` |
-| `GET /tasks/:id` | -- | `Task` (embeds `assignee: UserRef`) |
-
-- `EntityRef` has no endpoint of its own -- it only fills a nested slot.
-- Lists return `EntityShort`, single fetches return the full `Entity`; the same entity never changes shape at one call type.
-- Write endpoints accept `POST` / `PATCH` bodies and return the full `Entity`, so the client gets server-set fields (`id`, `createdAt`) back.
 
 ## #swe-docs-drift Documentation drift
 
@@ -112,7 +55,7 @@ This includes -- but is not limited to -- the entity model (#swe-entity), any `R
 
 - Env vars are documented in `.env.example` (committed); `.env` is gitignored and loaded automatically by the code.
 - **Never** commit real secrets.
-- Personal email addresses must **never** appear in committed files.
+- Personal email addresses **MUST NOT** appear in committed files.
   When a file needs an author or committer email, use the value from `git config user.email`.
   Do not substitute a personal email seen in conversation context, memory, or chat history.
   When unsure, run `git config user.email` and use that.
@@ -136,13 +79,19 @@ Keep deeper reporting detail available (_e.g._ call stack for errors, raw backen
 **Never** silently swallow an error: handle it, or propagate it with context added.
 Fail loud in development; degrade gracefully in production.
 Log at the right level -- `error` for actionable failures, `warn` for recoverable anomalies, `info` for milestones, `debug` for detail.
-Logs are structured and greppable; include a correlation id where requests cross services.
+Logs are structured and greppable, and carry the correlation or trace id (#swe-observability) so lines join across services.
 User-facing error text follows #swe-display-messages; internal detail stays in logs and the error object.
+
+## #swe-observability Observability
+
+Beyond logging (#swe-errors), expose the signals needed to see the system's health: key operations emit metrics, and a request crossing services carries one correlation or trace id end to end.
+Provide a health or readiness check for any long-running service.
+Keep signals actionable -- enough to locate a failure, not vanity counters.
 
 ## #swe-deps Dependencies
 
 Justify every new dependency: prefer the standard library, then a small well-maintained package, then writing it yourself.
-A dependency must be actively maintained and license-compatible.
+A dependency **MUST** be actively maintained and license-compatible.
 Commit the lockfile and pin versions.
 Removing a dependency is a feature -- prune unused ones.
 

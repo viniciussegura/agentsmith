@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { onDemandIndex, danglingTags } from '../src/bundles.js';
+import { onDemandIndex, danglingTags, coreToBundleRefs } from '../src/bundles.js';
 
 test('onDemandIndex renders an h1, the tag, a MUST directive, and one bullet per entry', () => {
   const md = onDemandIndex([
@@ -52,4 +52,36 @@ test('danglingTags ignores tag mentions inside inline backtick spans', () => {
     bundleTexts: [],
   });
   assert.deepEqual(result, [], 'backtick-wrapped mentions are not real references');
+});
+
+test('coreToBundleRefs flags a core reference to a bundle-only tag', () => {
+  const result = coreToBundleRefs({
+    coreText: '## #swe-x X\n\nSee #front-a11y for UI rules.',
+    bundleTexts: ['## #front-a11y Accessibility\n\nTarget WCAG.'],
+  });
+  assert.deepEqual(result, ['front-a11y'], 'core cannot rely on a tag only the bundle defines');
+});
+
+test('coreToBundleRefs does not flag bundle-to-core references', () => {
+  const result = coreToBundleRefs({
+    coreText: '## #swe-display-messages Messages\n\nWrite for the reader.',
+    bundleTexts: ['## #ui-states States\n\nFollow #swe-display-messages.'],
+  });
+  assert.deepEqual(result, [], 'a bundle may safely reference a core tag');
+});
+
+test('coreToBundleRefs does not flag a core-defined tag', () => {
+  const result = coreToBundleRefs({
+    coreText: '## #swe-done Done\n\nSee #swe-done item 1.',
+    bundleTexts: ['## #front-a11y Accessibility'],
+  });
+  assert.deepEqual(result, [], 'core referencing its own tag is fine');
+});
+
+test('coreToBundleRefs ignores a tag defined nowhere (that is danglingTags job)', () => {
+  const result = coreToBundleRefs({
+    coreText: '## #swe-x X\n\nSee #swe-ghost.',
+    bundleTexts: ['## #front-a11y Accessibility'],
+  });
+  assert.deepEqual(result, [], 'a wholly undefined tag is not a cross-boundary case');
 });

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
+import { resolveSections } from '../src/sections.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,15 +36,34 @@ if (outIdx !== -1 && (out === undefined || out.startsWith('--'))) {
   process.exit(1);
 }
 
+// A section's files are every *.md in instructions/<name>/, sorted for
+// deterministic output, unless the section pins an explicit `modules` order.
+const listFiles = (name) =>
+  readdirSync(join(pkgRoot, 'instructions', name))
+    .filter((f) => f.endsWith('.md'))
+    .sort()
+    .map((f) => `instructions/${name}/${f}`);
+
+const { coreModulePaths, bundles } = resolveSections({
+  sections: manifest.sections || [],
+  listFiles,
+});
+
+for (const b of bundles) {
+  if (!b.modulePaths.length) {
+    process.stderr.write(`agentsmith: warning -- section "${b.name}" has no .md files\n`);
+  }
+}
+
 const { commit, date } = sourceRevision();
 const built = buildOutputs({
   preamble: read(manifest.preamble),
-  modules: manifest.modules.map(read),
-  bundles: (manifest.bundles || []).map((b) => ({
+  modules: coreModulePaths.map(read),
+  bundles: bundles.map((b) => ({
     name: b.name,
     title: b.title,
     when: b.when,
-    modules: b.modules.map(read),
+    modules: b.modulePaths.map(read),
   })),
   source: manifest.source,
   commit,
@@ -57,6 +77,12 @@ const built = buildOutputs({
 if (built.dangling.length) {
   process.stderr.write(
     `agentsmith: warning -- unresolved #tag references: ${built.dangling.join(', ')}\n`,
+  );
+}
+
+if (built.crossBoundary.length) {
+  process.stderr.write(
+    `agentsmith: warning -- core references bundle-only #tag(s): ${built.crossBoundary.join(', ')}\n`,
   );
 }
 

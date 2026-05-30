@@ -12,7 +12,7 @@ Type labels remain appropriate as *qualifiers* (e.g. a `PageTitle`'s entity-type
 
 ## #front-nielsen-heuristics Usability Heuristics
 
-The UI design should follow established usability heuristics, for example [Nielsen's 10 Usability Heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/).
+Follow established usability heuristics in UI design, for example [Nielsen's 10 Usability Heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/).
 Design alternatives often present a trade-off between heuristics; point out the trade-off when it arises.
 
 ## #front-cdn Cognitive dimensions of notations
