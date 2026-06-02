@@ -75,6 +75,25 @@ test('--no-tools skips the adapter install', () => {
   }
 });
 
+test('--user installs the adapter into the home .claude and writes no AGENTS.md', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  const home = mkdtempSync(join(tmpdir(), 'agentsmith-home-'));
+  try {
+    execFileSync('node', [cli, '--user'], {
+      cwd: dir,
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+    });
+    assert.ok(existsSync(join(home, '.claude/agents/spec-specialist.md')), 'subagent in home');
+    assert.ok(existsSync(join(home, '.claude/skills/spec-review/SKILL.md')), 'skill in home');
+    assert.ok(existsSync(join(home, '.claude/commands/spec-review.md')), 'command in home');
+    assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'no core written under --user');
+    assert.ok(!existsSync(join(dir, 'AGENTS.md')), 'no stub written under --user');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('an unrelated .claude file survives the install', () => {
   const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
   try {

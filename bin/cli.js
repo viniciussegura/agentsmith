@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
@@ -31,6 +32,7 @@ const has = (flag) => args.includes(flag);
 const layout = has('--full') || has('--inline') ? 'full' : 'lean';
 const placement = has('--root') ? 'root' : 'nested';
 const installTools = !has('--no-tools');
+const userScope = has('--user');
 
 // Every *.md (and any file) under tools/, relative to pkgRoot, recursively.
 function listToolSources(absDir, relBase) {
@@ -101,34 +103,44 @@ if (built.crossBoundary.length) {
   );
 }
 
-if (has('--stdout')) {
+const writeAbs = (dest, content) => {
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, content);
+  process.stderr.write(`agentsmith: wrote ${dest}\n`);
+};
+
+// Install tool adapters (tools/<ai>/** -> <base>/.<ai>/**). Namespaced and
+// non-destructive: only the adapter's own files are written.
+const installAdapters = (base) => {
+  if (!installTools) return;
+  const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
+  for (const { src, dest } of planToolInstall(sources)) {
+    writeAbs(resolve(base, dest), readFileSync(join(pkgRoot, src)));
+  }
+};
+
+if (userScope) {
+  // User scope: install adapters into the home directory for all projects.
+  // The AGENTS.md rule is delivered separately (imported into ~/.claude/CLAUDE.md).
+  if (!installTools) {
+    process.stderr.write('agentsmith: --user with --no-tools has nothing to install\n');
+  }
+  installAdapters(homedir());
+} else if (has('--stdout')) {
   process.stdout.write(built.coreContent);
 } else {
-  const writeOut = (rel, content) => {
-    const dest = resolve(process.cwd(), rel);
-    mkdirSync(dirname(dest), { recursive: true });
-    writeFileSync(dest, content);
-    process.stderr.write(`agentsmith: wrote ${dest}\n`);
-  };
-
-  writeOut(built.corePath, built.coreContent);
-  for (const bundle of built.bundles) writeOut(bundle.path, bundle.content);
+  const cwd = process.cwd();
+  writeAbs(resolve(cwd, built.corePath), built.coreContent);
+  for (const bundle of built.bundles) writeAbs(resolve(cwd, bundle.path), bundle.content);
 
   if (built.stub) {
-    const stubDest = resolve(process.cwd(), built.stub.path);
+    const stubDest = resolve(cwd, built.stub.path);
     if (existsSync(stubDest)) {
       process.stderr.write(`agentsmith: kept existing ${stubDest}\n`);
     } else {
-      writeOut(built.stub.path, built.stub.content);
+      writeAbs(stubDest, built.stub.content);
     }
   }
 
-  // Install tool adapters (tools/<ai>/** -> .<ai>/**). Namespaced and
-  // non-destructive: only the adapter's own files are written.
-  if (installTools) {
-    const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
-    for (const { src, dest } of planToolInstall(sources)) {
-      writeOut(dest, readFileSync(join(pkgRoot, src)));
-    }
-  }
+  installAdapters(cwd);
 }

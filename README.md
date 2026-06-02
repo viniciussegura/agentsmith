@@ -32,6 +32,7 @@ Flags:
 - `--root` -- write the core to the project root instead of under `.agentsmith/`.
 - `--out <path>` -- write the core to a specific path.
 - `--no-tools` -- skip installing the tool adapters (`tools/<ai>/` into `.<ai>/`).
+- `--user` -- install the tool adapters into your home directory (`~/.<ai>/`, e.g. `~/.claude/`) for use across all projects, and write nothing else.
 - `--stdout` -- print the core to stdout instead of writing files (also skips the adapter install).
 
 The adapter install is namespaced and non-destructive: it writes only the adapter's own files (e.g. `.claude/skills/spec-review/`) and never touches the rest of a consumer's `.claude/`.
