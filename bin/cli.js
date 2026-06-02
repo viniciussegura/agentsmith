@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
 import { resolveSections } from '../src/sections.js';
 import { planToolInstall } from '../src/tools.js';
+import { userImport } from '../src/userimport.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -16,7 +17,9 @@ const read = (rel) => readFileSync(join(pkgRoot, rel), 'utf8');
 // Stamp the header with the source revision. Describes the instruction repo
 // (pkgRoot), not the consumer's project. Silently skipped outside a git repo.
 function sourceRevision() {
-  const git = (args) => execFileSync('git', args, { cwd: pkgRoot }).toString().trim();
+  // Ignore stderr so a missing .git (e.g. installed via npx, no repo) stays silent.
+  const git = (args) =>
+    execFileSync('git', args, { cwd: pkgRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
   try {
     const commit = git(['rev-parse', '--short', 'HEAD']);
     const date = git(['log', '-1', '--format=%cd', '--date=short']);
@@ -119,15 +122,25 @@ const installAdapters = (base) => {
   }
 };
 
-if (userScope) {
-  // User scope: install adapters into the home directory for all projects.
-  // The AGENTS.md rule is delivered separately (imported into ~/.claude/CLAUDE.md).
-  if (!installTools) {
-    process.stderr.write('agentsmith: --user with --no-tools has nothing to install\n');
-  }
-  installAdapters(homedir());
-} else if (has('--stdout')) {
+if (has('--stdout')) {
   process.stdout.write(built.coreContent);
+} else if (userScope) {
+  // User scope: write the generated instructions under the home directory, wire
+  // ~/.claude/CLAUDE.md to import them, and install adapters for all projects.
+  const base = homedir();
+  writeAbs(resolve(base, built.corePath), built.coreContent);
+  for (const bundle of built.bundles) writeAbs(resolve(base, bundle.path), bundle.content);
+
+  // Wire the import before installing adapters, so a later adapter-file error
+  // cannot leave instructions written but unwired.
+  const claudeMd = resolve(base, '.claude/CLAUDE.md');
+  const target = resolve(base, built.corePath).replace(/\\/g, '/');
+  const existing = existsSync(claudeMd) ? readFileSync(claudeMd, 'utf8') : null;
+  const next = userImport(existing, target);
+  if (next !== null) writeAbs(claudeMd, next);
+  else process.stderr.write(`agentsmith: kept existing import in ${claudeMd}\n`);
+
+  installAdapters(base);
 } else {
   const cwd = process.cwd();
   writeAbs(resolve(cwd, built.corePath), built.coreContent);

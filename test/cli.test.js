@@ -75,19 +75,72 @@ test('--no-tools skips the adapter install', () => {
   }
 });
 
-test('--user installs the adapter into the home .claude and writes no AGENTS.md', () => {
+// Run the CLI with HOME/USERPROFILE pointed at a throwaway home dir.
+function runUser(cwd, home, args = []) {
+  execFileSync('node', [cli, '--user', ...args], {
+    cwd,
+    env: { ...process.env, HOME: home, USERPROFILE: home },
+  });
+}
+
+test('--user writes home instructions, installs the adapter, and wires CLAUDE.md', () => {
   const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
   const home = mkdtempSync(join(tmpdir(), 'agentsmith-home-'));
   try {
-    execFileSync('node', [cli, '--user'], {
-      cwd: dir,
-      env: { ...process.env, HOME: home, USERPROFILE: home },
-    });
-    assert.ok(existsSync(join(home, '.claude/agents/spec-specialist.md')), 'subagent in home');
-    assert.ok(existsSync(join(home, '.claude/skills/spec-review/SKILL.md')), 'skill in home');
-    assert.ok(existsSync(join(home, '.claude/commands/spec-review.md')), 'command in home');
-    assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'no core written under --user');
-    assert.ok(!existsSync(join(dir, 'AGENTS.md')), 'no stub written under --user');
+    runUser(dir, home);
+    assert.ok(existsSync(join(home, '.agentsmith/AGENTS.md')), 'home core written');
+    assert.ok(existsSync(join(home, '.claude/skills/spec-review/SKILL.md')), 'adapter in home');
+    const claudeMd = readFileSync(join(home, '.claude/CLAUDE.md'), 'utf8');
+    assert.match(claudeMd, /agentsmith: generated user instructions/, 'import block present');
+    assert.match(claudeMd, /@.*\.agentsmith\/AGENTS\.md/, 'import line present');
+    assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'nothing written to cwd');
+    assert.ok(!existsSync(join(dir, 'AGENTS.md')), 'no cwd stub');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('--user is idempotent: a second run does not duplicate the import block', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  const home = mkdtempSync(join(tmpdir(), 'agentsmith-home-'));
+  try {
+    runUser(dir, home);
+    runUser(dir, home);
+    const claudeMd = readFileSync(join(home, '.claude/CLAUDE.md'), 'utf8');
+    const blocks = claudeMd.match(/agentsmith: generated user instructions/g) || [];
+    assert.equal(blocks.length, 1, 'import block appears exactly once');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('--user appends to an existing CLAUDE.md without clobbering it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  const home = mkdtempSync(join(tmpdir(), 'agentsmith-home-'));
+  try {
+    const claudeMd = join(home, '.claude/CLAUDE.md');
+    mkdirSync(dirname(claudeMd), { recursive: true });
+    writeFileSync(claudeMd, '# my own global rules\n');
+    runUser(dir, home);
+    const content = readFileSync(claudeMd, 'utf8');
+    assert.match(content, /^# my own global rules\n/, 'existing content preserved');
+    assert.match(content, /agentsmith: generated user instructions/, 'block appended');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('--user --no-tools writes instructions and wiring but no adapter', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  const home = mkdtempSync(join(tmpdir(), 'agentsmith-home-'));
+  try {
+    runUser(dir, home, ['--no-tools']);
+    assert.ok(existsSync(join(home, '.agentsmith/AGENTS.md')), 'home core written');
+    assert.ok(existsSync(join(home, '.claude/CLAUDE.md')), 'CLAUDE.md wired');
+    assert.ok(!existsSync(join(home, '.claude/skills/spec-review/SKILL.md')), 'no adapter');
   } finally {
     rmSync(dir, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
