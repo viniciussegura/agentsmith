@@ -19,6 +19,15 @@ Every pushback names the specific problem and proposes a path forward.
 - Specs live in `docs/specs/<YYYY-MM-DD>-<slug>.md`, plans in `docs/plans/<YYYY-MM-DD>-<slug>.md`.
 - Non-trivial changes start with a user-approved spec before a plan is written and executed.
 
+## #ai-spec-review Spec auto-review
+
+- After writing or substantially revising a spec (#ai-plan) under `docs/specs/`, offer an adversarial auto-review and wait for the user's choice; never start one unprompted.
+- On opt-in, a spec-specialist reviewer and the author alternate in rounds: the reviewer writes findings (each **blocking** or nit, with a stable id), the author revises the spec and writes a rebuttal (each finding `resolved` or `wontfix`), and the next reviewer reads the current spec, the latest rebuttal, and the running ledger.
+- Where the tool supports sub-agents, the reviewer is a separate agent so the critique is independent; otherwise the author takes the reviewer stance each round, or a human reviews.
+- Convergence guard, checked after each review in this order: zero open blocking findings = converged; otherwise two consecutive reviews that fail to beat the best (lowest) open-blocking count seen so far = stalled (earliest review 3); otherwise a 5-round cap.
+- On stall or the round cap, stop and ask the user how to proceed, summarizing the open blockers and any contested `wontfix`.
+- Only the final spec is committed; per-round reviews and rebuttals are ephemeral under `.agentsmith/tmp/` and are never committed.
+
 ## #ai-preflight Plan execution preflight
 
 Before executing an approved plan, ask and wait for answers to two questions:

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
 import { resolveSections } from '../src/sections.js';
+import { planToolInstall } from '../src/tools.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,6 +30,20 @@ const args = process.argv.slice(2);
 const has = (flag) => args.includes(flag);
 const layout = has('--full') || has('--inline') ? 'full' : 'lean';
 const placement = has('--root') ? 'root' : 'nested';
+const installTools = !has('--no-tools');
+
+// Every *.md (and any file) under tools/, relative to pkgRoot, recursively.
+function listToolSources(absDir, relBase) {
+  if (!existsSync(absDir)) return [];
+  const out = [];
+  for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+    const abs = join(absDir, entry.name);
+    const rel = `${relBase}/${entry.name}`;
+    if (entry.isDirectory()) out.push(...listToolSources(abs, rel));
+    else out.push(rel);
+  }
+  return out;
+}
 const outIdx = args.indexOf('--out');
 const out = outIdx !== -1 ? args[outIdx + 1] : undefined;
 if (outIdx !== -1 && (out === undefined || out.startsWith('--'))) {
@@ -105,6 +120,15 @@ if (has('--stdout')) {
       process.stderr.write(`agentsmith: kept existing ${stubDest}\n`);
     } else {
       writeOut(built.stub.path, built.stub.content);
+    }
+  }
+
+  // Install tool adapters (tools/<ai>/** -> .<ai>/**). Namespaced and
+  // non-destructive: only the adapter's own files are written.
+  if (installTools) {
+    const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
+    for (const { src, dest } of planToolInstall(sources)) {
+      writeOut(dest, readFileSync(join(pkgRoot, src)));
     }
   }
 }
