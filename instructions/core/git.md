@@ -32,6 +32,7 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
 
 - All work happens on branches off `main`.
   Changes land on `main` via squash-merge.
+  **Never** commit directly to `main` or the default branch; when a commit is warranted there, stop and ask to create a branch first.
 - A branch's scope is its logical unit, which may be wider than one feature.
   Implementing a feature often surfaces related issues; fixing them on the same branch is expected.
   A branch may also bundle deliberately, _e.g._ a "release revision" collecting several fixes.
