@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, existsSync, writeFileSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const cli = resolve(fileURLToPath(import.meta.url), '../../bin/cli.js');
@@ -47,6 +47,62 @@ test('an existing root AGENTS.md is never clobbered', () => {
     writeFileSync(root, 'MY OWN POINTER\n');
     run(dir);
     assert.equal(readFileSync(root, 'utf8'), 'MY OWN POINTER\n', 'consumer file preserved');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('default run installs the claude adapter into .claude', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir);
+    assert.ok(existsSync(join(dir, '.claude/agents/spec-specialist.md')), 'subagent installed');
+    assert.ok(existsSync(join(dir, '.claude/skills/spec-review/SKILL.md')), 'skill installed');
+    assert.ok(existsSync(join(dir, '.claude/commands/spec-review.md')), 'command installed');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--no-tools skips the adapter install', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir, ['--no-tools']);
+    assert.ok(existsSync(join(dir, '.agentsmith/AGENTS.md')), 'core still written');
+    assert.ok(!existsSync(join(dir, '.claude/skills/spec-review/SKILL.md')), 'adapter not installed');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--user installs the adapter into the home .claude and writes no AGENTS.md', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  const home = mkdtempSync(join(tmpdir(), 'agentsmith-home-'));
+  try {
+    execFileSync('node', [cli, '--user'], {
+      cwd: dir,
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+    });
+    assert.ok(existsSync(join(home, '.claude/agents/spec-specialist.md')), 'subagent in home');
+    assert.ok(existsSync(join(home, '.claude/skills/spec-review/SKILL.md')), 'skill in home');
+    assert.ok(existsSync(join(home, '.claude/commands/spec-review.md')), 'command in home');
+    assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'no core written under --user');
+    assert.ok(!existsSync(join(dir, 'AGENTS.md')), 'no stub written under --user');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('an unrelated .claude file survives the install', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    const mine = join(dir, '.claude/my-skill.md');
+    mkdirSync(dirname(mine), { recursive: true });
+    writeFileSync(mine, 'MINE\n');
+    run(dir);
+    assert.equal(readFileSync(mine, 'utf8'), 'MINE\n', 'consumer .claude file preserved');
+    assert.ok(existsSync(join(dir, '.claude/skills/spec-review/SKILL.md')), 'adapter still installed alongside');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

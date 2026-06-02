@@ -1,8 +1,9 @@
 # agentsmith
 
-Canonical agent instructions, kept in one place and forged into a project's `AGENTS.md`.
+Forges the tooling for best software-engineering practice with AI agents -- portable instructions first, and, where a tool supports them, skills, commands, and subagents.
 
-Write your cross-project rules once here; generate an inlined `AGENTS.md` in any repo instead of copy-pasting rules into each one.
+The inlined `AGENTS.md` is the default output, not the only one: cross-project rules are written once here and generated into any repo instead of being copy-pasted, and tool-specific adapters (e.g. for Claude Code) are installed alongside them.
+Portability is the default; tool-specific artifacts are additive.
 
 ## Why a generator (not `@`-imports)
 
@@ -13,7 +14,7 @@ Runtime token cost is the same either way -- imports get expanded into context a
 ## Usage
 
 Run in the target project.
-By default it writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, and a root `AGENTS.md` stub pointing at the core (an existing root stub is left untouched):
+By default it writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing root stub is left untouched), and installs the tool adapters under `tools/<ai>/` into their runtime locations (e.g. `tools/claude/` into `.claude/`):
 
 ```bash
 npx github:viniciussegura/agentsmith
@@ -30,23 +31,30 @@ Flags:
 - `--full` -- inline every bundle into one file instead of the lean core plus on-demand split.
 - `--root` -- write the core to the project root instead of under `.agentsmith/`.
 - `--out <path>` -- write the core to a specific path.
-- `--stdout` -- print the core to stdout instead of writing files.
+- `--no-tools` -- skip installing the tool adapters (`tools/<ai>/` into `.<ai>/`).
+- `--user` -- install the tool adapters into your home directory (`~/.<ai>/`, e.g. `~/.claude/`) for use across all projects, and write nothing else.
+- `--stdout` -- print the core to stdout instead of writing files (also skips the adapter install).
+
+The adapter install is namespaced and non-destructive: it writes only the adapter's own files (e.g. `.claude/skills/spec-review/`) and never touches the rest of a consumer's `.claude/`.
 
 Whether the generated `AGENTS.md` is committed in the consumer repo is the consumer's call -- agentsmith only produces the file.
 
 ## Structure
 
 ```
-instructions/      rule sections (the source of truth)
+instructions/      rule sections (the portable source of truth)
   main.md          preamble, emitted first
   core/            ai.md code.md git.md swe.md   always-loaded modules
   frontend/        front.md ui-guidelines.md     on-demand bundle
   backend/         backend.md                    on-demand bundle
+tools/             tool-specific adapters, installed into .<ai>/
+  claude/          agents/ skills/ commands/     Claude Code adapter (-> .claude/)
 manifest.json      preamble, ordered sections (folder + optional when/title), source label
 src/generate.js    pure: (preamble, modules, source) -> AGENTS.md text
 src/build.js       pure: assembles the lean core, bundle files, and root stub
 src/sections.js    pure: splits manifest sections into core vs on-demand bundles
 src/bundles.js     on-demand index + #tag reference-integrity checks
+src/tools.js       pure: maps tools/<ai>/** to .<ai>/** install paths
 bin/cli.js         reads sources, writes the files
 test/              tests for the generator
 ```
