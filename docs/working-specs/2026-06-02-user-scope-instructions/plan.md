@@ -1,6 +1,7 @@
 # Plan: User-scope instructions for `--user`
 
 Date: 2026-06-02
+Status: Implemented
 Spec: `docs/specs/2026-06-02-user-scope-instructions.md` (reviewed, converged at round 3)
 
 ## Overview

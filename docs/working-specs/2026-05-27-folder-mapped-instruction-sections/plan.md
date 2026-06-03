@@ -1,5 +1,8 @@
 # Plan: Folder-mapped instruction sections
 
+Date: 2026-05-27
+Status: Implemented
+
 Implements [the spec](../specs/2026-05-27-folder-mapped-instruction-sections.md).
 Decisions locked: `main.md` stays at root as `preamble`; alphabetical glob + optional `modules` override; unified `sections[]` with optional `when`; `build.js`/`generate.js` stay pure and unchanged, the split lives in `cli.js`.
 

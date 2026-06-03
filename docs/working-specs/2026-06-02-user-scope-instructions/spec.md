@@ -1,7 +1,7 @@
 # Spec: User-scope instructions for `--user`
 
 Date: 2026-06-02
-Status: Approved; implemented (plan `docs/plans/2026-06-02-user-scope-instructions.md`)
+Status: Implemented
 
 ## Motivation
 
