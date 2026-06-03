@@ -17,9 +17,10 @@ Each entry carries a drop-in, house-style block once the rule is concrete enough
 | 5 | `#front-i18n` | `front.md` (frontend bundle) | localization | ready (low priority) |
 | 6 | `#swe-perf` | `swe.md` | performance budgets | ready (low priority) |
 
-Since the last roll: Moves A and B (commits `5e00b1e`, `b10072a`) reworked the spec/plan workflow -- `#ai-plan` rewritten (per-unit `docs/working-specs/<date>-<slug>/` directories, `Status` tokens, append-only history), a new `#swe-reference-spec` added, `#swe-entity` re-homed to `docs/reference-spec/entity-model.md`, and `#swe-docs-drift` + `#swe-done` item 2 wired to the reference spec.
-The audit then caught a contradiction the rewrite introduced (append-only vs `Status`-advance) and proposed a `#ai-plan` amendment; that amendment was adopted the same run (it is no longer listed below).
-No other backlog proposal was adopted or removed.
+Since the last roll (two rolls back-to-back): Moves A and B (commits `5e00b1e`, `b10072a`) reworked the spec/plan workflow -- `#ai-plan` rewritten (per-unit `docs/working-specs/<date>-<slug>/` directories, `Status` tokens, append-only history), a new `#swe-reference-spec` added, `#swe-entity` re-homed to `docs/reference-spec/entity-model.md`, and `#swe-docs-drift` + `#swe-done` item 2 wired to the reference spec.
+The first roll caught a contradiction the rewrite introduced (append-only vs `Status`-advance), proposed a `#ai-plan` amendment, and that amendment plus two term nits were adopted in commit `cafd2c3`.
+This second roll re-checked post-`cafd2c3`: the three fixes are confirmed closed, and two minor source-edit nits surfaced (an unbolded hard "never" in `#swe-reference-spec` against bolded siblings; a redundant `#swe-display-messages` cross-ref in `#ui-canonical-states`) and were applied immediately as source edits, not new rules.
+No backlog proposal was adopted or removed this roll.
 
 The rule set is self-consistent: 38 source sections (28 core + 10 across the frontend and backend bundles) plus the generated `#on-demand` section; every `#tag` resolves, no dangling reference, no duplicate tag, and no core-to-bundle reference.
 
