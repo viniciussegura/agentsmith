@@ -39,17 +39,28 @@ This governs which word names a concept; #swe-naming governs the form that name 
 
 ## #swe-entity Entity model upkeep
 
-Core entities (_aka_ core concepts or core abstractions) are documented in `docs/entity-model.md` and follow rule #swe-terminology.
+Core entities (_aka_ core concepts or core abstractions) are documented in the entity model, `docs/reference-spec/entity-model.md` -- the canonical member of the reference spec (#swe-reference-spec) -- and follow rule #swe-terminology.
 This file presents a human-readable description of the current model, expressed as pure TypeScript types and interfaces.
 The description reflects how users should understand the model.
 It is **NOT** documentation of how the model is implemented (_e.g._ not a database schema).
 Every change to the entity schema **MUST** be accompanied by an updated entity model.
 
+## #swe-reference-spec Reference spec
+
+The reference spec is the living description of the system as it currently is -- the single place to learn what the software does now.
+It lives under `docs/reference-spec/`, created lazily when the first reference document is warranted, never preemptively.
+It is the counterpart to working specs and plans (#ai-plan): those are immutable point-in-time history, while the reference spec is mutable and always reflects the present.
+When the two disagree, the reference spec wins; a working spec is never consulted for current truth.
+A reference-spec document carries no `Status:` line: the `Draft`/`Approved`/`Implemented` lifecycle (#ai-plan) belongs to working specs and plans, whereas the reference spec has no states -- only the current truth.
+The entity model (#swe-entity) is its first and canonical member.
+Upkeep is not a separate mechanism: the reference spec is kept current under #swe-docs-drift and gated by #swe-done -- after a change ships, the reference spec is checked and any drift fixed in the same PR.
+Where the two could be confused, use the qualified terms "working spec" and "reference spec" (#swe-terminology, #swe-naming); a bare "spec" is fine only where context makes which one unambiguous.
+
 ## #swe-docs-drift Documentation drift
 
 Before opening or updating a PR, check for documentation drift -- any doc the change has made stale.
 Fix it in the same PR, before opening or updating.
-This includes -- but is not limited to -- the entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, and files under `docs/`.
+This includes -- but is not limited to -- the reference spec (#swe-reference-spec) and its entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, and files under `docs/`.
 
 ## #swe-environment Environment and secrets
 
@@ -100,7 +111,7 @@ Removing a dependency is a feature -- prune unused ones.
 A change is done only when all of these hold:
 
 1. If available, tests for the change pass locally.
-2. Documentation drift is resolved (#swe-docs-drift), including the entity model when the schema changed (#swe-entity).
+2. Documentation drift is resolved (#swe-docs-drift), including the reference spec when current behavior changed (#swe-reference-spec) and the entity model when the schema changed (#swe-entity).
 3. Unused dependencies are pruned (#swe-deps).
 4. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
 5. The change has been self-reviewed against these instructions.
