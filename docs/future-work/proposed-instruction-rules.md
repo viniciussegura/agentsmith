@@ -17,11 +17,11 @@ Each entry carries a drop-in, house-style block once the rule is concrete enough
 | 5 | `#front-i18n` | `front.md` (frontend bundle) | localization | ready (low priority) |
 | 6 | `#swe-perf` | `swe.md` | performance budgets | ready (low priority) |
 
-Since the last roll: no proposals adopted, no new proposals.
-Tooling changes only: instruction modules were mapped to per-folder sections under `instructions/<name>/` and the manifest collapsed to a unified `sections[]` list (commit `ec84a54`), and the generated-header separator was simplified to a colon (`71e582f`).
-Neither change touches the rule set or its tags.
+Since the last roll: Moves A and B (commits `5e00b1e`, `b10072a`) reworked the spec/plan workflow -- `#ai-plan` rewritten (per-unit `docs/working-specs/<date>-<slug>/` directories, `Status` tokens, append-only history), a new `#swe-reference-spec` added, `#swe-entity` re-homed to `docs/reference-spec/entity-model.md`, and `#swe-docs-drift` + `#swe-done` item 2 wired to the reference spec.
+The audit then caught a contradiction the rewrite introduced (append-only vs `Status`-advance) and proposed a `#ai-plan` amendment; that amendment was adopted the same run (it is no longer listed below).
+No other backlog proposal was adopted or removed.
 
-The rule set is self-consistent: 37 sections (27 core + 10 across the frontend and backend bundles), every `#tag` resolves, no dangling or cross-boundary references.
+The rule set is self-consistent: 38 source sections (28 core + 10 across the frontend and backend bundles) plus the generated `#on-demand` section; every `#tag` resolves, no dangling reference, no duplicate tag, and no core-to-bundle reference.
 
 ---
 
@@ -45,7 +45,7 @@ A change is not done until its tests pass locally (#swe-done).
 
 **Gap.** #swe-done requires self-review only; no rule covers a deliberate review pass.
 **Rationale.** Self-review is the floor; a deliberate pass catches scope creep and drift a linter cannot.
-Promoted above #swe-ci this round: it is unconditional and unblocked, whereas #swe-ci is conditional and waits on #swe-testing.
+The adversarial spec auto-review (#ai-spec-review) already proves the house values independent review of specs; this extends the principle to code.
 **Status.** Ready -- references #swe-done, #swe-docs-drift (exist). Phrased to fit solo and AI-only work.
 
 ```markdown
