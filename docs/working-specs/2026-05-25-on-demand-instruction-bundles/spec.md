@@ -1,4 +1,7 @@
-# On-demand instruction bundles
+# Spec: On-demand instruction bundles
+
+Date: 2026-05-25
+Status: Implemented
 
 ## Problem
 

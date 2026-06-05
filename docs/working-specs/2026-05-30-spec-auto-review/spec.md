@@ -1,7 +1,7 @@
 # Spec: Spec auto-review
 
 Date: 2026-05-30
-Status: Approved; implemented (plan `docs/plans/2026-05-30-spec-auto-review.md`)
+Status: Implemented
 
 ## Motivation
 

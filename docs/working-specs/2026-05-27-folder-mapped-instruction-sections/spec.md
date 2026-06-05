@@ -1,7 +1,7 @@
 # Spec: Folder-mapped instruction sections
 
-Status: draft, awaiting approval.
-Date: 2026-05-27.
+Date: 2026-05-27
+Status: Implemented
 
 ## Problem
 

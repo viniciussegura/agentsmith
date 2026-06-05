@@ -37,7 +37,7 @@ Each component carries:
 - `title`: short, focused message.
 - `subtitle` (optional): brief additional context.
 - `actions` (optional): the calls to action available given the state.
-- `additionalInformation` (optional): detail revealed behind a "show more information" affordance.
+- `additionalInformation` (optional): detail revealed behind a "show more details" affordance.
 - `errorObj` (errors only, required): copy-to-clipboard bundle of the raw error plus timestamp, URL, user, and call stack for the developer.
 
 Follow #swe-display-messages for what the visible text says.

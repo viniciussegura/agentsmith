@@ -1,6 +1,7 @@
 # Plan: Spec auto-review
 
 Date: 2026-05-30
+Status: Implemented
 Spec: `docs/specs/2026-05-30-spec-auto-review.md` (approved)
 
 ## Overview
