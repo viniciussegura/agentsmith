@@ -23,13 +23,14 @@ Confirm the target spec path before starting.
 ## Definitions
 
 - **Round** = one reviewer review followed by one author revision-and-rebuttal. The round cap counts these.
+- **Cycle** = a continuous run of rounds on one spec. The round count and the guard's `best` are **per cycle**. Substantially revising a spec after a prior cycle converged/stalled/capped starts a **new cycle** (reset the round count and `best`), even if you keep numbering rounds upward for continuity.
 - **Finding** = one issue, tagged **blocking** or **nit**, carrying a **stable id** reused verbatim when the issue recurs. See `finding-format.md`.
 - **Ledger** = the running list of findings with status `open` / `resolved` / `wontfix`. The guard reads the ledger, not a raw per-round count.
 - `b(i)` = open-blocking count after review `i` (a finding counts as open only if its status is `open`).
 
 ## Scratch
 
-Write every artifact under `.agentsmith/tmp/spec-review/<slug>/` (gitignored, never committed):
+Write every artifact under `.agentsmith/tmp/spec-review/<spec-dir-name>/` (gitignored, never committed), where `<spec-dir-name>` is the spec's own directory name under `docs/working-specs/` (e.g. `2026-06-09-review-board`) so the scratch folder matches the spec folder exactly:
 
 - `round-<n>.review.md`, `round-<n>.rebuttal.md`, and `ledger.md`.
 
@@ -46,10 +47,10 @@ For each round `n` starting at 1:
 
 ## Convergence guard
 
-Track `best` = the lowest `b` across all **prior** reviews (undefined before review 1). Check in this order; first match wins. Update `best := min(best, b(n))` only **after** the checks.
+Track `best` = the lowest `b` across all **prior** reviews **in the current cycle** (undefined before the cycle's first review). Check in this order; first match wins. Update `best := min(best, b(n))` only **after** the checks. On a new cycle, reset `best` and the cycle's round count.
 
 1. **Converged** -- `b(n) = 0`. Stop; present the final spec. Open nits may remain in the ledger.
-2. **Stalled** -- a review makes progress when `b(n)` is strictly below `best` (review 1 always counts as progress). Stall fires when two consecutive reviews both fail to make progress (earliest review 3); a progress review resets the tally. Stop; ask the user how to proceed.
-3. **Round cap** -- at most 5 rounds. On reaching it without convergence, stop; ask the user how to proceed.
+2. **Stalled** -- a review makes progress when `b(n)` is strictly below `best` (the cycle's first review always counts as progress). Stall fires when two consecutive reviews in the cycle both fail to make progress (earliest the cycle's third review); a progress review resets the tally. Stop; ask the user how to proceed.
+3. **Round cap** -- at most 5 rounds **per cycle**. On reaching it without convergence, stop; ask the user how to proceed.
 
 On stall or cap, summarize the open blocking findings and any `wontfix` the reviewer contests so the user can decide.
