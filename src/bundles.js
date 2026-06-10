@@ -93,3 +93,101 @@ export function coreToBundleRefs({ coreText, bundleTexts = [] }) {
     .filter((t) => bundleDefined.has(t) && !core.defined.has(t))
     .sort();
 }
+
+/**
+ * Parse the tag-keyed ownership map (`instructions/ownership.yaml`). Rows are kept
+ * in file order WITH duplicates preserved, so a duplicate key (double-ownership) is
+ * detectable -- a deduping YAML parser would hide it. Minimal on purpose: the map is a
+ * flat `bare-tag: owner` mapping under an `owners:` key, so no YAML dependency is needed.
+ *
+ * @param {string} text
+ * @returns {{ tag: string, owner: string }[]}
+ */
+export function parseOwnership(text) {
+  const rows = [];
+  let section = null;
+  for (const line of String(text).split('\n')) {
+    if (/^[a-z]/i.test(line)) {
+      section = line.split(':')[0].trim();
+      continue;
+    }
+    if (section !== 'owners') continue;
+    const m = line.match(/^\s+([a-z][a-z0-9-]*):\s*([a-z][a-z0-9-]*)\s*$/i);
+    if (m) rows.push({ tag: m[1].toLowerCase(), owner: m[2] });
+  }
+  return rows;
+}
+
+/**
+ * Parse role-registry metadata (`instructions/roles.yaml`): the declared role ids and the
+ * non-review owner markers. Owned-tag sets are NOT read here -- they derive from ownership.yaml.
+ *
+ * @param {string} text
+ * @returns {{ roles: string[], markers: string[] }}
+ */
+export function parseRoles(text) {
+  const roles = [];
+  const markers = [];
+  let section = null;
+  for (const line of String(text).split('\n')) {
+    if (/^[a-z]/i.test(line)) {
+      section = line.split(':')[0].trim();
+      continue;
+    }
+    if (section === 'roles') {
+      const m = line.match(/^\s+([a-z][a-z0-9-]*):/i);
+      if (m) roles.push(m[1].toLowerCase());
+    } else if (section === 'markers') {
+      const m = line.match(/^\s*-\s*([a-z][a-z0-9-]*)/i);
+      if (m) markers.push(m[1].toLowerCase());
+    }
+  }
+  return { roles, markers };
+}
+
+/**
+ * Coverage lint for the role->rule ownership map. Asserts every instruction #tag has
+ * exactly one resolvable owner. Hard failures (CI gate): orphans (a defined tag with no
+ * owner row), doubleOwned (a tag with more than one row), and unresolvedOwners (an owner
+ * that is neither a declared role nor a known marker). Warnings: stale (an owner row whose
+ * tag is defined nowhere) and rolesWithoutTags (a non-`correctness` role owning no tag).
+ *
+ * @param {{ instructionTexts: string[], ownershipText: string, rolesText: string }} input
+ * @returns {{ orphans: string[], doubleOwned: string[], unresolvedOwners: {tag:string,owner:string}[], stale: string[], rolesWithoutTags: string[] }}
+ */
+export function ownershipCoverage({ instructionTexts, ownershipText, rolesText }) {
+  const defined = new Set();
+  for (const text of instructionTexts) {
+    for (const tag of scanTags(text).defined) defined.add(tag);
+  }
+
+  const rows = parseOwnership(ownershipText);
+  const { roles, markers } = parseRoles(rolesText);
+  const validOwners = new Set([...roles, ...markers]);
+
+  const seen = new Set();
+  const doubleOwned = [];
+  for (const { tag } of rows) {
+    if (seen.has(tag)) doubleOwned.push(tag);
+    seen.add(tag);
+  }
+
+  const orphans = [...defined].filter((t) => !seen.has(t)).sort();
+  const unresolvedOwners = rows
+    .filter((r) => !validOwners.has(r.owner))
+    .map((r) => ({ tag: r.tag, owner: r.owner }));
+  const stale = rows.filter((r) => !defined.has(r.tag)).map((r) => r.tag).sort();
+
+  const owningRoles = new Set(rows.map((r) => r.owner));
+  const rolesWithoutTags = roles
+    .filter((r) => r !== 'correctness' && !owningRoles.has(r))
+    .sort();
+
+  return {
+    orphans,
+    doubleOwned: [...new Set(doubleOwned)].sort(),
+    unresolvedOwners,
+    stale,
+    rolesWithoutTags,
+  };
+}

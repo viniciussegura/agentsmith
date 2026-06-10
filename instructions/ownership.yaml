@@ -1,0 +1,75 @@
+# Role -> rule ownership map.
+#
+# Every instruction #tag has EXACTLY ONE owner: the role accountable for raising
+# findings/proposals about it. This is the one-to-one "single home" relation, distinct
+# from composition (the many-to-many "what a reviewer reads"). A role routinely reads
+# tags it does not own.
+#
+# Owner values: a domain role (security, db, frontend, ux, qa, docs), the base lens (swe),
+# or the non-review marker (process) for rules outside the review taxonomy.
+#
+# Tag-keyed by BARE name (no leading '#', which YAML would read as a comment). Adding a
+# rule forces exactly one new row here; the coverage lint (src/bundles.js) fails CI on any
+# orphan (unowned tag), duplicate key (double-ownership), or owner that resolves to no
+# declared role/marker. Role metadata lives in roles.yaml; a role's owned-tag set is
+# DERIVED from this file, never hand-listed there.
+#
+# Repo config, like manifest.json. NEVER exported: it appears in neither the generated
+# AGENTS.md nor the tools/claude plugin.
+
+owners:
+  # swe -- base lens, cross-cutting code and process quality
+  code-markdown: swe
+  code-style: swe
+  swe-naming: swe
+  swe-reuse: swe
+  swe-terminology: swe
+  swe-errors: swe
+  swe-observability: swe
+  swe-display-messages: swe
+  swe-deps: swe
+  swe-agile: swe
+  swe-future-work: swe
+  swe-technical-debts: swe
+
+  # security
+  swe-security: security
+  swe-environment: security
+
+  # db -- data modeling and the data-facing API contract
+  swe-entity: db
+  be-api-first: db
+  be-api-versioning: db
+
+  # docs
+  swe-docs-drift: docs
+
+  # qa
+  swe-done: qa
+
+  # frontend -- how the component is built
+  front-display-labels: frontend
+  front-a11y: frontend
+  ui-canonical-states: frontend
+
+  # ux -- the end-user experience and flow
+  front-nielsen-heuristics: ux
+  front-cdn: ux
+  ui-header-visibility: ux
+  ui-tabs: ux
+  ui-validation: ux
+
+  # process -- non-review: rules no reviewer lens covers
+  ai-conversational: process
+  ai-candid: process
+  ai-plan: process
+  ai-spec-review: process
+  ai-preflight: process
+  ai-memory: process
+  ai-review-engine: process
+  ai-review-board: process
+  git-title: process
+  git-pr-body: process
+  git-usage: process
+  git-branch-workflow: process
+  swe-reference-spec: process

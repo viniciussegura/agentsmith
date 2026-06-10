@@ -54,13 +54,15 @@ instructions/      rule sections (the portable source of truth)
   core/            ai.md code.md git.md swe.md   always-loaded modules
   frontend/        front.md ui-guidelines.md     on-demand bundle
   backend/         backend.md                    on-demand bundle
+  ownership.yaml   #tag -> owner map             repo config; NEVER exported
+  roles.yaml       review-role metadata          repo config; NEVER exported
 tools/             tool-specific adapters, installed into .<ai>/
   claude/          agents/ skills/ commands/     Claude Code adapter (-> .claude/)
 manifest.json      preamble, ordered sections (folder + optional when/title), source label
 src/generate.js    pure: (preamble, modules, source) -> AGENTS.md text
 src/build.js       pure: assembles the lean core, bundle files, and root stub
 src/sections.js    pure: splits manifest sections into core vs on-demand bundles
-src/bundles.js     on-demand index + #tag reference-integrity checks
+src/bundles.js     on-demand index + #tag reference-integrity + ownership coverage lint
 src/tools.js       pure: maps tools/<ai>/** to .<ai>/** install paths
 bin/cli.js         reads sources, writes the files
 test/              tests for the generator
@@ -71,6 +73,7 @@ test/              tests for the generator
 - Each rule has a `#tag` (e.g. `#swe-reuse`) usable as a handle in conversation.
 - Rules follow their own `#code-markdown` convention: one sentence per line.
 - To add a rule, drop a `.md` into a section folder under `instructions/` (e.g. `core/` or `backend/`); it is picked up automatically.
+- Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the `process` non-review marker) in `instructions/ownership.yaml`; adding a rule means adding its one owner row, or `npm test`'s coverage lint fails on the orphan. Role metadata lives in `instructions/roles.yaml`; both are repo config and are never exported.
 - To add a section, create a folder under `instructions/` and add an entry to `manifest.json` `sections`: a `name` (the folder) plus, for an on-demand bundle, a `title` and a `when`; a section with no `when` is always-loaded and inlined into the core.
 - Files in a section load alphabetically; set a section's `modules` to an explicit file list to override that order.
 - Section order in the output follows `manifest.json`.
