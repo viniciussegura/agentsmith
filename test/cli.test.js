@@ -59,6 +59,12 @@ test('default run installs the claude adapter into .claude', () => {
     assert.ok(existsSync(join(dir, '.claude/agents/spec-specialist.md')), 'subagent installed');
     assert.ok(existsSync(join(dir, '.claude/skills/spec-review/SKILL.md')), 'skill installed');
     assert.ok(existsSync(join(dir, '.claude/commands/spec-review.md')), 'command installed');
+    // the review-board adapter (reviewer personas, skill, commands)
+    assert.ok(existsSync(join(dir, '.claude/agents/review-correctness.md')), 'a reviewer persona installed');
+    assert.ok(existsSync(join(dir, '.claude/agents/review-pm.md')), 'pm reduce persona installed');
+    assert.ok(existsSync(join(dir, '.claude/skills/review-board/SKILL.md')), 'review-board skill installed');
+    assert.ok(existsSync(join(dir, '.claude/commands/review-board.md')), 'review-board command installed');
+    assert.ok(existsSync(join(dir, '.claude/commands/review-promote.md')), 'review-promote command installed');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -70,6 +76,7 @@ test('--no-tools skips the adapter install', () => {
     run(dir, ['--no-tools']);
     assert.ok(existsSync(join(dir, '.agentsmith/AGENTS.md')), 'core still written');
     assert.ok(!existsSync(join(dir, '.claude/skills/spec-review/SKILL.md')), 'adapter not installed');
+    assert.ok(!existsSync(join(dir, '.claude/skills/review-board/SKILL.md')), 'review-board adapter not installed');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

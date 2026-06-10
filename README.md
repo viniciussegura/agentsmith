@@ -39,6 +39,13 @@ The adapter install is namespaced and non-destructive: it writes only the adapte
 
 Whether the generated `AGENTS.md` is committed in the consumer repo is the consumer's call -- agentsmith only produces the file.
 
+## Bundled Claude Code tools
+
+Beyond the portable instructions, the Claude adapter ships skills, commands, and subagents that realize the instruction protocols with real sub-agent delegation:
+
+- **Spec auto-review** (`/spec-review`) -- adversarial review rounds that harden a spec before it becomes a plan (`#ai-spec-review`).
+- **Code-review board** (`/review-board`, `/review-promote`) -- a role-based review engine (`#ai-review-engine`, `#ai-review-board`): role-specialized reviewer subagents fan out over a diff or the whole repo, findings are verified adversarially, and a PM reduce groups them into epics and writes a prioritized triage report (`triage.md` -- a triage report, deliberately not an `#ai-plan` execution `plan.md`). It maintains a committed, human-readable issue store under `reviews/` in the consumer repo (closed and promoted issues are partitioned, never deleted); per-run reasoning stays ephemeral under `.agentsmith/tmp/`. The board is a triage layer on top of the team's tracker -- `/review-promote` records a human escalating an issue into the real backlog. Non-Claude tools run the same protocol in a degraded mode via `AGENTS.md`.
+
 ## Structure
 
 ```
