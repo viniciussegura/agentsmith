@@ -1,6 +1,7 @@
 # Entity model
 
 The core concepts of agentsmith's tooling, expressed as pure TypeScript types.
+The canonical member of the reference spec (`#swe-reference-spec`): it reflects the model as it is **now** and carries no `Status:` line.
 This is how a reader should *understand* the model -- not a description of how it is stored (the on-disk YAML layout lives in `tools/claude/skills/review-board/issue-format.md`).
 Per `#swe-entity`, every change to the entity schema updates this file; per `#swe-terminology`, these names are used identically everywhere.
 

@@ -45,6 +45,7 @@ Beyond the portable instructions, the Claude adapter ships skills, commands, and
 
 - **Spec auto-review** (`/spec-review`) -- adversarial review rounds that harden a spec before it becomes a plan (`#ai-spec-review`).
 - **Code-review board** (`/review-board`, `/review-promote`) -- a role-based review engine (`#ai-review-engine`, `#ai-review-board`): role-specialized reviewer subagents fan out over a diff or the whole repo, findings are verified adversarially, and a PM reduce groups them into epics and writes a prioritized triage report (`triage.md` -- a triage report, deliberately not an `#ai-plan` execution `plan.md`). It maintains a committed, human-readable issue store under `reviews/` in the consumer repo (closed and promoted issues are partitioned, never deleted); per-run reasoning stays ephemeral under `.agentsmith/tmp/`. The board is a triage layer on top of the team's tracker -- `/review-promote` records a human escalating an issue into the real backlog. Non-Claude tools run the same protocol in a degraded mode via `AGENTS.md`.
+- **Instruction review** (`/instruction-review`) -- the same engine and role registry turned on an instruction set itself (`#ai-instruction-review`): each role audits `instructions/` + the generated `AGENTS.md` through its lens, proposing missing or weak rules. It opens on the ownership coverage lint, verifies each proposal is a real not-already-covered gap, and rolls the backlog `docs/future-work/proposed-instruction-rules.md` -- proposing only, never editing instruction sources.
 
 ## Structure
 

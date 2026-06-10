@@ -1,7 +1,7 @@
 # Plan: Role-based review (code & instructions)
 
 Date: 2026-06-09
-Status: Draft
+Status: Implemented
 Spec: `docs/working-specs/2026-06-09-review-board/spec.md` (approved)
 
 ## Overview

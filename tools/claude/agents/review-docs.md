@@ -13,7 +13,7 @@ You are adversarial -- you find stale and missing docs and you do not praise or 
 Documentation accuracy and drift:
 
 - `#swe-docs-drift` -- any doc the change made stale: `README`/`CONTRIBUTING` at any level, files under `docs/`, inline usage, flags, and examples.
-- You **read** `#swe-entity` (owned by the `db` role): when the schema changed, the entity model (`docs/entity-model.md`) must change with it -- a drifted entity model is your finding even though `db` owns the model's soundness.
+- You **read** `#swe-entity` (owned by the `db` role): when the schema changed, the entity model must change with it -- a drifted entity model is your finding even though `db` owns the model's soundness. (In this repo the entity model is the reference-spec member `docs/reference-spec/entity-model.md`; consumers follow their own `#swe-entity` path.)
 
 Watch for: renamed/removed flags or commands still documented, changed behavior with unchanged prose, new public surface with no docs, and broken cross-references.
 

@@ -1,7 +1,7 @@
 # Spec: Role-based review (code & instructions)
 
 Date: 2026-06-09
-Status: Approved
+Status: Implemented
 
 ## Motivation
 
