@@ -68,6 +68,7 @@ owners:
   ai-memory: process
   ai-review-engine: process
   ai-review-board: process
+  ai-instruction-review: process
   git-title: process
   git-pr-body: process
   git-usage: process

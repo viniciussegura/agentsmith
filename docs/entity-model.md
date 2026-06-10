@@ -90,5 +90,31 @@ interface ReviewRoundInfo {
 
 ## Instruction review
 
-`InstructionProposal` is a core entity of the instruction-review application: a proposed new, strengthened, rehomed, or re-owned instruction rule, raised by a role through its lens and rolled into the backlog `docs/future-work/proposed-instruction-rules.md`.
-Its full type is documented here when the instruction-review application lands (Phase 3 of the review-board plan).
+The entity the instruction-review application (`#ai-instruction-review`) raises: a proposed change to the instruction set itself, rolled into the backlog `docs/future-work/proposed-instruction-rules.md`.
+This application proposes only -- it never edits instruction sources.
+
+```typescript
+type ProposalKind =
+  | 'new-rule'    // a rule the domain expects but the set lacks
+  | 'strengthen'  // an existing rule that is too weak or ambiguous
+  | 'rehome'      // an existing rule that should move to a different instructions/ file
+  | 'reowner';    // an existing rule whose ownership row should change owner
+
+// One proposed change to the instruction set, raised by a role through its lens.
+// Fields are required per kind (see below).
+interface InstructionProposal {
+  kind: ProposalKind;
+  tag: string;        // new #tag (new-rule) or an existing #tag (strengthen/rehome/reowner)
+  role: string;       // the role (lens) that raised it -- ties the proposal to the shared registry
+  gap: string;        // the gap or problem it addresses
+  rationale: string;  // one line
+  status: 'ready' | 'blocked' | 'conditional';
+  blockedOn?: string;     // a #tag or condition, when blocked/conditional
+  targetFile?: string;    // required for new-rule/strengthen: the instructions/ file the rule belongs in
+  draft?: string;         // required for new-rule once concrete: a drop-in house-style rule block
+  proposedFile?: string;  // required for rehome: where the rule should move
+  proposedOwner?: string; // required for reowner: the role / base lens / non-review marker it should be owned by
+}
+```
+
+Required-per-kind: `new-rule` and `strengthen` require `targetFile` (`new-rule` also `draft` once concrete); `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must resolve to a declared role, the `swe` base lens, or a known non-review marker.

@@ -65,6 +65,10 @@ test('default run installs the claude adapter into .claude', () => {
     assert.ok(existsSync(join(dir, '.claude/skills/review-board/SKILL.md')), 'review-board skill installed');
     assert.ok(existsSync(join(dir, '.claude/commands/review-board.md')), 'review-board command installed');
     assert.ok(existsSync(join(dir, '.claude/commands/review-promote.md')), 'review-promote command installed');
+    // the instruction-review adapter
+    assert.ok(existsSync(join(dir, '.claude/agents/instruction-editor.md')), 'instruction-editor persona installed');
+    assert.ok(existsSync(join(dir, '.claude/skills/instruction-review/SKILL.md')), 'instruction-review skill installed');
+    assert.ok(existsSync(join(dir, '.claude/commands/instruction-review.md')), 'instruction-review command installed');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

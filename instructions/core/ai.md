@@ -50,6 +50,14 @@ Every pushback names the specific problem and proposes a path forward.
 - Issues move through a single-owner status lifecycle (open / promoted / fixed / deprecated / superseded / duplicated); `promoted` is not a closing status.
 - Persistence is hybrid: a committed, human-readable canonical issue store (closed and promoted issues are partitioned, never agent-deleted) plus ephemeral per-run reasoning under `.agentsmith/tmp/` that is never committed.
 
+## #ai-instruction-review Instruction review
+
+- The engine's second application (#ai-review-engine): run the same roles over an **instruction set** itself (here, `instructions/` plus the generated `AGENTS.md`), each role proposing missing or weak rules through its lens, instead of raising code issues.
+- A round is always a **full audit** (no diff variant); it **opens by running the ownership coverage lint**, turning any orphan or double-owned `#tag` into the round's first proposal, since an unowned rule is one no lens would cover.
+- Each role emits `new-rule` / `strengthen` / `rehome` / `reowner` proposals; a per-proposal verify confirms the gap is real and not already covered by a live `#tag`; an editor reduce deduplicates, runs the once-only structural rubric (self-reference, lean-split, normative voice), and reconciles ownership to keep every tag single-owned.
+- It **proposes only** -- it never edits instruction sources: the single committed output is the rolling backlog `docs/future-work/proposed-instruction-rules.md`. Adopting a proposal into `instructions/` stays a deliberate human action.
+- Role **participation** is per-application: a lens active for code review may be inactive here (e.g. `correctness` audits code, not rules).
+
 ## #ai-preflight Plan execution preflight
 
 Before executing an approved plan, ask and wait for answers to two questions:

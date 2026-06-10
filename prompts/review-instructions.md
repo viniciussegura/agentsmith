@@ -3,6 +3,10 @@
 Standardized prompt for auditing the `instructions/` rule set and its generated `AGENTS.md`.
 Run it whenever instructions change, or on a cadence, to keep the rule set clear, terse, and coherent.
 
+> **Preferred path: the instruction-review application** (`#ai-instruction-review`, the `/instruction-review` skill) fans this audit out **per role** for sharper, less-diluted coverage.
+> This prompt is the **single-agent degraded fallback** of that application (`#ai-review-engine` degradation): one agent applies the dimensions below across all lenses sequentially.
+> Either way there is **one backlog and one rubric** -- the nine dimensions here are the shared rubric the per-role fan-out also applies, and both roll the same `docs/future-work/proposed-instruction-rules.md`. No duplication (`#swe-reuse`).
+
 ## Usage
 
 Paste the task below to an agent, or invoke it as a saved prompt.
