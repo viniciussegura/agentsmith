@@ -49,22 +49,16 @@ Every pushback names the specific problem and proposes a path forward.
 - Each issue has a globally-unique compositional id `<roundId>#<role>-<n>` minted by the raising round; ids are never reused, so cross-issue links stay valid forever.
 - Issues move through a single-owner status lifecycle (open / promoted / fixed / deprecated / superseded / duplicated); `promoted` is not a closing status.
 - Persistence is hybrid: a committed, human-readable canonical issue store (closed and promoted issues are partitioned, never agent-deleted) plus ephemeral per-run reasoning under `.agentsmith/tmp/` that is never committed.
-
-## #ai-instruction-review Instruction review
-
-- The engine's second application (#ai-review-engine): run the same roles over an **instruction set** itself (here, `instructions/` plus the generated `AGENTS.md`), each role proposing missing or weak rules through its lens, instead of raising code issues.
-- A round is always a **full audit** (no diff variant); it **opens by running the ownership coverage lint**, turning any orphan or double-owned `#tag` into the round's first proposal, since an unowned rule is one no lens would cover.
-- Each role emits `new-rule` / `strengthen` / `rehome` / `reowner` proposals; a per-proposal verify confirms the gap is real and not already covered by a live `#tag`; an editor reduce deduplicates, runs the once-only structural rubric (self-reference, lean-split, normative voice), and reconciles ownership to keep every tag single-owned.
-- It **proposes only** -- it never edits instruction sources: the single committed output is the rolling backlog `docs/future-work/proposed-instruction-rules.md`. Adopting a proposal into `instructions/` stays a deliberate human action.
-- Role **participation** is per-application: a lens active for code review may be inactive here (e.g. `correctness` audits code, not rules).
+- The engine has a second application, **instruction review**, that turns the same roles on an instruction set itself; because it applies only to repos that author an agentsmith-style instruction set, it is an on-demand bundle (`#ai-instruction-review`), not part of this core.
 
 ## #ai-preflight Plan execution preflight
 
 Before executing an approved plan, ask and wait for answers to two questions:
 
-1. **Execution shape** -- sequential in the main thread, delegated to parallel subagents, or delegated to sequential subagents? Give a token estimate per option and recommend one.
+1. **Execution shape** -- sequential in the main thread, delegated to parallel subagents, or delegated to sequential subagents? Give a token estimate per option.
 2. **Interaction shape** -- pause for checks and questions as they arise, or run non-stop and batch every question and decision at the end?
 
+For every preflight question, **always signal a recommended answer** and mark it clearly (e.g. label the option "(Recommended)"), so the user can accept the default at a glance.
 Answers are scoped to the current plan and not persisted.
 Re-ask at the start of each plan; do not infer from prior conversations, memory, or runtime hints.
 

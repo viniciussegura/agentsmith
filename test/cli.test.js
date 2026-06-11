@@ -35,6 +35,10 @@ test('folder sections inline the core and emit a file per bundle', () => {
     assert.ok(existsSync(join(dir, '.agentsmith/agents/backend.md')), 'backend bundle written');
     const backend = readFileSync(join(dir, '.agentsmith/agents/backend.md'), 'utf8');
     assert.match(backend, /#be-api-first/, 'a bundle-section rule lands in its bundle file');
+    // #ai-instruction-review is an authoring-only on-demand bundle, not in the consumer core
+    assert.doesNotMatch(core, /## #ai-instruction-review/, 'instruction-review rule is not defined in the lean core');
+    const authoring = readFileSync(join(dir, '.agentsmith/agents/authoring.md'), 'utf8');
+    assert.match(authoring, /## #ai-instruction-review/, 'instruction-review rule is defined in the authoring bundle');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

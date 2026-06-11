@@ -12,6 +12,11 @@
       "name": "backend",
       "title": "Back-end instructions",
       "when": "Back-end, API, or service work"
+    },
+    {
+      "name": "authoring",
+      "title": "Instruction-authoring instructions",
+      "when": "Authoring or auditing an agentsmith-style instruction set (the instructions/ rule sources)"
     }
   ],
   "output": "AGENTS.md"
