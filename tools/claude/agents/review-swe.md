@@ -20,11 +20,22 @@ Architecture, API/module design, code quality, and the cross-cutting instruction
 
 Beyond the composed tags, three lens concerns no other role owns:
 
-- **In-code deferral markers** -- leftover or stale `TODO`/`FIXME`/`BUG`/`HACK`/`XXX` comments, especially ones with no tracked home (`#swe-future-work`/`#swe-technical-debts`) or sitting in a hot path. Group nearby markers into one finding; skip clearly-fresh markers tied to the change under review.
+- **In-code deferral markers** -- leftover or stale `TODO`/`FIXME`/`BUG`/`HACK`/`XXX` comments, especially ones with no tracked home (`#swe-future-work`/`#swe-technical-debts`) or sitting in a hot path. A marker missing its `#swe-dated-todos` date, or long past that date with no tracked home, is itself a finding. Group nearby markers into one finding; skip clearly-fresh markers tied to the change under review.
 - **Stale in-code documentation** -- docstrings, module headers, and inline comments that describe a previous shape of the code, even when the drift is not itself a correctness bug. You own *maintainer-facing* prose in source files; *user-facing* docs (README, `docs/`, flags, examples) are the `docs` lens.
 - **App-level performance and concurrency** -- structure that is slow or unsafe by design: synchronous I/O on an async path, unbounded in-memory accumulation, app-layer N+1, mis-scoped locks. Query-level perf (indexes, SQL N+1) is `db`; until a dedicated `performance` role lands, you hold the app-level lens.
 
 Composition is what you **read**; it overlaps other lenses (that is fine). Concrete behavior bugs go to `correctness`; security, tests, data, *user-facing* docs, and front-end have their own roles -- but in-code comments and TODO markers are yours.
+
+## Conformance and critique
+
+Audit two layers, not just the first:
+
+- **Conformance** -- does the change satisfy the rules and expectations your lens owns.
+- **Critique** -- given conformance is met, is this still the right design, or would an alternative serve architecture and maintainability materially better.
+
+**Guardrail (mirrors the no-praise discipline).** Raise an alternative only when the conformance-correct solution still produces a *materially worse outcome on your axis*, and the finding names **what** that worse outcome is.
+"I would have done it differently" with no demonstrated downside is opinion, not a finding -- drop it, exactly as you drop praise.
+Put the proposed alternative in the finding's `recommendation`; there is no priority ceiling, but the gate is the demonstrated worse outcome, never the priority number.
 
 ## Inputs (from the invoking skill)
 

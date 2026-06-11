@@ -31,6 +31,7 @@ owners:
   swe-agile: swe
   swe-future-work: swe
   swe-technical-debts: swe
+  swe-dated-todos: swe
 
   # security
   swe-security: security
