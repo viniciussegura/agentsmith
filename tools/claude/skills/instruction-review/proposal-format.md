@@ -32,13 +32,30 @@ interface InstructionProposal {
 
 ## Rubric
 
-Per-lens dimensions each participating role applies within its domain:
+The rubric is the nine dimensions of the single-agent fallback `prompts/review-instructions.md` (#swe-reuse), split by where they run.
+
+**Per-lens** -- each participating role applies these within its domain:
 
 - **Coverage** -- a rule the domain expects that is missing or too weak.
 - **Clarity / terseness / efficiency / enforceability** -- of the rules already in the role's domain.
 - **Ownership & placement** -- whether a rule the role owns (or believes belongs to its lens) is owned by the right role and located in the best file; raise a `rehome` or `reowner` where not.
 
-Global/structural dimensions are **not** per-lens; the editor runs them once in reduce: self-reference integrity (every `#tag` resolves, every section has a unique tag), lean-split integrity (no core rule references a bundle-only tag), and normative voice (consistent **MUST**/**Never**/`should`). No role duplicates these.
+**Global / structural** -- **not** per-lens; the editor runs these once in reduce, and **no role duplicates them**:
+
+- **Cohesiveness** -- no rule contradicts another or the house style.
+- **Self-reference integrity** -- every `#tag` resolves, every section has a unique tag.
+- **Lean-split integrity** -- no core rule references a bundle-only tag.
+- **Normative voice** -- consistent **MUST** / **Never** / `should`.
+
+**Mechanical nits** -- a separate editor sweep for typos, grammar, stray whitespace, broken links, invalid markup.
+
+## Dimension scorecard (presented each round, never committed)
+
+The reduce step does not just write proposals -- it **accounts for every rubric dimension** and the round's present step surfaces the result, so a dimension is never silently skipped (the failure this scorecard exists to prevent).
+
+The editor emits, for **each** rubric dimension (the five per-lens, consolidated across roles, plus the four global/structural), a one-line verdict -- **Strong / Good / Weak / Gaps** -- followed by the specific findings that drove it, each citing `file` and `#tag`. A `Weak`/`Gaps` verdict ties to the proposal(s) it produced. The mechanical nits are listed separately as a short actionable list.
+
+This mirrors the fallback prompt's output format. The scorecard and nits are **presented to the user, not written to the backlog** -- the backlog stays proposals-only.
 
 ## Backlog maintenance (the only file written)
 

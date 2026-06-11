@@ -42,11 +42,13 @@ Spawn one `review-verifier` per proposal, biased to reject: confirm the gap is *
 
 ### 4. Reduce (instruction-editor, strong model)
 
-Spawn `instruction-editor` with the verified proposals: it deduplicates across lenses, runs the one-time global/structural rubric pass, reconciles `rehome`/`reowner` to a single owner (confirming the map stays complete and single-owner), rejects proposals missing their required field, and **rolls the backlog in place** per `proposal-format.md`. The backlog is the only file written.
+Spawn `instruction-editor` with the verified proposals: it deduplicates across lenses, reconciles `rehome`/`reowner` to a single owner (confirming the map stays complete and single-owner), rejects proposals missing their required field, and **rolls the backlog in place** per `proposal-format.md`. The backlog is the only file written.
+It then **accounts for every rubric dimension** (`proposal-format.md`): consolidate the per-lens verdicts from the role outputs, run the one-time global/structural rubric pass (cohesiveness, self-reference, lean-split, normative voice), and do the mechanical-nits sweep -- producing the **dimension scorecard** and nits list. These are ephemeral (presented, not committed).
 
 ### 5. Present (main thread)
 
-Summarize what moved, what closed, what was rejected, and recommend the top few proposals to draft next.
+Present, in this order: the **dimension scorecard** (a Strong/Good/Weak/Gaps verdict per rubric dimension, with the findings and `file`/`#tag` citations that drove each), then the **mechanical-nits** list, then what moved / closed / was rejected on the backlog, and a recommendation of the top few proposals to draft next.
+The scorecard is the round's proof that no dimension was skipped -- never omit it.
 
 ## Scratch
 
