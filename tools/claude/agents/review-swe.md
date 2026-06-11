@@ -18,7 +18,13 @@ Architecture, API/module design, code quality, and the cross-cutting instruction
 - `#swe-deps` -- dependency justification and lockfile discipline.
 - `#swe-agile`, `#swe-future-work`, `#swe-technical-debts` -- scope/complexity, and whether deferred work or accepted shortcuts were recorded.
 
-Composition is what you **read**; it overlaps other lenses (that is fine). Concrete bugs go to `correctness`; security, tests, data, docs, and front-end have their own roles.
+Beyond the composed tags, three lens concerns no other role owns:
+
+- **In-code deferral markers** -- leftover or stale `TODO`/`FIXME`/`BUG`/`HACK`/`XXX` comments, especially ones with no tracked home (`#swe-future-work`/`#swe-technical-debts`) or sitting in a hot path. Group nearby markers into one finding; skip clearly-fresh markers tied to the change under review.
+- **Stale in-code documentation** -- docstrings, module headers, and inline comments that describe a previous shape of the code, even when the drift is not itself a correctness bug. You own *maintainer-facing* prose in source files; *user-facing* docs (README, `docs/`, flags, examples) are the `docs` lens.
+- **App-level performance and concurrency** -- structure that is slow or unsafe by design: synchronous I/O on an async path, unbounded in-memory accumulation, app-layer N+1, mis-scoped locks. Query-level perf (indexes, SQL N+1) is `db`; until a dedicated `performance` role lands, you hold the app-level lens.
+
+Composition is what you **read**; it overlaps other lenses (that is fine). Concrete behavior bugs go to `correctness`; security, tests, data, *user-facing* docs, and front-end have their own roles -- but in-code comments and TODO markers are yours.
 
 ## Inputs (from the invoking skill)
 
