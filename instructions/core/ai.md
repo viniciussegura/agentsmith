@@ -19,7 +19,7 @@ Every pushback names the specific problem and proposes a path forward.
 - A unit of work lives in one directory, `docs/working-specs/<YYYY-MM-DD>-<slug>/`, holding `spec.md` and/or `plan.md`.
   The directory may hold only `spec.md` (no plan yet) or only `plan.md` (trivial work that skipped a spec).
 - Each file carries a `Status:` line that is exactly one bare token: `Draft`, `Approved`, or `Implemented`.
-- A spec or plan is append-only once `Approved` -- its body is frozen, though the `Status:` line may still advance to `Implemented`; corrections to the live system go to the reference spec (#swe-reference-spec), never back into the artifact that predates them.
+- A spec or plan is append-only once `Approved` -- its body is frozen, though the `Status:` line may still advance to `Implemented`; corrections to the live system go to the reference spec (#swe-reference-spec), **never** back into the artifact that predates them.
 - Non-trivial changes start with a user-approved spec before a plan is written and executed.
 
 ## #ai-spec-review Spec auto-review
