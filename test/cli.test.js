@@ -68,6 +68,7 @@ test('default run installs the claude adapter into .claude', () => {
     assert.ok(existsSync(join(dir, '.claude/agents/review-pm.md')), 'pm reduce persona installed');
     assert.ok(existsSync(join(dir, '.claude/skills/review-board/SKILL.md')), 'review-board skill installed');
     assert.ok(existsSync(join(dir, '.claude/skills/review-board/lint.mjs')), 'review-board store linter installed');
+    assert.ok(existsSync(join(dir, '.claude/skills/review-board/reviewer-common.md')), 'shared reviewer protocol installed');
     assert.ok(existsSync(join(dir, '.claude/commands/review-board.md')), 'review-board command installed');
     assert.ok(existsSync(join(dir, '.claude/commands/review-promote.md')), 'review-promote command installed');
     // the instruction-review adapter

@@ -34,22 +34,22 @@ Every pushback names the specific problem and proposes a path forward.
 
 ## #ai-review-engine Role-based review engine
 
-- A shared, opt-in review engine fans out **role-specialized reviewer sub-agents**, each a curated composition of existing instruction tags (#swe-reuse) rather than a fresh persona, so reviewers track the instruction set instead of forking it.
-- One pipeline, two applications: **code review** (#ai-review-board) and a sibling instruction-review application; they share the registry and the shape, and differ only in subject, schema, persistence, and reconciliation.
-- The shape is **setup -> fan-out (cheap model, parallel) -> verify (an adversarial per-finding skeptic, biased to reject) -> reduce (a strong-model editor that consolidates and writes the human-facing output) -> present**.
-- Three adversarial filters gate every finding before it becomes team work: the verify stage, the reduce-stage consolidation, and a human acceptance step.
-- Portable and degrades by host: real sub-agents when available, else one agent role-playing each lens sequentially, else a human supplying findings onto the same schema.
+- A shared, opt-in engine fans out **role-specialized reviewer sub-agents**, each a composition of existing instruction tags (#swe-reuse), not a fresh persona -- so reviewers track the instruction set instead of forking it.
+- One pipeline, two applications -- **code review** (#ai-review-board) and instruction review -- sharing the registry and shape, differing only in subject, schema, persistence, and reconciliation.
+- Shape: **setup -> fan-out (cheap model, parallel) -> verify (per-finding skeptic, biased to reject) -> reduce (strong-model editor; consolidates and writes the human output) -> present**.
+- Three adversarial filters gate every finding into team work: verify, reduce-stage consolidation, and human acceptance.
+- Degrades by host: real sub-agents, else one agent role-playing each lens, else a human filling the same schema.
 
 ## #ai-review-board Code-review board
 
-- On request, run the review engine (#ai-review-engine) over the current repo state or a branch-vs-default-branch diff, each role raising structured issues through its lens, then a project-manager reduce consolidates priority, groups issues into epics, and writes a prioritized triage report.
-- `correctness` (behavior bugs) and `swe` (the cross-cutting base lens) **always run**; other roles are gated by the paths and commit messages the change touches, so a relevant lens is never silently skipped and an irrelevant one is not paid for.
-- The board is a triage layer **on top of** the team's official tracker, not a replacement: a human promotes a board issue into the tracker, and that promotion is the human validation of the AI-raised issue.
-- `baselineCommit` is always a live default-branch SHA: a feature-branch round uses `merge-base(commit, default)` (squash-safe, never chained off a branch tip); a default-branch round chains off the previous default-branch round's commit.
-- Each issue has a globally-unique compositional id `<roundId>#<role>-<n>` minted by the raising round; ids are never reused, so cross-issue links stay valid forever.
-- Issues move through a single-owner status lifecycle (open / promoted / fixed / deprecated / superseded / duplicated); `promoted` is not a closing status.
-- Persistence is hybrid: a committed, human-readable canonical issue store (closed and promoted issues are partitioned, never agent-deleted) plus ephemeral per-run reasoning under `.agentsmith/tmp/` that is never committed.
-- The engine has a second application, **instruction review**, that turns the same roles on an instruction set itself; because it applies only to repos that author an agentsmith-style instruction set, it is an on-demand bundle (`#ai-instruction-review`), not part of this core.
+- On request, run the engine (#ai-review-engine) over the repo state or a branch-vs-default-branch diff; each role raises structured issues through its lens, then a project-manager reduce consolidates priority, groups issues into epics, and writes a prioritized triage report.
+- `correctness` (behavior bugs) and `swe` (the base lens) **always run**; other roles are gated by the paths and commit messages the change touches -- a relevant lens is never silently skipped, an irrelevant one never paid for.
+- The board is a triage layer **on top of** the team's tracker, not a replacement: a human promotes a board issue into the tracker, and that promotion is the human validation of the AI-raised finding.
+- `baselineCommit` is always a live default-branch SHA: a feature-branch round uses `merge-base(commit, default)` (squash-safe); a default-branch round chains off the prior default-branch round.
+- Each issue carries a globally-unique compositional id `<roundId>#<role>-<n>` minted by the raising round; ids are never reused, so cross-issue links stay valid.
+- Issues move through a single-owner lifecycle (open / promoted / fixed / deprecated / superseded / duplicated); `promoted` is not a closing status.
+- Persistence is hybrid: a committed, human-readable issue store (closed and promoted issues partitioned, never agent-deleted) plus ephemeral per-run reasoning under `.agentsmith/tmp/`, never committed.
+- A second application, **instruction review**, turns the same roles on an instruction set itself; it applies only to repos authoring an agentsmith-style set, so it is an on-demand bundle (`#ai-instruction-review`), not part of this core.
 
 ## #ai-preflight Plan execution preflight
 
