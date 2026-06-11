@@ -62,6 +62,9 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 - Write verified new issues under their already-minted compositional ids (no allocation step); apply reconciled status transitions; move newly-closing issues to `closed/`.
 - Do **not** set `promoted` here -- that is `/review-promote`.
 - Write/refresh `reviews/rounds/<round-id>.yaml` (the `ReviewRoundInfo`).
+- Validate the store before reducing: run `node .claude/skills/review-board/lint.mjs reviews`.
+  A non-zero exit means the write left the store structurally invalid -- an id/role/placement mismatch, a dangling `relatedIssues` reference, a closing status missing its `closingComments`/`closedInRound`, or a round with no `baselineCommit`.
+  Fix the offending files and rerun until it exits clean; the linter is read-only and never edits the store for you.
 
 ### 5. Reduce (PM role, strong model)
 

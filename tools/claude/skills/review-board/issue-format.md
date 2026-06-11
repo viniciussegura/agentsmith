@@ -95,3 +95,22 @@ reviews/
 `<round-id>` follows `<YYYY-MM-DD>[<letter>]-<target-branch>` (e.g. `2026-06-09b-feature-x`); it is the `<roundId>` prefix in every id minted that round.
 Per-run reasoning (reviewer outputs, verifier transcripts including rejected findings, PM deliberation) is **ephemeral** under `.agentsmith/tmp/review-board/<round-id>/`, gitignored, never committed; retained until the round's `triage.md` is reviewed.
 No agent deletes store files -- git history is the archive.
+
+## Validation
+
+The store is machine-validated by `lint.mjs` (installed alongside this file at `.claude/skills/review-board/lint.mjs`): `node .claude/skills/review-board/lint.mjs reviews`.
+It is **read-only** -- it reports and exits non-zero, never mutating the store -- so it is safe to run in CI or a pre-commit hook as the gate that the invariants below actually hold.
+Run it at the end of every round (SKILL step 4) and on every commit that touches `reviews/`.
+
+It enforces, as **errors** (non-zero exit):
+
+- Every issue/epic has an `id` of the form `<roundId>#<role>-<n>`, and that id is unique across the store.
+- `kind` matches the tree: `issue` under `issues/`, `epic` under `epics/`; the id's role segment matches its role directory (`epic` for epics).
+- Filesystem placement matches status: a closing status (`fixed`/`deprecated`/`superseded`/`duplicated`) lives under `closed/`, `promoted` under `promoted/`, everything else directly under its role directory.
+- A closing status carries `closingComments` and `closedInRound`; a `promoted` status carries `promotedTo`.
+- Every `relatedIssues[].issueId` resolves to an id that exists in the store.
+- Every `rounds/<id>.yaml` has a `baselineCommit` (never undefined) and a `commit`, and its `id` matches its filename.
+
+And as **warnings** (non-zero only under `--strict`): a missing `lastConfirmedCommit`, a filename that does not encode its id, a `relatedIssues` self-reference, and an id or `previousRound` whose round prefix has no matching `rounds/` file.
+
+It does **not** check supersession-chain acyclicity: our relations live in free-text `relatedIssues[].description`, not a typed field, so a reliable graph cannot be built without false positives. A typed relation kind is deferred work.

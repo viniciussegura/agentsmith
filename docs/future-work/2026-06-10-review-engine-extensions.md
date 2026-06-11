@@ -20,3 +20,9 @@ Recorded on approval of that work (`#swe-future-work`).
 **What.** First-class adapters (skills/commands/agents equivalents) for other assistants -- e.g. `tools/codex/`, `tools/gemini/` -- mirroring `tools/claude/`.
 **Why.** Today non-Claude tools run the protocol only in the degraded mode they read from `AGENTS.md`; native adapters would give them real fan-out/verify/reduce where their runtime supports it.
 **Constraints / dependencies.** The generator's `planToolInstall` already generalizes `tools/<ai>/ -> .<ai>/`, so the plumbing exists; the work is authoring each tool's native artifact format. Each adapter must stay in lockstep with the portable protocol so the three degradation tiers do not diverge.
+
+## Typed `relatedIssues` relation kind (and acyclicity checks)
+
+**What.** Replace (or supplement) the free-text `relatedIssues[].description` with a typed `kind` enum (`child-of`, `duplicate-of`, `superseded-by`, ...), so the store linter (`tools/claude/skills/review-board/lint.mjs`) can build a real relation graph and detect supersession/duplication cycles.
+**Why.** The linter currently validates `relatedIssues` referential integrity but **cannot** check acyclicity: with the relation encoded in prose, a generic cycle check would false-positive on legitimate bidirectional links (epic <-> child). A typed kind makes "no superseded-by cycle" mechanically enforceable, closing the one integrity gap called out in `issue-format.md`.
+**Constraints / dependencies.** Schema change to `RelatedIssue` in `issue-format.md` (and the entity model if the relation becomes a core concept); a migration note for any existing stores; the linter gains a directed-graph pass per relation kind. Inspired by the reference implementation's `supersededBy`/`duplicateOf` typed fields and its acyclicity validation.
