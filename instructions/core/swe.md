@@ -37,6 +37,12 @@ Every in-code deferral marker carries the date it was written, inside the tag: `
 The date records the marker's age, not a due date -- it lets a later reader or reviewer judge staleness without `git blame`, which a squash-merge (#git-branch-workflow) collapses to a single commit.
 A marker that implies real follow-up work belongs in `docs/future-work/` (#swe-future-work) or a technical-debt note (#swe-technical-debts), not left to rot in code.
 
+## #swe-dead-code Dead and disabled code
+
+Delete dead code; **never** comment it out to keep it around: version control is the history (#git-branch-workflow).
+Remove unreachable branches, unused identifiers, and disabled blocks in the same change that orphans them.
+Code you intend to restore later is deferred work (#swe-future-work), not a commented-out block left to rot.
+
 ## #swe-terminology Terminology
 
 Avoid terminology drift.
@@ -66,7 +72,15 @@ Where the two could be confused, use the qualified terms "working spec" and "ref
 
 Before opening or updating a PR, check for documentation drift -- any doc the change has made stale.
 Fix it in the same PR, before opening or updating.
-This includes -- but is not limited to -- the reference spec (#swe-reference-spec) and its entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, and files under `docs/`.
+This includes, but is not limited to, the reference spec (#swe-reference-spec) and its entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, and files under `docs/`.
+Discover the affected docs, do not eyeball them: search the docs for the identifiers, flags, commands, and paths the change touched, and check each hit.
+A doc *example* (snippet, CLI invocation, config block, request/response) is stale when it no longer runs or matches the current surface; update it in the same PR or delete it.
+
+## #swe-public-surface-docs Document new public surface
+
+New public surface ships documented in the same change -- a CLI command or flag, endpoint, exported function or type, config key, or env var (#swe-environment).
+State what it does, its inputs and outputs, and one example, where consumers already look (`README`, `docs/`, or the reference spec #swe-reference-spec) -- not only in code comments.
+Removing surface is the mirror: delete its doc in the same change (#swe-docs-drift).
 
 ## #swe-environment Environment and secrets
 
@@ -112,14 +126,32 @@ A dependency **MUST** be actively maintained and license-compatible.
 Commit the lockfile and pin versions.
 Removing a dependency is a feature -- prune unused ones.
 
+## #swe-testing Testing
+
+Write tests test-first: a failing test before the code that satisfies it.
+Every bug fix starts with a test that reproduces the bug.
+Tests should be written by an agent other than the one that implemented the feature, to cover behavior, not implementation.
+Tests live beside the code or under `test/`, mirroring the source layout.
+A change is not done until its tests pass locally (#swe-done).
+
+## #swe-test-quality Test credibility
+
+A test must be able to fail: assert observable behavior, never that code merely ran; no tautologies or unread snapshots.
+Cover the error paths and edge cases the change adds, not just the happy path.
+Keep tests deterministic -- no real clock, order, locale, network, or unseeded RNG; a test that flakes counts as failing (#swe-done), fixed at the source or quarantined with a tracked record (#swe-future-work).
+Fixtures use synthetic data (#swe-environment, #swe-security), isolated per test, kept in step with the schema.
+A test that passes against a mock proves nothing.
+
 ## #swe-done Definition of done
 
 A change is done only when all of these hold:
 
-1. If available, tests for the change pass locally.
+1. Tests for the change pass locally.
+   When the repo has no test harness, or the change is genuinely untestable, the verification actually performed is stated and recorded (#git-pr-body, #swe-technical-debts): "done" is never "it compiled."
 2. Documentation drift is resolved (#swe-docs-drift), including the reference spec when current behavior changed (#swe-reference-spec) and the entity model when the schema changed (#swe-entity).
 3. Unused dependencies are pruned (#swe-deps).
 4. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
 5. The change has been self-reviewed against these instructions.
 
 Do not open or update a PR before all items hold.
+
