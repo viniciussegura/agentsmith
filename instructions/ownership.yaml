@@ -32,10 +32,13 @@ owners:
   swe-future-work: swe
   swe-technical-debts: swe
   swe-dated-todos: swe
+  swe-dead-code: swe
 
   # security
   swe-security: security
   swe-environment: security
+  ai-untrusted-content: security
+  ai-tool-safety: security
 
   # db -- data modeling and the data-facing API contract
   swe-entity: db
@@ -44,9 +47,12 @@ owners:
 
   # docs
   swe-docs-drift: docs
+  swe-public-surface-docs: docs
 
   # qa
   swe-done: qa
+  swe-testing: qa
+  swe-test-quality: qa
 
   # frontend -- how the component is built
   front-display-labels: frontend

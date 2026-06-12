@@ -130,7 +130,7 @@ Removing a dependency is a feature -- prune unused ones.
 
 Write tests test-first: a failing test before the code that satisfies it.
 Every bug fix starts with a test that reproduces the bug.
-Tests should be written by an agent other than the one that implemented the feature, to cover behavior, not implementation.
+Assert against the public surface, not internals; where the workflow supports it, tests are authored independently of the implementation.
 Tests live beside the code or under `test/`, mirroring the source layout.
 A change is not done until its tests pass locally (#swe-done).
 
@@ -151,7 +151,7 @@ A change is done only when all of these hold:
 2. Documentation drift is resolved (#swe-docs-drift), including the reference spec when current behavior changed (#swe-reference-spec) and the entity model when the schema changed (#swe-entity).
 3. Unused dependencies are pruned (#swe-deps).
 4. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
-5. The change has been self-reviewed against these instructions.
+5. The change has been self-reviewed against these instructions; self-review is the floor, and a non-trivial diff escalates to a deliberate, independent review pass (#ai-review-board) before it squash-merges to `main`.
 
 Do not open or update a PR before all items hold.
 

@@ -8,6 +8,7 @@ import { buildOutputs } from '../src/build.js';
 import { resolveSections } from '../src/sections.js';
 import { planToolInstall } from '../src/tools.js';
 import { userImport } from '../src/userimport.js';
+import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -112,14 +113,36 @@ const writeAbs = (dest, content) => {
   process.stderr.write(`agentsmith: wrote ${dest}\n`);
 };
 
+// Merge agentsmith's owned hooks into <base>/.claude/settings.json without clobbering
+// the consumer's own settings. Project installs use a project-relative command (hooks
+// run from the project root); user installs need the absolute home path (a user hook's
+// cwd is the active project, not home). Idempotent across reinstalls.
+const installSettings = (base, { absolute }) => {
+  const dest = resolve(base, '.claude/settings.json');
+  let existing = null;
+  if (existsSync(dest)) {
+    try {
+      existing = JSON.parse(readFileSync(dest, 'utf8'));
+    } catch {
+      process.stderr.write(`agentsmith: warning -- ${dest} is not valid JSON; left untouched\n`);
+      return;
+    }
+  }
+  const commandPath = absolute ? resolve(base, HOOK_REL) : HOOK_REL;
+  const next = mergeSettings(existing, agentsmithHooks(commandPath));
+  writeAbs(dest, `${JSON.stringify(next, null, 2)}\n`);
+};
+
 // Install tool adapters (tools/<ai>/** -> <base>/.<ai>/**). Namespaced and
 // non-destructive: only the adapter's own files are written.
-const installAdapters = (base) => {
+const installAdapters = (base, { absolute }) => {
   if (!installTools) return;
   const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
   for (const { src, dest } of planToolInstall(sources)) {
     writeAbs(resolve(base, dest), readFileSync(join(pkgRoot, src)));
   }
+  // Wire settings after the hook script is on disk, so it never references a missing file.
+  installSettings(base, { absolute });
 };
 
 if (has('--stdout')) {
@@ -140,7 +163,7 @@ if (has('--stdout')) {
   if (next !== null) writeAbs(claudeMd, next);
   else process.stderr.write(`agentsmith: kept existing import in ${claudeMd}\n`);
 
-  installAdapters(base);
+  installAdapters(base, { absolute: true });
 } else {
   const cwd = process.cwd();
   writeAbs(resolve(cwd, built.corePath), built.coreContent);
@@ -155,5 +178,5 @@ if (has('--stdout')) {
     }
   }
 
-  installAdapters(cwd);
+  installAdapters(cwd, { absolute: false });
 }
