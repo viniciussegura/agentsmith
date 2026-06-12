@@ -6,7 +6,9 @@
 # tags it does not own.
 #
 # Owner values: a domain role (security, db, frontend, ux, qa, docs), the base lens (swe),
-# or the non-review marker (process) for rules outside the review taxonomy.
+# or a meta lens (ai, git) for the agent-behavior / VCS-workflow process rules. Ownership
+# follows DOMAIN, not tag prefix: an `ai-`/`swe-` prefixed rule whose subject is security
+# (e.g. ai-untrusted-content, swe-security) is owned by `security`, not by prefix.
 #
 # Tag-keyed by BARE name (no leading '#', which YAML would read as a comment). Adding a
 # rule forces exactly one new row here; the coverage lint (src/bundles.js) fails CI on any
@@ -33,6 +35,7 @@ owners:
   swe-technical-debts: swe
   swe-dated-todos: swe
   swe-dead-code: swe
+  swe-reference-spec: swe
 
   # security
   swe-security: security
@@ -66,18 +69,19 @@ owners:
   ui-tabs: ux
   ui-validation: ux
 
-  # process -- non-review: rules no reviewer lens covers
-  ai-conversational: process
-  ai-candid: process
-  ai-plan: process
-  ai-spec-review: process
-  ai-preflight: process
-  ai-memory: process
-  ai-review-engine: process
-  ai-review-board: process
-  ai-instruction-review: process
-  git-title: process
-  git-pr-body: process
-  git-usage: process
-  git-branch-workflow: process
-  swe-reference-spec: process
+  # ai -- meta lens: agent behavior, planning, memory, the review engine (instruction-review only)
+  ai-conversational: ai
+  ai-candid: ai
+  ai-plan: ai
+  ai-spec-review: ai
+  ai-preflight: ai
+  ai-memory: ai
+  ai-review-engine: ai
+  ai-review-board: ai
+  ai-instruction-review: ai
+
+  # git -- meta lens: VCS workflow, commits, branches, PRs (instruction-review only)
+  git-title: git
+  git-pr-body: git
+  git-usage: git
+  git-branch-workflow: git

@@ -92,7 +92,7 @@ roles:
   ux:          { paths: ["**/*.tsx", "**/*.jsx", "**/*.vue", "**/pages/**", "**/views/**"], keywords: ["flow", "usability", "ux"] }
 # Phase 3 (instruction review) adds:
 # instruction-review:
-#   participants: [swe, security, db, qa, docs, frontend, ux]
+#   participants: [swe, security, db, qa, docs, frontend, ux, ai, git]
 ```
 
 ## Degradation

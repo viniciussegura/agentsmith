@@ -12,6 +12,11 @@
 # correctness owns no tag by design (its subject is the diff's behavior, not a rule), so the
 # coverage lint exempts it from the "every role owns >=1 tag" warning.
 #
+# `ai` and `git` are META LENSES: they own the process rules (agent behavior, VCS workflow)
+# and run in instruction-review ONLY (always:false keeps them out of every code-review round,
+# where those rules never produce a code finding). They replace the old `process` non-review
+# marker -- every rule now has a reviewing lens, so there is no un-reviewed bucket.
+#
 # Repo config, like manifest.json. NEVER exported to AGENTS.md or the plugin.
 
 roles:
@@ -23,7 +28,8 @@ roles:
   docs:        { always: false, base_lens: false, instruction_review: true }
   frontend:    { always: false, base_lens: false, instruction_review: true }
   ux:          { always: false, base_lens: false, instruction_review: true }
+  ai:          { always: false, base_lens: false, instruction_review: true }
+  git:         { always: false, base_lens: false, instruction_review: true }
 
-# Owners outside the review taxonomy (rules nothing reviews).
-markers:
-  - process
+# No non-review markers: every #tag resolves to a reviewing lens above.
+markers: []

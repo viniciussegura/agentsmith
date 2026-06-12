@@ -21,7 +21,7 @@ Each reviewer persona is application-neutral; your spawn prompt supplies the ins
 
 ## Participants
 
-Not every code lens maps to instruction rules, so role **participation** is per-application. The default participating set is `swe`, `security`, `db`, `qa`, `docs`, `frontend`, `ux` (`correctness` audits code, not rules, so it does not participate). A repo that also runs the board may override this under an `instruction-review.participants` key in `reviews/config.yaml`; a repo with no board uses this skill default. The two applications never share config shape -- only the optional file.
+Not every code lens maps to instruction rules, so role **participation** is per-application. The default participating set is `swe`, `security`, `db`, `qa`, `docs`, `frontend`, `ux`, `ai`, `git` (`correctness` audits code, not rules, so it does not participate). `ai` and `git` are meta lenses that exist **only** here -- they own the agent-behavior and VCS-workflow process rules and never run in a code-review round. A repo that also runs the board may override this under an `instruction-review.participants` key in `reviews/config.yaml`; a repo with no board uses this skill default. The two applications never share config shape -- only the optional file.
 
 ## Round pipeline
 
