@@ -1,7 +1,7 @@
 # Proposal format and the decisions log
 
 Reference for the instruction-review application (`#ai-instruction-review`): the proposal schema, the rubric, and how the decisions log is maintained.
-This application **proposes, then triages** -- it edits instruction sources only through the triage step's per-proposal human accept (#swe-done).
+This application **proposes, then triages via an editable worksheet** -- it edits instruction sources only through `/instruction-apply` on the human's recorded worksheet decisions (#swe-done).
 It generalizes `prompts/review-instructions.md` from one umbrella reviewer to a per-role fan-out; that prompt's rubric and decision-logging steps are reused here, not duplicated.
 
 ## Schema
@@ -69,4 +69,4 @@ Format -- one line per `#tag`, no draft blocks:
 
 The log holds **at most one entry per `#tag`**: before appending, check for an existing entry and update it rather than duplicate (a duplicate would erode the "stops re-litigation" guarantee).
 
-Writes happen in the triage step (SKILL step 5), per disposition: `reject`/`fold`/`defer` write a decision line here; `adopt` writes to `instructions/` (not here, via guided adoption + `npm test`); `decide-later` writes to ephemeral `.agentsmith/instruction-review/parked.md` (not here). Before adopting, drop any decisions-log or live-`#tag` duplicate (check `node bin/cli.js --stdout`). Adoption stays a deliberate human action gated in triage.
+Writes happen in the **Apply pipeline** (`/instruction-apply`), driven by each worksheet entry's `decision` field (`park | adopt | reject | fold:<tag> | defer:<condition>`): `reject`/`fold`/`defer` write a decision line here; `adopt` writes to `instructions/` (not here, via guided ensure-end-state adoption + `npm test`); `park` stays in the worksheet `.agentsmith/instruction-review/triage.md` (not here) and re-surfaces next round. Before adopting, drop any decisions-log or live-`#tag` duplicate (check `node bin/cli.js --stdout`). Adoption stays a deliberate human action -- the round only writes the worksheet; applying the human's decisions is the separate, gated `/instruction-apply` step.
