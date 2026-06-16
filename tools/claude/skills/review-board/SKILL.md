@@ -22,7 +22,7 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 
 ## Store and scratch
 
-- Committed canonical store under `reviews/` (layout in `issue-format.md`). Mutated in place across rounds.
+- Local canonical store **and** its `config.yaml` under `.agentsmith/review-board/` (gitignored, per-machine; layout in `issue-format.md`), mutated in place across rounds; nothing committed to the repo. The durable shared record is the external tracker (promoted issues), not this store.
 - Ephemeral per-run scratch under `.agentsmith/tmp/review-board/<round-id>/` (gitignored): each reviewer's raw output, every verifier transcript (including rejected findings), and the PM deliberation. Never committed; retained until the round's `triage.md` has been reviewed and any promotion done.
 
 ## Round pipeline
@@ -33,14 +33,14 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 - **Target** (`targetRef`): `feature-branch` (reviewing a branch before merge -- the usual case) or `main` (a periodic review of what landed on the default branch).
 - **`commit` + `baselineCommit`** (baseline is **always a live default-branch SHA**), by target:
   - `feature-branch`: `commit` = branch tip; `baselineCommit = merge-base(commit, <default>)`, recomputed from git each round (squash-safe -- never chained off a branch tip).
-  - `main`: `commit` = current default-branch HEAD; `baselineCommit` = the `commit` of the most recent prior `main` round. If none, **bootstrap**: force `full-sweep`, `baselineCommit` = current default HEAD.
+  - `main`: `commit` = current default-branch HEAD. `baselineCommit` = the `commit` of the most recent prior `main` round in the local store (the recurring case: "current HEAD vs the last `main` round"). If **no prior `main` round** exists, **bootstrap**: `full-sweep`, `baselineCommit` = current default HEAD. If the **local store is absent** (fresh clone / wiped machine) the prior-round SHA is unknowable -- do not infer; offer bootstrap / full-sweep / a user-provided hash and ask at the confirmation gate.
 - `<default>` is the repo's configured default branch, resolved once. If a branch shares no history with it (`merge-base` empty), fall back to `full-sweep` with `baselineCommit` = current default HEAD.
 - **Mode precedence**: force `full-sweep` whenever no usable baseline diff exists (first repo round; first `main` round with no prior). The first round in a repo is always a `full-sweep` with no carry-forward.
 - Compute the diff over `baselineCommit..commit` (`diff` mode) or take the whole-project surface (`full-sweep`).
-- **Select roles** from `reviews/config.yaml`: a role runs when the diff touches a path matching its globs, or a commit message in `baselineCommit..commit` matches its keywords. `correctness` and `swe` always run. A `full-sweep` runs every active role. The user may force-add a role.
+- **Select roles** from `.agentsmith/review-board/config.yaml`: a role runs when the diff touches a path matching its globs, or a commit message in `baselineCommit..commit` matches its keywords. `correctness` and `swe` always run. A `full-sweep` runs every active role. The user may force-add a role.
 - **Dirtiness scan** (the step-2 test) over all prior open **and recently-closed** issues; **force-select the owning role** (the issue id's `<role>` segment) of any dirty issue even if gating would skip it.
-- If `reviews/config.yaml` is absent, create it from the **default config** (below) before selecting.
-- **Confirmation gate**: present the resolved `mode`, `targetRef`, `baselineCommit` (and how it was derived), and the selected role set for the user to confirm or override **in one interaction**. An explicit non-interactive run may skip the gate and use the computed defaults.
+- If `.agentsmith/review-board/config.yaml` is absent, create it from the **default config** (below) before selecting.
+- **Confirmation gate**: present the resolved `mode`, `targetRef`, and the selected role set, and **confirm the `baselineCommit`**, offering (with a recommended default marked): **(i-feature)** `merge-base` for a feature branch; **(i-main)** the prior `main`-round SHA; **(i-bootstrap)** default HEAD for a first-ever `main` round; **(ii)** a fresh full sweep (zero carry-forward); **(iii)** a user-provided hash. On an **absent local store** for a `main` round, present (i-bootstrap)/(ii)/(iii) and ask -- do not auto-pick. Confirm or override **in one interaction**. An explicit non-interactive run may skip the gate and use the computed default.
 
 ### 2. Reconcile + review (parallel, one sub-agent per selected role, cheap model)
 
@@ -60,14 +60,14 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 
 - Write verified new issues under their already-minted compositional ids (no allocation step); apply reconciled status transitions; move newly-closing issues to `closed/`.
 - Do **not** set `promoted` here -- that is `/review-promote`.
-- Write/refresh `reviews/rounds/<round-id>.yaml` (the `ReviewRoundInfo`).
-- Validate the store before reducing: run `node .claude/skills/review-board/lint.mjs reviews`.
+- Write/refresh `.agentsmith/review-board/rounds/<round-id>.yaml` (the `ReviewRoundInfo`).
+- Validate the store before reducing (a local integrity check, not a CI gate): run `node .claude/skills/review-board/lint.mjs .agentsmith/review-board`.
   A non-zero exit means the write left the store structurally invalid -- an id/role/placement mismatch, a dangling `relatedIssues` reference, a closing status missing its `closingComments`/`closedInRound`, or a round with no `baselineCommit`.
   Fix the offending files and rerun until it exits clean; the linter is read-only and never edits the store for you.
 
 ### 5. Reduce (PM role, strong model)
 
-- Spawn `review-pm` with **summaries** of all open issues (verified-new + carried-forward); it consolidates priority, groups issues into canonical epics, marks duplicates `duplicated`, may down-rank/reject (with a recorded reason), and writes `reviews/rounds/<round-id>.triage.md`.
+- Spawn `review-pm` with **summaries** of all open issues (verified-new + carried-forward); it consolidates priority, groups issues into canonical epics, marks duplicates `duplicated`, may down-rank/reject (with a recorded reason), and writes `.agentsmith/review-board/rounds/<round-id>.triage.md`.
 - Apply the PM's status mutations and epic updates to the store.
 
 ### 6. Present (main thread)
@@ -75,7 +75,7 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 - Summarize the round, **including the count of findings verify rejected** and the path to their scratch transcripts, so a human can spot-check the bias-to-reject drops.
 - Offer to promote selected issues/epics via `/review-promote` (the human validation step).
 
-## Default config (`reviews/config.yaml`)
+## Default config (`.agentsmith/review-board/config.yaml`)
 
 When absent, create it with this default. It is hand-maintained thereafter (activate a role by adding a row). `correctness` and `swe` are always-on (no gating).
 

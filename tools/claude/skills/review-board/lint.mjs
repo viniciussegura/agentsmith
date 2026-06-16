@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Store integrity linter for the code-review board (#ai-review-board).
 //
-// Read-only validator for a `reviews/` issue store: it never mutates the store,
-// it reports. A non-zero exit means the store is structurally invalid; wire it
-// into CI (or run it at the end of a review round) so the invariants the SKILL
-// describes are enforced mechanically instead of trusted to the agent.
+// Read-only validator for the local `.agentsmith/review-board/` issue store: it
+// never mutates the store, it reports. A non-zero exit means the store is
+// structurally invalid. The store is local (gitignored, not committed), so this
+// is a local integrity check the review round runs -- not a CI/pre-commit gate.
 //
 // Zero-dependency on purpose -- it ships into a consumer's `.claude/` and must
 // run on bare `node`, so it does NOT parse arbitrary YAML. It extracts the
@@ -13,8 +13,8 @@
 // decoration it does not read.
 //
 // Usage:
-//   node .claude/skills/review-board/lint.mjs [reviews-dir] [--strict]
-//   (default dir: ./reviews; --strict promotes warnings to a non-zero exit)
+//   node .claude/skills/review-board/lint.mjs [store-dir] [--strict]
+//   (default dir: ./.agentsmith/review-board; --strict promotes warnings to a non-zero exit)
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, relative, sep, basename, resolve } from 'node:path';
@@ -148,15 +148,29 @@ function placementOf(relParts) {
 // ---------- the lint ----------
 
 /**
- * Validate a `reviews/` store. Returns human-readable errors and warnings;
+ * Validate a local `.agentsmith/review-board/` issue store. Returns human-readable errors and warnings;
  * never throws on store content and never mutates the store.
- * @param {{ root: string }} input  `root` is the reviews directory.
+ * @param {{ root: string }} input  `root` is the store directory (`.agentsmith/review-board/`).
  * @returns {{ errors: string[], warnings: string[] }}
  */
 export function lintStore({ root }) {
   const errors = [];
   const warnings = [];
   if (!existsSync(root)) return { errors, warnings };
+
+  // `promotedTo` is required on a promoted issue only when a tracker is
+  // configured (a non-empty top-level `tracker:` key in the local config.yaml);
+  // a no-tracker repo uses the local store as the working record (spec N1).
+  let trackerConfigured = false;
+  const configPath = join(root, 'config.yaml');
+  if (existsSync(configPath)) {
+    try {
+      const t = topScalar(readFileSync(configPath, 'utf8'), 'tracker');
+      trackerConfigured = typeof t === 'string' && t !== '';
+    } catch {
+      /* unreadable config -> treat as no tracker */
+    }
+  }
 
   const rel = (abs) => relative(root, abs).split(sep).join('/');
   const records = [];
@@ -260,8 +274,8 @@ export function lintStore({ root }) {
           errors.push(`${where}: closing status \`${p.status}\` requires \`closedInRound\``);
         }
       }
-      if (p.status === 'promoted' && !p.promotedTo) {
-        errors.push(`${where}: status \`promoted\` requires \`promotedTo\``);
+      if (p.status === 'promoted' && trackerConfigured && !p.promotedTo) {
+        errors.push(`${where}: status \`promoted\` requires \`promotedTo\` (a tracker is configured in config.yaml)`);
       }
     }
 
@@ -325,7 +339,7 @@ const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === resolve(ar
 if (invokedDirectly) {
   const strict = argv.includes('--strict');
   const dirArg = argv.slice(2).find((a) => !a.startsWith('--'));
-  const root = resolve(dirArg || join(cwd(), 'reviews'));
+  const root = resolve(dirArg || join(cwd(), '.agentsmith', 'review-board'));
   const found = existsSync(root);
   const { errors, warnings } = lintStore({ root });
 

@@ -16,7 +16,7 @@ of review -- it does not replace either neighbour:
   high-stakes; reach for this when you want a fast gate before squash-merge.
 
 Do **not** re-implement the board here: no role fan-out, no verifier, no persistence,
-no `reviews/` store. One agent, one pass, output to the chat.
+no issue store. One agent, one pass, output to the chat.
 
 ## When to run
 

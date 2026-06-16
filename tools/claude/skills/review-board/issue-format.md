@@ -73,16 +73,16 @@ A **closing** status (`fixed`/`deprecated`/`superseded`/`duplicated`) sets `clos
 
 `<roundId>#<role>-<n>`: `<roundId>` is the raising round (globally unique -- round ids never repeat), `<role>` the owning role, `<n>` that role's local counter over **newly-raised** findings this round (carried-forward/reopened issues keep their origin-round id and do not consume the counter).
 Epics are `<roundId>#epic-<n>`, minted by the PM.
-Ids are never reused, so `relatedIssues` links stay valid forever; the `<role>` segment is what Setup reads to force-select a dirty issue's owning role.
+Ids are never reused, so `relatedIssues` links stay valid within the local store's lifetime (cross-machine continuity is the tracker's job); the `<role>` segment is what Setup reads to force-select a dirty issue's owning role.
 Filenames render the id filesystem-safely (the `#` may be written as `--`); the trailing `<slug>` is regenerable decoration, identity keys off the id.
 
 ## The store
 
-Committed, canonical, living (not per-round folders):
+Local, per-machine, gitignored, living (not committed, not per-round folders):
 
 ```
-reviews/
-  config.yaml                            active roles + gating table (+ instruction-review.participants, Phase 3)
+.agentsmith/review-board/
+  config.yaml                            active roles + gating table (+ instruction-review.participants)
   issues/<role-id>/<id>-<slug>.yaml       open issues, mutated in place across rounds
   issues/<role-id>/closed/<...>.yaml      issues with a CLOSING status
   issues/<role-id>/promoted/<...>.yaml    issues escalated to the external tracker (status 'promoted')
@@ -93,21 +93,21 @@ reviews/
 ```
 
 `<round-id>` follows `<YYYY-MM-DD>[<letter>]-<target-branch>` (e.g. `2026-06-09b-feature-x`); it is the `<roundId>` prefix in every id minted that round.
-Per-run reasoning (reviewer outputs, verifier transcripts including rejected findings, PM deliberation) is **ephemeral** under `.agentsmith/tmp/review-board/<round-id>/`, gitignored, never committed; retained until the round's `triage.md` is reviewed.
-No agent deletes store files -- git history is the archive.
+Per-run reasoning (reviewer outputs, verifier transcripts including rejected findings, PM deliberation) is **separate** per-run scratch under `.agentsmith/tmp/review-board/<round-id>/` (also gitignored), retained until the round's `triage.md` is reviewed.
+The store is **local-lifetime**: within a machine's store no agent deletes files (a closing/promoted issue moves partition, never vanishes), so ids stay unique and `relatedIssues` links stay valid. The durable, shared record is the **tracker** (promoted issues) and **git history** (fixed commits), not this store. A store loss is atomic -- the whole `.agentsmith/review-board/` directory disappears together, leaving an empty store and a forced full sweep -- so there is no partial-absence that could dangle a reference.
 
 ## Validation
 
-The store is machine-validated by `lint.mjs` (installed alongside this file at `.claude/skills/review-board/lint.mjs`): `node .claude/skills/review-board/lint.mjs reviews`.
-It is **read-only** -- it reports and exits non-zero, never mutating the store -- so it is safe to run in CI or a pre-commit hook as the gate that the invariants below actually hold.
-Run it at the end of every round (SKILL step 4) and on every commit that touches `reviews/`.
+The store is machine-validated by `lint.mjs` (installed alongside this file at `.claude/skills/review-board/lint.mjs`): `node .claude/skills/review-board/lint.mjs .agentsmith/review-board`.
+It is **read-only** -- it reports and exits non-zero, never mutating the store. The store is local (not committed), so this is a **local integrity check the round runs**, not a CI/pre-commit gate.
+Run it at the end of every round (SKILL step 4).
 
 It enforces, as **errors** (non-zero exit):
 
 - Every issue/epic has an `id` of the form `<roundId>#<role>-<n>`, and that id is unique across the store.
 - `kind` matches the tree: `issue` under `issues/`, `epic` under `epics/`; the id's role segment matches its role directory (`epic` for epics).
 - Filesystem placement matches status: a closing status (`fixed`/`deprecated`/`superseded`/`duplicated`) lives under `closed/`, `promoted` under `promoted/`, everything else directly under its role directory.
-- A closing status carries `closingComments` and `closedInRound`; a `promoted` status carries `promotedTo`.
+- A closing status carries `closingComments` and `closedInRound`; a `promoted` status carries `promotedTo` **when a tracker is configured** in `.agentsmith/review-board/config.yaml` (no tracker configured: a missing `promotedTo` is valid, and `promoted` is discouraged in favor of a closing status).
 - Every `relatedIssues[].issueId` resolves to an id that exists in the store.
 - Every `rounds/<id>.yaml` has a `baselineCommit` (never undefined) and a `commit`, and its `id` matches its filename.
 

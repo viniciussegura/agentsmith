@@ -49,7 +49,7 @@ Every pushback names the specific problem and proposes a path forward.
 - `baselineCommit` is always a live default-branch SHA: a feature-branch round uses `merge-base(commit, default)` (squash-safe); a default-branch round chains off the prior default-branch round.
 - Each issue carries a globally-unique compositional id `<roundId>#<role>-<n>` minted by the raising round; ids are never reused, so cross-issue links stay valid.
 - Issues move through a single-owner lifecycle (open / promoted / fixed / deprecated / superseded / duplicated); `promoted` is not a closing status.
-- Persistence is hybrid: a committed, human-readable issue store (closed and promoted issues partitioned, never agent-deleted) plus ephemeral per-run reasoning under `.agentsmith/tmp/`, never committed.
+- Persistence is local-first: the whole board -- the issue/epic/round store and its `config.yaml` -- lives under `.agentsmith/review-board/` (gitignored, per-machine, never committed); nothing is committed to the repo. The single durable, shared record of a finding is its promotion to the team's external tracker; with an absent local store there is no prior state to carry forward, and the baseline is confirmed through the setup gate (the tracker and git history, not the store, carry cross-machine continuity). Per-run reasoning stays ephemeral under `.agentsmith/tmp/`.
 - A second application, **instruction review**, turns the same roles on an instruction set itself; it applies only to repos authoring an agentsmith-style set, so it is an on-demand bundle (`#ai-instruction-review`), not part of this core.
 
 ## #ai-preflight Plan execution preflight

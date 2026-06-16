@@ -160,6 +160,7 @@ status: promoted
 lastConfirmedCommit: abc1234
 `;
   const root = mkStore({
+    'config.yaml': 'tracker: github\n', // a tracker is configured -> promotedTo required
     'issues/swe/r1--swe-1-x.yaml': promoted, // not under promoted/, no promotedTo
     'rounds/r1.yaml': ROUND,
   });
@@ -167,6 +168,29 @@ lastConfirmedCommit: abc1234
     const { errors } = lintStore({ root });
     assert.ok(errors.some((e) => /requires placement `promoted\/`/.test(e)), 'placement');
     assert.ok(errors.some((e) => /requires `promotedTo`/.test(e)), 'promotedTo');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('no tracker configured: a promoted issue without promotedTo is allowed', () => {
+  const promoted = `id: "r1#swe-1"
+kind: issue
+title: Escalated
+description: x
+priority: high
+priorityRationale: x
+status: promoted
+lastConfirmedCommit: abc1234
+`;
+  const root = mkStore({
+    // no config.yaml -> no tracker -> promotedTo not required
+    'issues/swe/promoted/r1--swe-1-x.yaml': promoted, // correct placement
+    'rounds/r1.yaml': ROUND,
+  });
+  try {
+    const { errors } = lintStore({ root });
+    assert.ok(!errors.some((e) => /requires `promotedTo`/.test(e)), 'promotedTo not required without a tracker');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
