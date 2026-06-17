@@ -30,7 +30,7 @@ interface InstructionProposal {
 
 **Required per kind** (the reduce step rejects a proposal missing its kind's field): `new-rule` and `strengthen` require `targetFile`; `new-rule` also requires `draft` once concrete; `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must be a **resolvable owner** (a declared role, the `swe` base lens, or a known non-review marker -- else the editor rejects/normalizes it).
 
-For a `strengthen` (and a text-changing `rehome`/`reowner`) the worksheet also renders a read-only **`current:`** block -- the verbatim live `## #tag` section the draft replaces -- immediately before `draft:`, so the human sees a before/after at decision time. It is review-surface only; `/instruction-apply` never reads it. `new-rule` has no `current:`. (Full worksheet grammar is in the instruction-review SKILL.) Both `current:` and `draft:` are located by their bare marker, not by fence position.
+The triage worksheet is the structured **`triage.json`** (`{ round, entries[] }`; schema + validator in `devtools/triage-ui/schema.mjs`, full shape in the instruction-review SKILL). Each entry projects the proposal as typed fields plus a `decision` object (`verdict` defaulting to `park`; typed params `details`/`foldTarget`) and an `applyLog`. For a `strengthen` (and a text-changing `rehome`/`reowner`) the entry also carries a read-only **`current`** field -- the verbatim live `## #tag` section the draft replaces -- so the UI shows a before/after; it is review-surface only and `/instruction-apply` never reads it. `new-rule` has no `current`.
 
 ## Rubric
 
@@ -67,8 +67,10 @@ Format -- one line per `#tag`, no draft blocks:
 
 - `#tag -- rejected: <reason>`
 - `#tag -- folded into <X>: <reason>`
-- `#tag -- deferred: <condition to adopt> (-> <targetFile>, <role>)` -- the deferral, its trigger, and the placement hint persist; the draft does **not** (a future audit re-drafts when the condition holds; the dropped draft stays in git history).
+- `#tag -- deferred: <condition to adopt> (-> <basename(targetFile)>, <role>)` -- the deferral, its trigger, and the placement hint (file **basename**, e.g. `swe.md`) persist; the draft does **not** (a future audit re-drafts when the condition holds; the dropped draft stays in git history).
+
+(In the live log the leading `#tag` is backtick-wrapped, e.g. `` `#swe-ci` -- deferred: … ``; apply generates this grammar from typed fields.)
 
 The log holds **at most one entry per `#tag`**: before appending, check for an existing entry and update it rather than duplicate (a duplicate would erode the "stops re-litigation" guarantee).
 
-Writes happen in the **Apply pipeline** (`/instruction-apply`), driven by each worksheet entry's ticked `decision` checkbox (`adopt`/`reject`/`fold`/`defer`/`refine`; none ticked = `park`), with reason/target/condition/input taken from the entry's `decisionText`: `reject`/`fold`/`defer` write a decision line here; `adopt` writes to `instructions/` (not here, via guided ensure-end-state adoption + `npm test`); `refine` writes nothing -- it is surfaced for discussion; `park` stays in the worksheet `.agentsmith/instruction-review/triage.md` (not here) and re-surfaces next round. Before adopting, drop any decisions-log or live-`#tag` duplicate (check `node bin/cli.js --stdout`). Adoption stays a deliberate human action -- the round only writes the worksheet; applying the human's decisions is the separate, gated `/instruction-apply` step.
+Writes happen in the **Apply pipeline** (`/instruction-apply`), driven by each `triage.json` entry's `decision.verdict` (`adopt`/`reject`/`fold`/`defer`/`refine`; default `park`), with reason/condition/input from `decision.details` and the fold target from `decision.foldTarget`: `reject`/`fold`/`defer` write a decision line here; `adopt` writes to `instructions/` (not here, via guided ensure-end-state adoption + `npm test`); `refine` writes nothing -- it is surfaced for discussion; `park` stays in the worksheet `.agentsmith/instruction-review/triage.json` (not here) and re-surfaces next round. Before adopting, drop any decisions-log or live-`#tag` duplicate (check `node bin/cli.js --stdout`). Adoption stays a deliberate human action -- the round only writes the worksheet; applying the human's decisions is the separate, gated `/instruction-apply` step.
