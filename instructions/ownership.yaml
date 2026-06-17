@@ -36,6 +36,7 @@ owners:
   swe-dated-todos: swe
   swe-dead-code: swe
   swe-reference-spec: swe
+  swe-async: swe
 
   # security
   swe-security: security
@@ -47,6 +48,7 @@ owners:
   swe-entity: db
   be-api-first: db
   be-api-versioning: db
+  be-schema-migration: db
 
   # docs
   swe-docs-drift: docs
@@ -61,6 +63,7 @@ owners:
   front-display-labels: frontend
   front-a11y: frontend
   ui-canonical-states: frontend
+  ui-design-tokens: frontend
 
   # ux -- the end-user experience and flow
   front-nielsen-heuristics: ux
@@ -68,6 +71,8 @@ owners:
   ui-header-visibility: ux
   ui-tabs: ux
   ui-validation: ux
+  ui-empty-state-guidance: ux
+  ui-destructive-confirm: ux
 
   # ai -- meta lens: agent behavior, planning, memory, the review engine (instruction-review only)
   ai-conversational: ai
@@ -85,3 +90,6 @@ owners:
   git-pr-body: git
   git-usage: git
   git-branch-workflow: git
+  git-secret-history: git
+  git-merge-conflict: git
+  git-tooling: git

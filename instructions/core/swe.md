@@ -11,8 +11,8 @@ Follow [Agile software development](https://en.wikipedia.org/wiki/Agile_software
 
 ## #swe-reuse Reuse before creation
 
-Before creating a component, search the codebase for one with the same name or purpose.
-Two components with the same name and purpose in different directories is a bug.
+Before creating a component, utility, hook, or helper, search the codebase for one with the same name or purpose.
+Two implementations of the same concept in different directories is a bug: consolidate into one shared implementation and delete the duplicate -- do not leave both.
 Serve one concept from a single shared implementation across pages or endpoints rather than duplicating it.
 
 ## #swe-naming Naming conventions
@@ -25,6 +25,7 @@ Match the surrounding code's existing convention over importing a new one (#swe-
 
 Deferred or out-of-scope work goes in `docs/future-work/<YYYY-MM-DD>-<slug>.md`, stating what it is, why it matters, and any constraints or dependencies.
 Record it when the decision to defer is made, not later.
+Before starting non-trivial work in an area, scan `docs/future-work/` for entries whose scope overlaps: a deferred item may carry constraints or dependencies the new work must respect.
 
 ## #swe-technical-debts Technical debt
 
@@ -72,7 +73,7 @@ Where the two could be confused, use the qualified terms "working spec" and "ref
 
 Before opening or updating a PR, check for documentation drift -- any doc the change has made stale.
 Fix it in the same PR, before opening or updating.
-This includes, but is not limited to, the reference spec (#swe-reference-spec) and its entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, and files under `docs/`.
+This includes, but is not limited to, the reference spec (#swe-reference-spec) and its entity model (#swe-entity), any `README` or `CONTRIBUTING` file at any level, files under `docs/`, and any other user-facing documentation surface outside those paths (e.g. `prompts/`, standalone usage guides).
 Discover the affected docs, do not eyeball them: search the docs for the identifiers, flags, commands, and paths the change touched, and check each hit.
 A doc *example* (snippet, CLI invocation, config block, request/response) is stale when it no longer runs or matches the current surface; update it in the same PR or delete it.
 
@@ -108,6 +109,7 @@ Keep deeper reporting detail available (_e.g._ call stack for errors, raw backen
 ## #swe-errors Error handling and logging
 
 **Never** silently swallow an error: handle it, or propagate it with context added.
+Context **MUST** name the operation and its distinguishing inputs (_e.g._ `wrap(err, 'fetchUser', { userId })`) so structured logs are greppable without `git blame`.
 Fail loud in development; degrade gracefully in production.
 Log at the right level -- `error` for actionable failures, `warn` for recoverable anomalies, `info` for milestones, `debug` for detail.
 Logs are structured and greppable, and carry the correlation or trace id (#swe-observability) so lines join across services.
@@ -115,7 +117,9 @@ User-facing error text follows #swe-display-messages; internal detail stays in l
 
 ## #swe-observability Observability
 
-Beyond logging (#swe-errors), expose the signals needed to see the system's health: key operations emit metrics, and a request crossing services carries one correlation or trace id end to end.
+Beyond logging (#swe-errors), expose the signals needed to see the system's health.
+At minimum, every externally-called operation (HTTP endpoint, queue consumer, scheduled job) emits latency and error-count signals.
+A request crossing services carries one correlation or trace id end to end.
 Provide a health or readiness check for any long-running service.
 Keep signals actionable -- enough to locate a failure, not vanity counters.
 
@@ -130,7 +134,7 @@ Removing a dependency is a feature -- prune unused ones.
 
 Write tests test-first: a failing test before the code that satisfies it.
 Every bug fix starts with a test that reproduces the bug.
-Assert against the public surface, not internals; where the workflow supports it, tests are authored independently of the implementation.
+Assert against the public surface, not internals; the default is tests authored independently of the implementation -- the only accepted exception is solo work with no reviewer, where a deliberate gap between writing the code and writing its tests is the minimum substitute.
 Tests live beside the code or under `test/`, mirroring the source layout.
 A change is not done until its tests pass locally (#swe-done).
 
@@ -140,7 +144,7 @@ A test must be able to fail: assert observable behavior, never that code merely 
 Cover the error paths and edge cases the change adds, not just the happy path.
 Keep tests deterministic -- no real clock, order, locale, network, or unseeded RNG; a test that flakes counts as failing (#swe-done), fixed at the source or quarantined with a tracked record (#swe-future-work).
 Fixtures use synthetic data (#swe-environment, #swe-security), isolated per test, kept in step with the schema.
-A test that passes against a mock proves nothing.
+Do not mock the subject under test -- a test that validates a mock of the thing it claims to verify proves nothing; doubles for infrastructure boundaries (network, filesystem, external services, clock) are legitimate, scoped to the boundary, not the logic.
 
 ## #swe-done Definition of done
 
@@ -148,6 +152,7 @@ A change is done only when all of these hold:
 
 1. Tests for the change pass locally.
    When the repo has no test harness, or the change is genuinely untestable, the verification actually performed is stated and recorded (#git-pr-body, #swe-technical-debts): "done" is never "it compiled."
+   Invoking the untestable exception **requires naming the specific blocker** (e.g. "no test harness exists", "purely declarative config with no executable path") -- "hard to test" or "not worth testing" do not qualify.
 2. Documentation drift is resolved (#swe-docs-drift), including the reference spec when current behavior changed (#swe-reference-spec) and the entity model when the schema changed (#swe-entity).
 3. Unused dependencies are pruned (#swe-deps).
 4. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
@@ -155,3 +160,9 @@ A change is done only when all of these hold:
 
 Do not open or update a PR before all items hold.
 
+## #swe-async Async and concurrency hygiene
+
+**Never** perform synchronous blocking I/O (file reads, DNS, database) on an async or event-loop thread -- push it to a worker or use the async API.
+Every `Promise` or async operation has an error handler: no fire-and-forget without a `.catch()` or `try/catch` boundary that at minimum logs.
+Avoid unbounded in-memory accumulation: stream, paginate, or apply back-pressure instead of loading an entire result set into memory.
+Scope locks and mutexes to the shortest critical section that preserves correctness.

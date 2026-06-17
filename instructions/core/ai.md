@@ -6,7 +6,8 @@
   Fragments are fine when the meaning is clear.
 - Be conscious of token usage: terse agent-to-agent messages, efficient command use.
 - Signal before starting any task expected to incur heavy token usage.
-- **EVERY** subagent dispatch states an explicit model: the cheapest model that fits the task.
+- **EVERY** subagent dispatch states an explicit model: the cheapest model whose context window, tool-use capability, and reasoning depth suffice for the task: a bounded read/summarise task uses the cheapest tier; complex code, conflict reconciliation, or sustained multi-step reasoning uses a stronger one. 
+  State the model id, not a tier label.
 
 ## #ai-candid Candid stance
 
@@ -21,6 +22,8 @@ Every pushback names the specific problem and proposes a path forward.
   The directory may hold only `spec.md` (no plan yet) or only `plan.md` (trivial work that skipped a spec).
 - Each file carries a `Status:` line that is exactly one bare token: `Draft`, `Approved`, or `Implemented`.
 - A spec or plan is append-only once `Approved` -- its body is frozen, though the `Status:` line may still advance to `Implemented`; corrections to the live system go to the reference spec (#swe-reference-spec), **never** back into the artifact that predates them.
+- Work is **non-trivial** -- requiring a user-approved spec before a plan is written or executed -- when it meets any of: touches more than one file with distinct purposes; introduces or removes public surface (#swe-public-surface-docs); or cannot be stated in a single sentence. 
+  A self-evidently-correct single-file edit or rename may skip the spec.
 - Non-trivial changes start with a user-approved spec before a plan is written and executed.
 
 ## #ai-spec-review Spec auto-review
@@ -56,7 +59,8 @@ Every pushback names the specific problem and proposes a path forward.
 
 Before executing an approved plan, ask and wait for answers to two questions:
 
-1. **Execution shape** -- sequential in the main thread, delegated to parallel subagents, or delegated to sequential subagents? Give a token estimate per option.
+1. **Execution shape** -- sequential in the main thread, delegated to parallel subagents, or delegated to sequential subagents?
+   Give a rough token estimate per option as an order-of-magnitude integer (e.g. ~2k, ~10k, ~50k); exact figures are not expected.
 2. **Interaction shape** -- pause for checks and questions as they arise, or run non-stop and batch every question and decision at the end?
 
 For every preflight question, **always signal a recommended answer** and mark it clearly (e.g. label the option "(Recommended)"), so the user can accept the default at a glance.

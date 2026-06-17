@@ -40,12 +40,43 @@ Each component carries:
 - `additionalInformation` (optional): detail revealed behind a "show more details" affordance.
 - `errorObj` (errors only, required): copy-to-clipboard bundle of the raw error plus timestamp, URL, user, and call stack for the developer.
 
+**MUST** use these shared components wherever a canonical state is displayed; never render a one-off inline spinner, empty placeholder, or error banner that duplicates their behavior (#swe-reuse).
+
 Follow #swe-display-messages for what the visible text says.
 
-## #ui-validation Validation errors stay close to their cause
+## #ui-validation Validation errors stay close to their cause, appear at the right time
 
-**Rule.** Render validation errors next to the input that caused them, using #ui-canonical-states if not handled by the input itself.
+**Placement.** Render validation errors next to the input that caused them, using #ui-canonical-states if not handled by the input itself.
 Do not surface a top-of-form summary banner unless the error is genuinely cross-cutting (touches multiple fields and cannot be pinned to one).
 
+**Timing.** Validate on blur, not on keystroke; once a field is in error, re-validate on every keystroke so the error clears the moment it is fixed; always re-validate the whole form on submit.
+
 **Why.** When a field is invalid, the user looks at the field, not the top of the form.
-A banner that repeats per-field errors adds noise and trains users to ignore inline error text.
+Validating too early (keystroke) trains users to ignore inline errors; too late (submit-only) hides problems until it is too late to course-correct.
+
+## #ui-empty-state-guidance Empty states guide the user
+
+Every empty state (#ui-canonical-states) **MUST** include:
+
+1. A short reason the space is empty (first run vs. filtered result vs. no data yet).
+2. A primary call-to-action out of the empty state, or -- when none is available -- what will populate the space.
+
+**Never** render a bare "No results" without context and a way forward (#front-nielsen-heuristics, recognition over recall).
+
+## #ui-design-tokens Design tokens over magic values
+
+Use the project's shared design tokens (CSS custom properties, theme-scale values, or the framework equivalent) for every color, spacing, radius, shadow, and typography value.
+**Never** hard-code a hex color, pixel constant, or magic value where a token exists.
+Where no token exists, add one rather than inlining; an inline override is a last resort, documented with a comment.
+This covers visual style values; general non-visual literals are #code-style.
+
+## #ui-destructive-confirm Destructive actions need confirmation or undo
+
+Any user-initiated irreversible or hard-to-reverse action (delete, archive, bulk-remove, reset, permanent publish) **MUST** offer one of:
+
+1. A confirmation step that names what will be destroyed and requires an explicit positive gesture.
+2. An undo affordance available long enough to notice (a snackbar/toast with Undo).
+
+Prefer undo for low-stakes bulk actions; confirmation for single high-stakes ones.
+**Never** make the destructive action the default button; label it with the action ("Delete"), not "OK"; make it vis.
+This is the user-facing mirror of #ai-tool-safety (agent actions).
