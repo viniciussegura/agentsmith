@@ -55,7 +55,7 @@ main { flex: 1; display: flex; min-height: 0; }
 .cell.add { background: var(--add-bg); color: var(--add-fg); }
 .cell.empty { background: rgba(255,255,255,.03); }
 
-.navbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.navbar { display: flex; align-items: center; gap: 12px; margin: 20px 0 4px; border-top: 1px solid var(--border); padding-top: 16px; }
 .nav { background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; cursor: pointer; font: inherit; }
 .nav:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .nav:disabled { opacity: .4; cursor: default; }

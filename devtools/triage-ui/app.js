@@ -151,7 +151,6 @@ function renderDetail() {
   const nav = el('div', { class: 'navbar' }, [prev, el('span', { class: 'pos', text: `${state.sel + 1} / ${total}` }), next]);
 
   $('#detail').replaceChildren(
-    nav,
     el('div', { class: 'meta', text: `${e.kind} · ${e.role} · ${e.targetFile} · status: ${e.status?.state}` }),
     el('h2', { text: `#${e.tag}` }),
     el('div', { class: 'gap', text: e.gap || '' }),
@@ -162,6 +161,7 @@ function renderDetail() {
     detailsLabel,
     detailsBox,
     foldWrap,
+    nav,
   );
   refreshConditional(e, detailsBox, foldWrap, foldSelect);
 }
