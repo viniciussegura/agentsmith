@@ -21,14 +21,20 @@ function extractFence(lines, marker) {
   const mi = lines.findIndex((l) => l.trim() === `${marker}:`);
   if (mi === -1) return null;
   let open = -1;
+  let openLen = 0;
   for (let i = mi + 1; i < lines.length; i++) {
-    if (/^`{3,}\s*$/.test(lines[i])) { open = i; break; }
+    const m = lines[i].match(/^(`{3,})\s*$/);
+    if (m) { open = i; openLen = m[1].length; break; }
     if (lines[i].trim() !== '') break; // non-blank, non-fence -> no block
   }
   if (open === -1) return null;
+  // CommonMark: the closing fence is at least as long as the opening one, so a
+  // nested code block fenced with FEWER backticks (e.g. ```typescript inside a
+  // ```` field) is body content, not the terminator.
+  const closeRe = new RegExp(`^\`{${openLen},}\\s*$`);
   const body = [];
   for (let i = open + 1; i < lines.length; i++) {
-    if (/^`{3,}\s*$/.test(lines[i])) return body.join('\n');
+    if (closeRe.test(lines[i])) return body.join('\n');
     body.push(lines[i]);
   }
   throw new Error(`unterminated ${marker} fence`);

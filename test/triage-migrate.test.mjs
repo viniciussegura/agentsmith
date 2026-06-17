@@ -94,3 +94,68 @@ test('a ticked decision during migration fails loudly', () => {
   const ticked = MD.replace('- [ ] adopt', '- [x] adopt');
   assert.throws(() => parseWorksheet(ticked), /unexpected ticked decision/);
 });
+
+// Regression: a current:/draft: body that itself contains a 3-backtick code
+// block must not be truncated at the nested fence. The outer field uses a
+// 4-backtick fence; closing must respect the OPENING fence length, so a nested
+// 3-backtick fence is body content, not the terminator (cf. be-api-first).
+const NESTED_MD = `# worksheet
+
+round 2026-06-16
+
+---
+
+### be-api-first   strengthen · db · backend/backend.md
+- kind: strengthen
+- role: db
+- targetFile: instructions/backend/backend.md
+- status: ready
+- gap: nested code fence must survive
+
+current:
+\`\`\`\`
+## #be-api-first API first
+
+Old body.
+
+\`\`\`typescript
+interface User { id: string; }
+\`\`\`
+
+Trailing table after the code block.
+\`\`\`\`
+
+draft:
+\`\`\`\`
+## #be-api-first API first
+
+New body.
+
+\`\`\`typescript
+interface User { id: string; name: string; }
+\`\`\`
+
+Trailing line after the code block.
+\`\`\`\`
+
+decision:
+- [ ] adopt
+- [ ] reject
+- [ ] fold
+- [ ] defer
+- [ ] refine
+
+decisionText:
+`;
+
+test('a nested code fence inside current/draft is not truncated', () => {
+  const file = parseWorksheet(NESTED_MD);
+  assert.equal(file.entries.length, 1);
+  const e = file.entries[0];
+  // the nested ```typescript block survives intact, INCLUDING its closing fence
+  assert.match(e.current, /```typescript\ninterface User \{ id: string; \}\n```/);
+  assert.match(e.draft, /```typescript\ninterface User \{ id: string; name: string; \}\n```/);
+  // and so does everything AFTER the nested block
+  assert.match(e.current, /Trailing table after the code block\.$/);
+  assert.match(e.draft, /Trailing line after the code block\.$/);
+});
