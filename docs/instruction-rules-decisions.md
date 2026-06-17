@@ -12,12 +12,9 @@ A deferred entry carries a placement hint `(-> <targetFile>, <role>)` so a futur
 - `#swe-migrations` -- deferred: project owns a database (-> swe.md, db). Expand-contract, reversible schema change.
 - `#swe-data-integrity` -- deferred: project owns a database (-> swe.md, db). Store-level keys / NOT NULL / unique / FK constraints.
 - `#swe-transaction` -- deferred: project owns a database (-> swe.md, db). Multi-write atomicity / rollback-on-partial-failure.
-- `#be-api-first` -- deferred: project exposes a data-facing API (-> backend.md, db). Strengthen: bounded, paginated list envelope, not a bare array.
 - `#be-api-idempotency` -- deferred: project exposes a data-facing API (-> backend.md, db). Retry-safe writes / idempotency key.
 - `#front-i18n` -- deferred: product targets more than one locale (-> front.md, frontend). Externalized text, locale-aware formatting.
 - `#ui-responsive` -- deferred: project ships a UI (-> ui-guidelines.md, frontend). Components reflow across viewports.
-- `#ui-design-tokens` -- deferred: project ships a UI (-> ui-guidelines.md, frontend). Shared tokens, no inlined raw hex/px.
-- `#ui-destructive-confirm` -- deferred: project ships a UI (-> ui-guidelines.md, ux). Confirm/undo guard before an irreversible user action.
 - `#ui-perceived-performance` -- deferred: project ships a UI (-> ui-guidelines.md, ux). Feedback within the perception window; busy the trigger.
 
 ## Folded
