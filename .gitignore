@@ -10,3 +10,6 @@ tmp/
 
 # caveman /compress backups
 *.original.md
+
+# Brainstorming visual-companion mockups
+.superpowers/
