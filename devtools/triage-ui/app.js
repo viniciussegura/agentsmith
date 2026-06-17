@@ -122,6 +122,13 @@ function renderDetail() {
     currentDiff = fresh;
     scheduleSave();
   });
+  // The full-text editor is collapsed by default; the side-by-side diff is the primary view.
+  const draftWrap = el('div', { class: 'editor hidden' }, [draft]);
+  const editToggle = el('button', { class: 'nav small', text: '✎ Edit draft', onclick: () => {
+    const hidden = draftWrap.classList.toggle('hidden');
+    editToggle.textContent = hidden ? '✎ Edit draft' : '▾ Hide editor';
+    if (!hidden) draft.focus();
+  } });
 
   const detailsBox = el('textarea', { class: 'details', oninput: () => { applyDecision(e); scheduleSave(); } });
   detailsBox.value = e.decision?.details || '';
@@ -154,9 +161,10 @@ function renderDetail() {
     el('div', { class: 'meta', text: `${e.kind} · ${e.role} · ${e.targetFile} · status: ${e.status?.state}` }),
     el('h2', { text: `#${e.tag}` }),
     el('div', { class: 'gap', text: e.gap || '' }),
-    el('label', { class: 'field', text: 'current → draft (editable)' }),
+    el('label', { class: 'field', text: 'current → draft' }),
     currentDiff,
-    draft,
+    editToggle,
+    draftWrap,
     verdicts,
     detailsLabel,
     detailsBox,

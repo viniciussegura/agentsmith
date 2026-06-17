@@ -61,6 +61,10 @@ main { flex: 1; display: flex; min-height: 0; }
 .nav:disabled { opacity: .4; cursor: default; }
 .pos { color: var(--muted); }
 
+.nav.small { padding: 3px 10px; font-size: 12px; margin: 4px 0; }
+.editor { margin: 6px 0; }
+.editor.hidden { display: none; }
+
 label.field { display: block; margin: 12px 0 4px; color: var(--muted); font-size: 12px; }
 textarea, select {
   width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border);
