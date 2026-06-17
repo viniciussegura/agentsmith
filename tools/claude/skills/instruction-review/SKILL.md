@@ -60,9 +60,20 @@ Then write / refresh the triage worksheet `.agentsmith/instruction-review/triage
 
 Worksheet format -- one `### <tag>` section per proposal:
 
-- The tag is the first token after `### `. `- key:` lines are authoritative (the bracketed label after the tag is decorative): `decision` (default `park`), `kind`, `role`, `targetFile`, `status`, `blockedOn`, `gap`, and `proposedFile`/`proposedOwner` for `rehome`/`reowner`. Every `InstructionProposal` field is projected -- nothing is dropped (a `blocked`/`conditional` proposal keeps its `status`/`blockedOn`).
+- The tag is the first token after `### `. `- key:` metadata lines are authoritative (the bracketed label after the tag is decorative): `kind`, `role`, `targetFile`, `status`, `blockedOn`, `gap`, and `proposedFile`/`proposedOwner` for `rehome`/`reowner`. Every `InstructionProposal` field is projected -- nothing is dropped (a `blocked`/`conditional` proposal keeps its `status`/`blockedOn`).
 - The draft is the **first fenced code block** in the entry, fenced with **more backticks than any fence inside it** (use a 4-backtick fence so a draft may contain a 3-backtick code block). `new-rule`/`strengthen` carry a draft; the human edits it freely before `adopt`.
-- Default every entry's `decision: park` (merged per the setup gate when *Consider parked* was chosen).
+- After the draft, a bare `decision:` marker followed by a 5-option checkbox set, then a bare `decisionText:` marker with an empty body:
+  ```
+  decision:
+  - [ ] adopt
+  - [ ] reject
+  - [ ] fold
+  - [ ] defer
+  - [ ] refine
+
+  decisionText:
+  ```
+  None ticked = `park` (the default). The human ticks at most one box and writes any reason / fold target / condition / input under `decisionText`. Decision goes **last** so the reading flow is gap -> draft -> decide -> note. (Full grammar in the Apply pipeline below.)
 
 End with a handoff message naming **both** the worksheet path and the next command: `/instruction-apply`.
 
@@ -70,17 +81,17 @@ End with a handoff message naming **both** the worksheet path and the next comma
 
 A separate command consumes the worksheet and executes every decision in one non-stop, **crash-idempotent** pass. The round only *writes* the worksheet; this is where `instructions/` and the decisions log change.
 
-Worksheet path: `.agentsmith/instruction-review/triage.md` (gitignored, per-machine). Decision vocabulary -> sink: `park` (default; stays, re-surfaces next round) · `adopt` (the draft, into `instructions/`) · `reject` / `fold:<tag>` / `defer:<condition>` (the decisions log).
+Worksheet path: `.agentsmith/instruction-review/triage.md` (gitignored, per-machine). Decisions are recorded as **checkboxes** (none ticked = `park`): `adopt` (the draft, into `instructions/`) · `reject` / `fold` / `defer` (the decisions log) · `refine` (surfaced for discussion, no write) · `park` (stays, re-surfaces next round). Parameters (reason / fold target / condition / refine input) go in the entry's `decisionText`.
 
 ### A1. Validate (one pass, before any write)
 
 Normalize line endings (`\r?\n` -- the repo is Windows). If the worksheet is absent/empty, report "nothing to apply" and stop. Validate every entry; a malformed entry is **reported and skipped**, never half-applied:
 
 - Structural: a `#tag` in more than one entry heading -> all its entries malformed; a duplicated authoritative key in one entry -> malformed; a `new-rule`/`strengthen` with a missing or unterminated draft fence -> malformed.
-- `decision` is one of `park | adopt | reject | fold:<tag> | defer:<condition>`.
-- `reject`/`fold` need `reason`; `defer` needs a `<condition>` plus `targetFile` + `role` (they fill the `(-> <targetFile>, <role>)` log suffix).
-- `fold:<tag>` needs a **resolvable target** (a live `#tag` or an existing decisions-log entry) -- no dangling fold.
-- `adopt` needs `status: ready` and the kind's field: `new-rule`/`strengthen` a non-empty draft; `rehome` a `proposedFile`; `reowner` a resolvable `proposedOwner` (declared role / `swe` base lens / known marker).
+- **Markers**: `decision:` and `decisionText:` are bare lines (no leading `- `), recognized only **outside** the draft fence; two bare `decision:` (or `decisionText:`) markers in one entry -> malformed.
+- **Decision (checkbox)**: the checkbox block is the contiguous run of tick/blank lines right after the `decision:` marker, terminated by the first non-matching line; scope tick-counting **strictly** to this block (never the draft fence, never `decisionText`). A tick is `^- \[[xX]\] <label>$`, a blank `^- \[ \] <label>$`, `<label>` one of `adopt|reject|fold|defer|refine`. **0 or 1 tick**; disposition is read from the ticked line's label only (unticked labels unvalidated); none ticked = `park`. Malformed (never a silent untick): >=2 ticks, a checkbox-shaped line matching neither grammar (`-[x]`, `* [x]`, `[ x ]`, `- [x]adopt`), or a ticked label outside the five.
+- **decisionText**: the free block after the `decisionText:` marker to the next `### `/EOF. Its **human part** is everything above the first `<!-- apply-log -->` sentinel (the whole body if none); apply's failure notes live below it and are ignored by every check. Params come from the human part: `reject` -> non-empty reason; `fold` -> the **first non-blank line** begins with a **resolvable target `#tag`** (`#tag -- <reason>`), no dangling fold; `defer` -> non-empty condition (plus `targetFile`+`role` from metadata, filling the `(-> <targetFile>, <role>)` suffix); `refine` -> non-empty input. `adopt`/`park` need none.
+- `adopt` also needs `status: ready` and the kind's field: `new-rule`/`strengthen` a non-empty draft; `rehome` a `proposedFile`; `reowner` a resolvable `proposedOwner` (declared role / `swe` base lens / known marker).
 
 ### A2. Pre-flight (clean base)
 
@@ -94,13 +105,14 @@ Each adopt is applied as a **declarative, idempotent ensure-end-state** -- it co
 - `strengthen`: ensure the tag's section (its `## #tag ...` heading to the next `##` heading or EOF) **equals** the draft -- replace the whole section (add it if absent). Whole-section replacement is correct from any partial and never false-positives on prose the draft shares with the original.
 - `rehome`: ensure the section is present in `proposedFile` (add iff absent) **and** absent from the old `targetFile` (remove iff present).
 - `reowner`: ensure the `ownership.yaml` row exists with its **resolved owner** equal to `proposedOwner` (add iff absent, else rewrite owner).
-- `reject` / `fold` / `defer`: ensure the tag's decisions-log line exists with the matching disposition -- `#tag -- rejected: <reason>` / `folded into <tag>: <reason>` / `deferred: <condition> (-> <targetFile>, <role>)`. One line per tag, update in place.
+- `reject` / `fold` / `defer`: ensure the tag's decisions-log line exists with the matching disposition -- `#tag -- rejected: <reason>` / `folded into <tag>: <reason>` / `deferred: <condition> (-> <targetFile>, <role>)`, using the reason/target/condition from the entry's `decisionText` human part. One line per tag, update in place.
+- `refine`: write nothing; **leave the entry** (gate-(ii) treats it like `park`, never pruned) and surface it with its `decisionText` in the report so the discussion can happen this turn. Resolved only when the human re-ticks a terminal box.
 
-After each adopt, regenerate (`node bin/cli.js`) and run `npm test`; it **must stay green** (#swe-done). **Recovery is per-entry, not file-wide:** snapshot each file's pre-edit content before touching it; on an `npm test` failure (or any error) restore only those snapshots -- never wipe a sibling adoption that already landed in the same file (many rules live in `core/swe.md`, so a file-wide `git restore` would be wrong). Then set the entry `decision: park`, append a `- note:` with the failure, and continue.
+After each adopt, regenerate (`node bin/cli.js`) and run `npm test`; it **must stay green** (#swe-done). **Recovery is per-entry, not file-wide:** snapshot each file's pre-edit content before touching it; on an `npm test` failure (or any error) restore only those snapshots -- never wipe a sibling adoption that already landed in the same file (many rules live in `core/swe.md`, so a file-wide `git restore` would be wrong). Then clear the entry's tick (none = `park`) and append the failure **below** its `decisionText` `<!-- apply-log -->` sentinel (creating it if absent), leaving the human part untouched; continue.
 
 ### A4. Commit + report
 
-On each successful `adopt`/`reject`/`fold`/`defer`, **remove that entry from the worksheet immediately** (so it always holds exactly the not-yet-applied entries; a crash resumes by re-running -- the already-applied entries are gone, and the ensure-end-state makes any re-touch a no-op). Decisions-log appends are append-only. `park` entries (and any re-parked failure, now `decision: park` -- retrying it is a deliberate re-edit to `adopt`) remain as the carry. Report: adopted / rejected / folded / deferred / parked / failed (each failure with its reason).
+On each successful `adopt`/`reject`/`fold`/`defer`, **remove that entry from the worksheet immediately** (so it always holds exactly the not-yet-applied entries; a crash resumes by re-running -- the already-applied entries are gone, and the ensure-end-state makes any re-touch a no-op). Decisions-log appends are append-only. `park` and `refine` entries (and any re-parked failure -- now unticked, retrying it is a deliberate re-tick to `adopt`) remain as the carry; a `refine` persists like `park` until the human re-ticks a terminal box. Report: adopted / rejected / folded / deferred / **refined** / parked / failed (each failure with its reason). The setup gate's `K` (un-applied decisions) counts only the applyable terminals (adopt/reject/fold/defer); `refine` is reported separately and **not** counted in K.
 
 ## Scratch
 
