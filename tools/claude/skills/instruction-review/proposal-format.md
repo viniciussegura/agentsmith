@@ -30,6 +30,8 @@ interface InstructionProposal {
 
 **Required per kind** (the reduce step rejects a proposal missing its kind's field): `new-rule` and `strengthen` require `targetFile`; `new-rule` also requires `draft` once concrete; `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must be a **resolvable owner** (a declared role, the `swe` base lens, or a known non-review marker -- else the editor rejects/normalizes it).
 
+For a `strengthen` (and a text-changing `rehome`/`reowner`) the worksheet also renders a read-only **`current:`** block -- the verbatim live `## #tag` section the draft replaces -- immediately before `draft:`, so the human sees a before/after at decision time. It is review-surface only; `/instruction-apply` never reads it. `new-rule` has no `current:`. (Full worksheet grammar is in the instruction-review SKILL.) Both `current:` and `draft:` are located by their bare marker, not by fence position.
+
 ## Rubric
 
 The rubric is the nine dimensions of the single-agent fallback `prompts/review-instructions.md` (#swe-reuse), split by where they run.
