@@ -64,6 +64,7 @@ owners:
   front-a11y: frontend
   ui-canonical-states: frontend
   ui-design-tokens: frontend
+  ui-framework-idioms: frontend
 
   # ux -- the end-user experience and flow
   front-nielsen-heuristics: ux

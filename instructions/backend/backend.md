@@ -19,6 +19,10 @@ When returning an instance, the data structure **MUST NOT** have optional fields
 A field may be nullable, but never optional.
 This surfaces backend issues earlier: it is always clear when a value should have been returned.
 
+**Identifiers** -- every entity's `id` is stable, opaque, and never reused after deletion; do not expose internal auto-increment integers as public ids. Changing the id strategy for a live entity is a breaking change (#be-api-versioning).
+
+**Pagination** -- list endpoints that may return more than fits in one response **MUST** paginate, with one strategy applied uniformly across the service: cursor (`{ data: EntityShort[]; nextCursor: string | null }`) or offset (`{ data: EntityShort[]; total: number; page: number; pageSize: number }`). The envelope is part of the versioned contract (#be-api-versioning).
+
 Worked example -- one entity through its variations, `Ref ⊂ Short ⊂ Entity`:
 
 ```typescript
@@ -73,8 +77,12 @@ Each variation maps to a call site:
 
 ## #be-api-versioning API versioning and deprecation
 
-Version the API contract; a breaking change to a released shape ships under a new version, never by mutating the old one.
-Mark a superseded field or endpoint as deprecated before removal, with a documented migration path for consumers.
+Version the API contract; a **breaking change** ships under a new version, never by mutating the released shape.
+An unreleased shape may change freely; the versioning obligation attaches only once a shape has shipped to a consumer. A version increment is a release-time decision (#swe-done / #git-pr-body), never per-commit during development.
+A breaking change is any of: removing or renaming a field or endpoint; narrowing a field's type; making a previously-nullable field non-nullable; changing the semantics of an existing field.
+Additive changes (new optional request fields, new nullable response fields) are non-breaking and **MUST NOT** increment the version.
+Signal the version by one convention per service, applied uniformly -- a URL path segment (`/v2/`) for REST, a new named type for GraphQL, a metadata field for gRPC.
+Mark a superseded field or endpoint deprecated before removal, with a documented migration path; deprecated surface stays functional for at least one full release cycle.
 Entity variations (#be-api-first) stay stable within a version.
 
 ## #be-schema-migration Schema migration safety

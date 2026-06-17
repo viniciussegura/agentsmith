@@ -30,3 +30,10 @@ Meet contrast ratios: 4.5:1 for body text, 3:1 for large text and UI affordances
 **Never** convey state by color alone -- pair it with text or an icon.
 Content that updates asynchronously (search results, notifications, status) **MUST** announce via an appropriate live region (`aria-live`, `role="status"`, `role="alert"`) at a politeness matching urgency.
 Animation and transitions **MUST** respect `prefers-reduced-motion: reduce` with a no-motion fallback.
+
+## #ui-framework-idioms Framework-idiomatic state and effects
+
+- Derive, don't mirror: a value computable from existing state or props is computed at render, never copied into separate state and resynced.
+- Effects synchronize with external systems (DOM, subscriptions, non-UI libraries) -- not for deriving values from state or props. (React `useEffect`, Angular `effect`, Vue `watchEffect`, Svelte `$effect`.)
+- **Never** hold server-fetched data in component-local state when a data-fetching cache already owns it (React Query, SWR, RTK Query, Angular `resource`/`httpResource`, Vue Query, or equivalent).
+- State that always changes together is one unit of state.

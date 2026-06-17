@@ -30,3 +30,5 @@ A deferred entry carries a placement hint `(-> <targetFile>, <role>)` so a futur
 - `#swe-regression-tests` -- rejected: covered by `#swe-testing` (every bug fix starts with a reproducing test) plus tests-committed under `#swe-done`.
 - `#ui-user-control` -- rejected: overlaps the deferred `#ui-destructive-confirm`; the residual gap (form-cancel, back-button input preservation) is too narrow for its own tag.
 - `#swe-reference-spec` -- rejected (reowner -> `docs`): it is the system-of-record (architecture / entity-model home), not a docs-sync artifact; stays owned by `swe`.
+- `#front-nielsen-heuristics` -- rejected: Enumerating Nielsen's heuristics is general knowledge the agent already holds; conflicts with #ai-conversational terseness. Keep the live pointer + trade-off obligation.
+- `#front-cdn` -- rejected: Enumerating the cognitive dimensions is general knowledge the agent already holds; conflicts with #ai-conversational terseness. Keep the live pointer + trade-off obligation.
