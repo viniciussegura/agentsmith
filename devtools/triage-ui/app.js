@@ -85,7 +85,26 @@ function renderSidebar() {
 
 function renderDiff(entry) {
   const rows = lineDiff(entry.current || '', entry.draft || '');
-  return el('div', { class: 'diff' }, rows.map((r) => el('div', { class: `line ${r.type}`, text: r.text })));
+  const cell = (text, cls) => el('div', { class: `cell ${cls}`, text: text ?? '' });
+  const out = [el('div', { class: 'drow head' }, [cell('current', 'lbl'), cell('draft', 'lbl')])];
+  let dels = [];
+  let adds = [];
+  const flush = () => {
+    for (let k = 0; k < Math.max(dels.length, adds.length); k++) {
+      out.push(el('div', { class: 'drow' }, [
+        cell(dels[k], dels[k] === undefined ? 'empty' : 'del'),
+        cell(adds[k], adds[k] === undefined ? 'empty' : 'add'),
+      ]));
+    }
+    dels = []; adds = [];
+  };
+  for (const r of rows) {
+    if (r.type === 'same') { flush(); out.push(el('div', { class: 'drow' }, [cell(r.text, 'same'), cell(r.text, 'same')])); }
+    else if (r.type === 'del') dels.push(r.text);
+    else adds.push(r.text);
+  }
+  flush();
+  return el('div', { class: 'diff sxs' }, out);
 }
 
 function renderDetail() {
@@ -124,7 +143,15 @@ function renderDetail() {
   const detailsLabel = el('label', { class: 'field', text: DETAIL_LABEL[e.decision?.verdict || 'park'] });
   detailRefs.detailsLabel = detailsLabel;
 
+  const total = state.data.entries.length;
+  const prev = el('button', { class: 'nav', text: '◀ Prev', onclick: () => goTo(state.sel - 1) });
+  const next = el('button', { class: 'nav', text: 'Next ▶', onclick: () => goTo(state.sel + 1) });
+  prev.disabled = state.sel === 0;
+  next.disabled = state.sel === total - 1;
+  const nav = el('div', { class: 'navbar' }, [prev, el('span', { class: 'pos', text: `${state.sel + 1} / ${total}` }), next]);
+
   $('#detail').replaceChildren(
+    nav,
     el('div', { class: 'meta', text: `${e.kind} · ${e.role} · ${e.targetFile} · status: ${e.status?.state}` }),
     el('h2', { text: `#${e.tag}` }),
     el('div', { class: 'gap', text: e.gap || '' }),
@@ -164,5 +191,20 @@ function refreshConditional(e, detailsBox, foldWrap, foldSelect) {
     foldWrap.append(el('label', { class: 'field', text: 'Fold target (#tag)' }), foldSelect);
   }
 }
+
+function goTo(i) {
+  const n = state.data.entries.length;
+  if (!n) return;
+  state.sel = Math.max(0, Math.min(n - 1, i));
+  renderSidebar();
+  renderDetail();
+}
+
+// Arrow keys navigate when focus isn't in an editable field.
+document.addEventListener('keydown', (ev) => {
+  if (['TEXTAREA', 'SELECT', 'INPUT'].includes(document.activeElement?.tagName)) return;
+  if (ev.key === 'ArrowLeft') goTo(state.sel - 1);
+  else if (ev.key === 'ArrowRight') goTo(state.sel + 1);
+});
 
 load();
