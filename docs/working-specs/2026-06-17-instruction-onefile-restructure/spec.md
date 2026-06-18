@@ -1,6 +1,6 @@
 # Spec: one-file-per-tag instructions + triage workflow v2
 
-Status: Draft
+Status: Approved
 
 ## Motivation
 
