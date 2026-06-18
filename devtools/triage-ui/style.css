@@ -130,6 +130,8 @@ textarea.details { min-height: 60px; }
 .chip-link { cursor: pointer; font: inherit; font-size: 10px; }
 .chip-link:hover { background: var(--add-bg); }
 .chip-orphan { color: var(--muted); border-color: var(--border); border-style: dashed; }
+.chip-create { color: var(--accent); border-color: var(--accent); border-style: dashed; cursor: pointer; font: inherit; font-size: 10px; background: transparent; }
+.chip-create:hover { background: var(--panel); border-style: solid; }
 .inline-code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--bg); padding: 0 4px; border-radius: 3px; color: var(--fg); }
 
 .scdetails { margin: 4px 0; }
@@ -138,8 +140,11 @@ textarea.details { min-height: 60px; }
 .finding-file { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 11px; color: var(--muted); }
 .finding-note { color: var(--fg); margin-top: 4px; }
 
-.scnits .scn { color: var(--fg); margin: 4px 0; display: flex; gap: 6px; }
+.scnits .scn { color: var(--fg); margin: 4px 0; display: flex; align-items: baseline; gap: 6px; }
 .scnits .scn-bullet { color: var(--muted); flex-shrink: 0; }
+.scnits .scn-text { flex: 1; }
+.nit-done { margin-left: auto; cursor: pointer; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; font-size: 10px; padding: 0 7px; flex-shrink: 0; }
+.nit-done:hover { color: var(--add-fg); border-color: var(--add-fg); }
 
 /* Refine reply panel */
 .reply {

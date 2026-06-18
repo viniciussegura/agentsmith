@@ -123,6 +123,34 @@ function tagChip(tag) {
   }
   return el('span', { class: 'chip chip-tag chip-orphan', title: 'no proposal or candidate addresses this yet', text: `#${tag}` });
 }
+// Spin an orphan finding into a worksheet candidate (then jump to it). kind is
+// inferred from whether the tag is already live (strengthen) or new (new-rule);
+// role from the finding's lens (global findings default to the swe base lens).
+function createCandidateFromFinding(d) {
+  if (tagLocation(d.tag)) return; // already has a proposal/candidate
+  const kind = state.tags.includes(`#${d.tag}`) ? 'strengthen' : 'new-rule';
+  state.data.candidates.push({
+    tag: d.tag,
+    kind,
+    role: d.lens || 'swe',
+    targetFile: d.file || 'instructions/',
+    gap: d.note || `From scorecard finding: ${d.dimension}${d.lens ? ' / ' + d.lens : ''}.`,
+    priority: 'medium',
+    decision: { verdict: 'park' },
+  });
+  const ci = sortedCandidates().findIndex((c) => c.tag === d.tag);
+  select('candidate', ci);
+  scheduleSave();
+}
+
+// Check off a mechanical nit (remove it as it's addressed). Nits are ephemeral
+// round artifacts, so dismissing makes the list a working checklist.
+function dismissNit(i) {
+  state.data.scorecard.nits.splice(i, 1);
+  renderScorecardDetail();
+  scheduleSave();
+}
+
 // Inline-format free text: turn `code` spans and #tags into styled nodes; a #tag
 // becomes an actionable chip when it resolves to a worksheet item.
 function richText(s) {
@@ -228,14 +256,19 @@ function renderScorecardDetail() {
           d.lens ? el('span', { class: 'chip chip-role', text: d.lens }) : null,
           tagChip(d.tag),
           d.file ? el('code', { class: 'finding-file', text: d.file }) : null,
+          tagLocation(d.tag) ? null : el('button', { class: 'chip chip-create', title: 'Create a candidate from this finding', text: '+ candidate', onclick: () => createCandidateFromFinding(d) }),
         ].filter(Boolean)),
         el('div', { class: 'finding-note' }, richText(d.note || '')),
       ]))));
   }
   if (sc.nits?.length) {
     kids.push(el('label', { class: 'field', text: 'mechanical nits' }));
-    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n) =>
-      el('div', { class: 'scn' }, [el('span', { class: 'scn-bullet', text: '•' }), el('span', {}, richText(n))]))));
+    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n, i) =>
+      el('div', { class: 'scn' }, [
+        el('span', { class: 'scn-bullet', text: '•' }),
+        el('span', { class: 'scn-text' }, richText(n)),
+        el('button', { class: 'nit-done', title: 'Mark this nit done (remove it)', text: '✓', onclick: () => dismissNit(i) }),
+      ]))));
   }
   $('#detail').replaceChildren(...kids);
 }
