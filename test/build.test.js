@@ -5,10 +5,10 @@ import { generate } from '../src/generate.js';
 
 const base = {
   preamble: '# Agent instructions\n\nIntro.',
-  modules: ['# Core\n\n## #core-x X'],
+  modules: [{ text: '# Core\n\n## #core-x X', demote: 1 }],
   bundles: [
     { name: 'frontend', title: 'Front-end instructions', when: 'Front-end or UI work',
-      modules: ['# Front\n\n## #front-y Y'] },
+      modules: [{ text: '# Front\n\n## #front-y Y', demote: 1 }] },
   ],
   source: 's',
 };
@@ -73,7 +73,7 @@ test('stub is planned when nested, omitted when root', () => {
 test('dangling tag references are surfaced', () => {
   const out = buildOutputs({
     ...base,
-    modules: ['# Core\n\n## #core-x X\n\nSee #core-ghost.'],
+    modules: [{ text: '# Core\n\n## #core-x X\n\nSee #core-ghost.', demote: 1 }],
     layout: 'lean',
     placement: 'nested',
   });
@@ -83,7 +83,7 @@ test('dangling tag references are surfaced', () => {
 test('core references to bundle-only tags are surfaced as cross-boundary', () => {
   const out = buildOutputs({
     ...base,
-    modules: ['# Core\n\n## #core-x X\n\nSee #front-y for the rest.'],
+    modules: [{ text: '# Core\n\n## #core-x X\n\nSee #front-y for the rest.', demote: 1 }],
     layout: 'lean',
     placement: 'nested',
   });
@@ -94,7 +94,7 @@ test('core references to bundle-only tags are surfaced as cross-boundary', () =>
 test('full layout has no cross-boundary refs since every module is inlined', () => {
   const out = buildOutputs({
     ...base,
-    modules: ['# Core\n\n## #core-x X\n\nSee #front-y for the rest.'],
+    modules: [{ text: '# Core\n\n## #core-x X\n\nSee #front-y for the rest.', demote: 1 }],
     layout: 'full',
     placement: 'root',
     output: 'AGENTS.md',
@@ -120,8 +120,8 @@ test('multi-bundle lean lists every bundle href', () => {
   const out = buildOutputs({
     ...base,
     bundles: [
-      { name: 'frontend', title: 'F', when: 'FE work', modules: ['# F\n\n## #f-a A'] },
-      { name: 'backend', title: 'B', when: 'BE work', modules: ['# B\n\n## #b-a A'] },
+      { name: 'frontend', title: 'F', when: 'FE work', modules: [{ text: '# F\n\n## #f-a A', demote: 1 }] },
+      { name: 'backend', title: 'B', when: 'BE work', modules: [{ text: '# B\n\n## #b-a A', demote: 1 }] },
     ],
     layout: 'lean',
     placement: 'nested',
@@ -134,9 +134,20 @@ test('multi-bundle lean lists every bundle href', () => {
 test('bundle title falls back to name when title is absent', () => {
   const out = buildOutputs({
     ...base,
-    bundles: [{ name: 'frontend', when: 'FE work', modules: ['# F\n\n## #f-a A'] }],
+    bundles: [{ name: 'frontend', when: 'FE work', modules: [{ text: '# F\n\n## #f-a A', demote: 1 }] }],
     layout: 'lean',
     placement: 'nested',
   });
   assert.match(out.bundles[0].content, /^# frontend$/m);
+});
+
+test('buildOutputs demotes core modules by their descriptor', () => {
+  const out = buildOutputs({
+    preamble: '# Root',
+    modules: [{ text: '# G\n\nx', demote: 1 }, { text: '# #t T\n\ny', demote: 2 }],
+    bundles: [],
+    source: 's',
+  });
+  assert.match(out.coreContent, /^## G$/m);
+  assert.match(out.coreContent, /^### #t T$/m);
 });

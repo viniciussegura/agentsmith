@@ -95,12 +95,12 @@ for (const b of bundles) {
 const { commit, date } = sourceRevision();
 const built = buildOutputs({
   preamble: read(manifest.preamble),
-  modules: coreModules.map(({ path }) => read(path)),
+  modules: coreModules.map(({ path, demote }) => ({ text: read(path), demote })),
   bundles: bundles.map((b) => ({
     name: b.name,
     title: b.title,
     when: b.when,
-    modules: b.modules.map(({ path }) => read(path)),
+    modules: b.modules.map(({ path, demote }) => ({ text: read(path), demote })),
   })),
   source: manifest.source,
   commit,
