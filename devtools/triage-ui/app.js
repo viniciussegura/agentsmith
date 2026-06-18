@@ -125,8 +125,13 @@ async function renderDetail() {
   const e = state.data.entries[state.sel];
   if (!e) return;
 
-  // Fetch live text ONCE; reuse e._live for in-place diff re-renders
+  // Fetch live text ONCE; reuse e._live for in-place diff re-renders.
+  // Guard against a fast-navigation race: if the selection changed while the
+  // fetch was in flight, abandon this (stale) render so it can't overwrite the
+  // newer one.
+  const mySel = state.sel;
   const curText = await liveCurrent(e);
+  if (state.sel !== mySel) return;
 
   const diffNode = renderDiff(e, curText);
 
@@ -276,12 +281,6 @@ function renderReport(report, errorMsg) {
           el('span', { class: 'report-val', text: String(report[k]) }),
         ]));
       }
-    }
-    if (report.tags && report.tags.length) {
-      lines.push(el('div', { class: 'report-row' }, [
-        el('span', { class: 'report-key', text: 'tags' }),
-        el('span', { class: 'report-val', text: report.tags.join(', ') }),
-      ]));
     }
   }
 

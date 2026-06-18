@@ -156,7 +156,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let liveTags = [];
   try {
     const out = execFileSync('node', ['bin/cli.js', '--stdout'], { cwd: root, encoding: 'utf8' });
-    liveTags = [...out.matchAll(/^#{1,6}\s+#(\S+)/gm)].map((m) => m[1]);
+    liveTags = [...out.matchAll(/^#{1,6}\s+(#\S+)/gm)].map((m) => m[1]);
   } catch { /* leave empty; only fold entries need it */ }
   apply({ root, triagePath, liveTags })
     .then((r) => { console.log(JSON.stringify(r, null, 2)); })

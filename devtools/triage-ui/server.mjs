@@ -84,7 +84,7 @@ function liveTagsFromCli() {
   try {
     const out = execSync('node bin/cli.js --stdout', { cwd: REPO_ROOT, encoding: 'utf8' });
     const tags = new Set();
-    for (const m of out.matchAll(/^##\s+(#\S+)/gm)) tags.add(m[1]);
+    for (const m of out.matchAll(/^#{1,6}\s+(#\S+)/gm)) tags.add(m[1]);
     return [...tags];
   } catch {
     return [];
@@ -146,7 +146,8 @@ export function createServer({
       if (dirty) return send(res, 409, { error: 'dirty base', paths: dirty.split('\n') });
       applying = true;
       try {
-        const report = await apply({ root: REPO_ROOT, triagePath });
+        // Pass live #tags so a `fold` entry's foldTarget passes cross-ref validation.
+        const report = await apply({ root: REPO_ROOT, triagePath, liveTags: tagsProvider() });
         return send(res, 200, { report, version: currentToken(triagePath) });
       } catch (err) {
         return send(res, 500, { error: String(err.message || err) });
