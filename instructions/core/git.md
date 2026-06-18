@@ -1,37 +1,5 @@
 # Git
 
-## #git-title Commit and PR title format
-
-- Conventional Commits: `<type>(<scope>): <subject>`, where `<type>` is one of `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `perf`, `ci`, `build`.
-- The full title (`<type>(<scope>): <subject>`) fits on one line of 72 characters or fewer; `<scope>` is optional (omit the parentheses when absent).
-- `<subject>` is sentence case, past tense (what was done).
-- A breaking change is flagged with `!` before the colon (`feat!: ...`) and carries a `BREAKING CHANGE:` footer in the body.
-- Prefix AI-authored commits and PR titles with `🤖 ` -- a marker that keeps history honest about who wrote what.
-
-| Author | Subject |
-|---|---|
-| AI | `🤖 feat(backend): Added cursor pagination to the list API` |
-| Human | `docs: Split README into docs/getting-started.md` |
-
-## #git-pr-body PR description
-
-A PR body **MUST** contain at minimum:
-
-1. **What changed** -- a concise summary of the diff's intent.
-2. **Why** -- the motivation or issue it addresses; link the spec or plan (#ai-plan) and related issues.
-3. **Verification** -- the concrete steps taken: the commands run and any test output, or, when untestable, the explicit statement per #swe-done item 1. Not a bare "it works".
-4. **Model** (AI-authored PRs only) -- the model(s) used, per #git-usage.
-5. **Reviewer notes** (optional) -- anything reviewers should scrutinize, and any follow-up deferred to #swe-future-work.
-
-## #git-usage Authorship reporting
-
-- AI commits add a trailer after `Co-Authored-By:`: `Usage: model=<model-id>` (e.g. `claude-opus-4-7[1m]`).
-  Multiple models: `model=claude-opus-4-7; subagents=claude-sonnet-4-6 x3`.
-  The `Co-Authored-By:` line names the same (or dominant) model.
-- AI PR bodies note the model(s) used.
-- No token or time figures in git -- they cannot be reliably sourced and go stale.
-  Track spend in tooling (`/cost`, `rtk gain`) instead.
-
 ## #git-branch-workflow Branch workflow
 
 We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutorials/comparing-workflows/feature-branch-workflow), with one adjustment: a branch maps to a **logical unit of work**, not strictly a single feature.
@@ -54,6 +22,23 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
   Once pushed (any branch, including feature branches) a commit is append-only: no `git push --force`, no `--force-with-lease`, no rebase or reset of pushed commits.
   Local-only commits may be amended or reordered until the next push.
 
+## #git-merge-conflict Merge-conflict resolution
+
+- **Never** push a tree containing conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
+- An AI agent **MUST NOT** auto-resolve a merge conflict -- stop, surface the conflicting hunks, and ask the user to decide, giving a recommendation.
+- After the user resolves, the agent may stage the resolved files and continue.
+- Prefer rebasing a local (unpushed) branch over a merge commit; once pushed, resolve via a merge commit, never a rebase (#git-branch-workflow).
+
+## #git-pr-body PR description
+
+A PR body **MUST** contain at minimum:
+
+1. **What changed** -- a concise summary of the diff's intent.
+2. **Why** -- the motivation or issue it addresses; link the spec or plan (#ai-plan) and related issues.
+3. **Verification** -- the concrete steps taken: the commands run and any test output, or, when untestable, the explicit statement per #swe-done item 1. Not a bare "it works".
+4. **Model** (AI-authored PRs only) -- the model(s) used, per #git-usage.
+5. **Reviewer notes** (optional) -- anything reviewers should scrutinize, and any follow-up deferred to #swe-future-work.
+
 ## #git-secret-history Committed-secret response
 
 If a secret (credential, token, key) is found in published history:
@@ -66,12 +51,18 @@ If a secret (credential, token, key) is found in published history:
 A history rewrite for any other reason remains prohibited (#git-branch-workflow). 
 Committing the secret in the first place violates #swe-environment.
 
-## #git-merge-conflict Merge-conflict resolution
+## #git-title Commit and PR title format
 
-- **Never** push a tree containing conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
-- An AI agent **MUST NOT** auto-resolve a merge conflict -- stop, surface the conflicting hunks, and ask the user to decide, giving a recommendation.
-- After the user resolves, the agent may stage the resolved files and continue.
-- Prefer rebasing a local (unpushed) branch over a merge commit; once pushed, resolve via a merge commit, never a rebase (#git-branch-workflow).
+- Conventional Commits: `<type>(<scope>): <subject>`, where `<type>` is one of `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `perf`, `ci`, `build`.
+- The full title (`<type>(<scope>): <subject>`) fits on one line of 72 characters or fewer; `<scope>` is optional (omit the parentheses when absent).
+- `<subject>` is sentence case, past tense (what was done).
+- A breaking change is flagged with `!` before the colon (`feat!: ...`) and carries a `BREAKING CHANGE:` footer in the body.
+- Prefix AI-authored commits and PR titles with `🤖 ` -- a marker that keeps history honest about who wrote what.
+
+| Author | Subject |
+|---|---|
+| AI | `🤖 feat(backend): Added cursor pagination to the list API` |
+| Human | `docs: Split README into docs/getting-started.md` |
 
 ## #git-tooling Git invocation
 
@@ -79,3 +70,12 @@ Committing the secret in the first place violates #swe-environment.
 - **Never** run interactive git in an agent session (`git rebase -i`, `git add -p`, `git commit` with no message).
 - Do not pass `--no-verify` to bypass hooks: that disables a safety check (#ai-tool-safety). 
   If a hook blocks a commit, surface the failure and ask.
+
+## #git-usage Authorship reporting
+
+- AI commits add a trailer after `Co-Authored-By:`: `Usage: model=<model-id>` (e.g. `claude-opus-4-7[1m]`).
+  Multiple models: `model=claude-opus-4-7; subagents=claude-sonnet-4-6 x3`.
+  The `Co-Authored-By:` line names the same (or dominant) model.
+- AI PR bodies note the model(s) used.
+- No token or time figures in git -- they cannot be reliably sourced and go stale.
+  Track spend in tooling (`/cost`, `rtk gain`) instead.
