@@ -1,0 +1,1 @@
+This bundle applies only when **authoring or auditing an instruction set built with agentsmith's own machinery** (an `instructions/` rule tree, `ownership.yaml`, and the generator) -- not when merely consuming generated instructions.
