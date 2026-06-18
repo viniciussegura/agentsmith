@@ -5,13 +5,23 @@ argument-hint: (no arguments; reads the worksheet)
 
 Apply the instruction-review triage worksheet. $ARGUMENTS
 
-Use the `instruction-review` skill, **Apply pipeline** section. Read `.agentsmith/instruction-review/triage.json`; if it is absent or has no entries, report "nothing to apply" and stop.
+Read `.agentsmith/instruction-review/triage.json`. If it is absent or has no entries, report "nothing to apply" and stop.
 
-Validate every entry first with `devtools/triage-ui/schema.mjs` (`validateFile` + `validateCrossRefs`; malformed -> report and skip, never half-apply), then execute each entry by its **`decision.verdict`** (default `park`), with reason/condition/input from `decision.details` and the fold target from `decision.foldTarget`:
+Otherwise, delegate entirely to the shared engine:
 
-- `adopt` -> requires `status.state === 'ready'`; guided **ensure-end-state** edit into `instructions/` (replace the tag's section / add the rule + `ownership.yaml` row / rehome / reowner), then regenerate (`node bin/cli.js`) and run `npm test`; must stay green (#swe-done). Recovery is per-entry (snapshot, not file-wide restore).
-- `reject` / `fold` / `defer` -> one line in `docs/instruction-rules-decisions.md` in the canonical grammar (backtick-wrapped tag; defer hint uses `basename(targetFile)`), one line per tag, update in place.
-- `refine` -> write nothing; leave the entry and surface it with its `decision.details` for discussion.
-- `park` (default) -> leave it (re-surfaces next round).
+```
+node devtools/triage-ui/apply.mjs
+```
 
-On each success, **splice the terminal entry and rewrite `triage.json` atomically** (canonical serializer) so a crash resumes cleanly; on a failed adopt, set the entry's `decision` to `{verdict:'park'}` and push the failure to `entry.applyLog`. `current` is never read (review-surface only). Report adopted / rejected / folded / deferred / refined / parked / failed at the end.
+The engine (shared with the triage UI's POST /api/apply) handles everything:
+
+- **Validate** -- `validateFile` + `validateCrossRefs` from `devtools/triage-ui/schema.mjs`; malformed entries are reported and skipped, never half-applied. `adopt` additionally requires `status.state === 'ready'`. The live instruction text is read from disk (no stored `current` in the schema).
+- **Process each entry by verdict:**
+  - `adopt` -- write or create the tag's rule file under its group dir in `instructions/` (whole-file, not a section splice) and ensure the `ownership.yaml` row; then regenerate (`node bin/cli.js`) and gate on `node --test` (#swe-done); per-entry snapshot recovery on failure (re-park + `applyLog` push).
+  - `reject` / `fold` / `defer` -- append one canonical line to `docs/instruction-rules-decisions.md` (backtick-wrapped tag; defer hint uses `basename(targetFile)` and `role`); one line per tag, idempotent.
+  - `refine` -- write nothing; leave the entry.
+  - `park` (default) -- leave the entry.
+  - `rehome` / `reowner` -- skipped (deferred to a future engine version).
+- **Atomic splice** -- on each terminal verdict (`adopt`/`reject`/`fold`/`defer`), splice the entry from `entries[]` and rewrite `triage.json` atomically (temp + rename, canonical serializer); a crash resumes cleanly. `park` and `refine` entries remain as the carry.
+
+Report the engine's JSON result: **adopted / rejected / folded / deferred / refined / parked / skipped / failed**. For each `refine` entry, surface its `decision.details` (the open question) and `decision.lastRoundReply` (the prior answer, if any) so discussion can happen this turn.

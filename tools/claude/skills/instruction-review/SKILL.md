@@ -80,37 +80,40 @@ End with a handoff message naming **both** the worksheet path and the next comma
 
 A separate command consumes the worksheet and executes every decision in one non-stop, **crash-idempotent** pass. The round only *writes* the worksheet; this is where `instructions/` and the decisions log change.
 
-Worksheet path: `.agentsmith/instruction-review/triage.json` (gitignored, per-machine). The decision is a typed object `decision.verdict` (default `park`): `adopt` (the draft, into `instructions/`) · `reject` / `fold` / `defer` (the decisions log) · `refine` (surfaced for discussion, no write) · `park` (stays, re-surfaces next round). Parameters are typed fields: `decision.details` (reject reason / defer condition / refine input) and `decision.foldTarget` (fold).
+Worksheet path: `.agentsmith/instruction-review/triage.json` (gitignored, per-machine). The decision is a typed object `decision.verdict` (default `park`): `adopt` (the draft, into `instructions/`) · `reject` / `fold` / `defer` (the decisions log) · `refine` (surfaced for discussion, no write) · `park` (stays, re-surfaces next round). Parameters are typed fields: `decision.details` (reject reason / defer condition / refine question) and `decision.foldTarget` (fold); `decision.lastRoundReply` carries the prior answer for `refine` entries.
+
+The pipeline is implemented by `devtools/triage-ui/apply.mjs` (shared with the triage UI's POST /api/apply). The `/instruction-apply` command runs `node devtools/triage-ui/apply.mjs` and reports its output; it does **not** hand-edit files itself.
 
 ### A1. Validate (one pass, before any write)
 
-`JSON.parse` the file (normalize is unnecessary -- JSON is structured). If absent or `entries` is empty, report "nothing to apply" and stop. Validate every entry with `devtools/triage-ui/schema.mjs` (`validateFile` + `validateCrossRefs`); a malformed entry is **reported and skipped**, never half-applied:
+`JSON.parse` the file. If absent or `entries` is empty, report "nothing to apply" and stop. Validate every entry with `devtools/triage-ui/schema.mjs` (`validateFile` + `validateCrossRefs`); a malformed entry is **reported and skipped**, never half-applied:
 
-- **Structural (`validateFile`):** each kind's required content field (`new-rule`/`strengthen` -> `draft`; `strengthen` also `current`; `rehome` -> `proposedFile`; `reowner` -> `proposedOwner`); `status` union (`blocked`/`conditional` need `blockedOn`); `decision` union (`reject`/`defer`/`refine`/`fold` need `details`; `fold` needs `foldTarget`); `applyLog` a string[]; no duplicate `tag`.
+- **Structural (`validateFile`):** each kind's required content field (`new-rule`/`strengthen` -> `draft`; `rehome` -> `proposedFile`; `reowner` -> `proposedOwner`); `status` union (`blocked`/`conditional` need `blockedOn`); `decision` union (`reject`/`defer`/`refine`/`fold` need `details`; `fold` needs `foldTarget`); `applyLog` a string[]; no duplicate `tag`. (`current` is no longer a stored field -- the engine reads the live file from disk.)
 - **Cross-reference (`validateCrossRefs`):** `fold.foldTarget` must resolve to a **live `#tag`** (from `node bin/cli.js --stdout`); `reowner.proposedOwner` must be a resolvable owner (declared role / `swe` base lens / known marker, from `roles.yaml`).
 - `adopt` additionally requires `status.state === 'ready'` (a `blocked`/`conditional` entry cannot be adopted until re-emitted ready).
-- `current` is **never read** -- it is review-surface only; its presence/absence never affects validation or apply.
 
 ### A2. Pre-flight (clean base)
 
-Before the first adoption, check `instructions/` + `ownership.yaml` for unrelated uncommitted edits; ask the user to stash or commit first. This keeps a clean base so the idempotent re-apply and per-entry snapshot recovery cannot confuse or discard user edits. (No-op when no entry is `adopt`.)
+Before the first adoption, check `instructions/` + `ownership.yaml` for unrelated uncommitted edits; ask the user to stash or commit first. (No-op when no entry is `adopt`.)
 
 ### A3. Process (non-stop; respects `#ai-preflight`)
 
-Each adopt is applied as a **declarative, idempotent ensure-end-state** -- it converges the file from any starting state (including a crash partial), never depending on a pre-edit anchor; the optional done-check just lets it skip an already-satisfied entry:
+The engine processes each entry by verdict. Instructions are now **one file per tag** under group dirs (e.g. `instructions/core/swe/swe-errors.md`), each group with an `_intro.md`. An `adopt` is therefore a **whole-file write/create**, not a section splice:
 
-- `new-rule`: ensure the section exists in `targetFile` (add **iff absent** -- never a second copy) and its `ownership.yaml` row exists (add iff absent).
-- `strengthen`: ensure the tag's section (from its heading line `^## #<tag>(\s|$)` to the line before the next `^## ` heading, or EOF) **equals** the `draft` -- replace the whole section (add it if absent). This `## #tag -> next ## / EOF` delimiter is the **same** one the worksheet's `current` field captured, so the before/after pair reflects exactly what is replaced. Whole-section replacement is correct from any partial and never false-positives on prose the draft shares with the original.
-- `rehome`: ensure the section is present in `proposedFile` (add iff absent) **and** absent from the old `targetFile` (remove iff present).
-- `reowner`: ensure the `ownership.yaml` row exists with its **resolved owner** equal to `proposedOwner` (add iff absent, else rewrite owner).
-- `reject` / `fold` / `defer`: ensure the tag's decisions-log line exists in the **canonical grammar** of `docs/instruction-rules-decisions.md` (tag backtick-wrapped), reason from `decision.details`: `` `#tag` -- rejected: <details> `` / `` `#tag` -- folded into `<foldTarget>`: <details> `` / `` `#tag` -- deferred: <details> (-> <basename(targetFile)>, <role>) `` (the defer hint uses the file **basename**, e.g. `swe.md`, and `role` from the entry). One line per tag, update in place. (Editorial prose some existing lines carry -- a trailing sentence, a sub-locator like `` `#swe-done` item 5 `` -- is human-added and not regenerated.)
-- `refine`: write nothing; **leave the entry** (gate consider treats it like `park`, never pruned) and surface it with its `decision.details` in the report so the discussion can happen this turn. Resolved only when the human re-sets the verdict to a terminal one.
+- `new-rule`: write or create the tag's rule file in its group dir and ensure its `ownership.yaml` row exists (add iff absent).
+- `strengthen`: write the tag's rule file with the `draft` content (replace whole file; add iff absent).
+- `rehome`: write the file in `proposedFile`'s group dir and remove it from `targetFile`'s group dir.
+- `reowner`: ensure the `ownership.yaml` row exists with `proposedOwner` (add iff absent, else rewrite owner).
+- `reject` / `fold` / `defer`: ensure the tag's decisions-log line exists in the **canonical grammar** of `docs/instruction-rules-decisions.md` (tag backtick-wrapped), reason from `decision.details`: `` `#tag` -- rejected: <details> `` / `` `#tag` -- folded into `<foldTarget>`: <details> `` / `` `#tag` -- deferred: <details> (-> <basename(targetFile)>, <role>) `` (the defer hint uses the file **basename** and `role` from the entry). One line per tag, update in place.
+- `refine`: write nothing; **leave the entry** and surface `decision.details` + `decision.lastRoundReply` in the report so discussion can happen this turn. Resolved only when the human re-sets the verdict to a terminal one.
+- `park` (default): leave the entry.
+- `rehome` / `reowner`: **skipped** (deferred to a future engine version); reported as `skipped`.
 
-After each adopt, regenerate (`node bin/cli.js`) and run `npm test`; it **must stay green** (#swe-done). **Recovery is per-entry, not file-wide:** snapshot each file's pre-edit content before touching it; on an `npm test` failure (or any error) restore only those snapshots -- never wipe a sibling adoption that already landed in the same file (many rules live in `core/swe.md`, so a file-wide `git restore` would be wrong). Then set the entry's `decision` to `{ verdict: 'park' }` and **push the failure string to `entry.applyLog`** (rewriting the file via the canonical serializer); a re-attempt requires a deliberate human re-decision; continue.
+After each adopt, regenerate (`node bin/cli.js`) and gate on `node --test` (#swe-done). **Recovery is per-entry, not file-wide:** snapshot pre-edit content; on failure restore only those snapshots, set the entry's `decision` to `{ verdict: 'park' }`, and push the failure string to `entry.applyLog` (rewrite via canonical serializer); continue.
 
 ### A4. Commit + report
 
-On each successful terminal verdict (`adopt`/`reject`/`fold`/`defer`), **splice that entry from `entries[]` and rewrite the whole file atomically** (temp + rename) via the canonical serializer, so `triage.json` always holds exactly the not-yet-applied entries; a crash resumes by re-running (already-removed entries are gone; ensure-end-state makes any re-touch a no-op). The rewrite re-emits the surviving entries **semantically unchanged** (deep-equal) -- only the spliced entry is removed, so applying one entry never alters a `park` entry the human is mid-editing. Decisions-log appends are append-only. `park` and `refine` entries (and any re-parked failure -- now `park`, retrying it is a deliberate human re-decision) remain as the carry; a `refine` persists like `park` until the human re-sets a terminal verdict. Report: adopted / rejected / folded / deferred / **refined** / parked / failed (each failure with its reason). The setup gate's `K` counts only the applyable terminals (adopt/reject/fold/defer); `park` and `refine` are **not** counted in K.
+On each successful terminal verdict (`adopt`/`reject`/`fold`/`defer`), **splice that entry from `entries[]` and rewrite the whole file atomically** (temp + rename) via the canonical serializer, so `triage.json` always holds exactly the not-yet-applied entries; a crash resumes by re-running (ensure-end-state makes any re-touch a no-op). `park`, `refine`, and re-parked failures remain as the carry. Report: adopted / rejected / folded / deferred / **refined** / parked / **skipped** / failed (each failure with its reason). The setup gate's `K` counts only the applyable terminals (adopt/reject/fold/defer); `park` and `refine` are **not** counted in K.
 
 ## Scratch
 
