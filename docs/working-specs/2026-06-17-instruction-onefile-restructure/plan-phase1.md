@@ -12,6 +12,32 @@
 
 ---
 
+## Execution note (actual order — supersedes the task numbering below)
+
+The task numbers below are a logical grouping, **not** the safe execution order.
+The reorder/normalize pre-steps and the reference capture MUST run **before** the
+build-wiring task (T4), because after T4 the still-flat tree emits wrong heading
+levels (a flat section file is read as a leaf tag → demote 2), which would
+corrupt any baseline captured afterward. Crucially, after T1–T3 the generator
+still reproduces the original output on the flat tree (modules passed as strings
+→ demote 1, alphabetical order), so the reference is correct if captured then.
+
+**Order actually used (and recommended):** T1 → T2 → T3 → **T6 (reorder) → T7
+(normalize, folded into the same `reorder.mjs` run over all files) → capture the
+reference** → T4 → T5 → T8 (migrate + gate vs reference) → T9.
+
+**Reference capture:** `ref1` = `node bin/cli.js --stdout`, `--full --stdout`,
+and the lean bundle files (from a default `node bin/cli.js` run), taken on the
+reordered+normalized flat tree with the post-T3 generator, saved under
+`.agentsmith/tmp/restructure/ref1/` (gitignored).
+
+**Gate normalization:** the generated header line `Source revision <commit>
+(<date>)` is volatile by design (it stamps HEAD + the build date). `gate.mjs`
+strips that line from both sides before comparing, so the gate proves the
+*instruction content* is byte-identical regardless of when ref vs post is taken.
+
+---
+
 ## File structure
 
 - Modify `src/generate.js` — `demoteHeadings(md, by)` takes a level count; `generate()` accepts per-module demote.
