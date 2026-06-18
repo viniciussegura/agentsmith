@@ -90,7 +90,9 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
 
   if (!existsSync(triagePath)) return { error: 'nothing to apply' };
   const file = migrateWorksheet(JSON.parse(read(triagePath)));
-  if (!Array.isArray(file.entries) || file.entries.length === 0) return { error: 'nothing to apply' };
+  const hasEntries = Array.isArray(file.entries) && file.entries.length > 0;
+  const hasCandidates = Array.isArray(file.candidates) && file.candidates.length > 0;
+  if (!hasEntries && !hasCandidates) return { error: 'nothing to apply' };
 
   // rehome/reowner are deferred (reported skipped, untouched), so their cross-refs
   // (e.g. reowner.proposedOwner) are out of scope -- exclude them from the gate.
@@ -98,10 +100,11 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
   const problems = [...validateFile(file), ...validateCrossRefs(xrefFile, { liveTags, resolvableOwners: [] })];
   if (problems.length) return { error: 'invalid', problems };
 
-  const report = { adopted: [], rejected: [], folded: [], deferred: [], refined: [], parked: [], skipped: [], failed: [] };
+  const report = { adopted: [], rejected: [], folded: [], deferred: [], refined: [], parked: [], skipped: [], wanted: [], ignored: [], failed: [] };
   let entries = file.entries;
+  let candidates = Array.isArray(file.candidates) ? file.candidates : [];
   const total = entries.length;
-  const rewrite = () => atomicWrite(triagePath, canonicalJSON({ ...file, entries }));
+  const rewrite = () => atomicWrite(triagePath, canonicalJSON({ ...file, entries, candidates }));
   let i = 0;
   emit({ type: 'start', total });
 
@@ -157,6 +160,38 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
     done('parked');
     i++;
   }
+
+  // --- candidate pass (runs after the entries loop) ---
+  let ci = 0;
+  while (ci < candidates.length) {
+    const c = candidates[ci];
+    const v = c.decision?.verdict || 'park';
+    if (v === 'wanted') {
+      report.wanted.push(c.tag);
+      emit({ type: 'candidate', tag: c.tag, outcome: 'wanted' });
+      ci++;
+      continue;
+    }
+    if (v === 'reject') {
+      try {
+        const details = (c.decision.details && c.decision.details.trim()) || 'not pursued';
+        ensureDecisionLine(decisionsPath, 'reject', { tag: c.tag, decision: { details } });
+      } catch (err) {
+        report.failed.push({ tag: c.tag, reason: String(err.message || err) });
+        emit({ type: 'candidate', tag: c.tag, outcome: 'failed' });
+        ci++;
+        continue;
+      }
+      candidates = candidates.filter((x) => x !== c);
+      rewrite();
+      report.ignored.push(c.tag);
+      emit({ type: 'candidate', tag: c.tag, outcome: 'ignored' });
+      continue; // ci unchanged: the array shrank
+    }
+    emit({ type: 'candidate', tag: c.tag, outcome: 'parked' });
+    ci++;
+  }
+
   return report;
 }
 
@@ -172,6 +207,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } catch { /* leave empty; only fold entries need it */ }
   const onProgress = (ev) => {
     if (ev.type === 'start') process.stderr.write(`applying ${ev.total} entr${ev.total === 1 ? 'y' : 'ies'}…\n`);
+    else if (ev.type === 'candidate') process.stderr.write(`  candidate #${ev.tag} -> ${ev.outcome}\n`);
     else if (ev.phase === 'begin') process.stderr.write(`  [${ev.i + 1}/${ev.total}] #${ev.tag} (${ev.verdict})\n`);
     else if (ev.phase === 'gate') process.stderr.write(`        running node --test…\n`);
     else if (ev.phase === 'done') process.stderr.write(`        -> ${ev.outcome}\n`);

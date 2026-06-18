@@ -126,3 +126,74 @@ test('empty / missing worksheet reports nothing to apply', async () => {
     assert.deepEqual(await apply({ root, triagePath, gate: NOOP_GATE }), { error: 'nothing to apply' });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+function fixtureC(entries, candidates) {
+  const { root, triagePath } = fixture(entries);
+  const f = JSON.parse(readFileSync(triagePath, 'utf8'));
+  f.candidates = candidates;
+  writeFileSync(triagePath, JSON.stringify(f, null, 2) + '\n');
+  return { root, triagePath };
+}
+
+test('wanted candidate is surfaced and left in place', async () => {
+  const { root, triagePath } = fixtureC([], [{
+    tag: 'swe-new', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-new.md',
+    gap: 'g', priority: 'high', decision: { verdict: 'wanted' },
+  }]);
+  try {
+    const report = await apply({ root, triagePath, gate: NOOP_GATE });
+    assert.deepEqual(report.wanted, ['swe-new']);
+    assert.equal(readTriage(triagePath).candidates.length, 1); // left
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('reject candidate logs a decisions line and splices', async () => {
+  const { root, triagePath } = fixtureC([], [{
+    tag: 'swe-bad', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-bad.md',
+    gap: 'g', priority: 'low', decision: { verdict: 'reject', details: 'dupe of swe-x' },
+  }]);
+  try {
+    const report = await apply({ root, triagePath, gate: NOOP_GATE });
+    assert.deepEqual(report.ignored, ['swe-bad']);
+    assert.match(readFileSync(join(root, 'docs/instruction-rules-decisions.md'), 'utf8'),
+      /^- `#swe-bad` -- rejected: dupe of swe-x$/m);
+    assert.equal(readTriage(triagePath).candidates.length, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('reject candidate without details defaults to "not pursued"', async () => {
+  const { root, triagePath } = fixtureC([], [{
+    tag: 'swe-bad2', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-bad2.md',
+    gap: 'g', priority: 'low', decision: { verdict: 'reject' },
+  }]);
+  try {
+    await apply({ root, triagePath, gate: NOOP_GATE });
+    assert.match(readFileSync(join(root, 'docs/instruction-rules-decisions.md'), 'utf8'),
+      /^- `#swe-bad2` -- rejected: not pursued$/m);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a file with only candidates is not short-circuited as nothing-to-apply', async () => {
+  const { root, triagePath } = fixtureC([], [{
+    tag: 'swe-w', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-w.md',
+    gap: 'g', priority: 'high', decision: { verdict: 'wanted' },
+  }]);
+  try {
+    const report = await apply({ root, triagePath, gate: NOOP_GATE });
+    assert.ok(!report.error, 'must process, not return nothing-to-apply');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('onProgress emits candidate events', async () => {
+  const { root, triagePath } = fixtureC([], [{
+    tag: 'swe-w2', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-w2.md',
+    gap: 'g', priority: 'high', decision: { verdict: 'wanted' },
+  }]);
+  try {
+    const events = [];
+    await apply({ root, triagePath, gate: NOOP_GATE, onProgress: (e) => events.push(e) });
+    const c = events.find((e) => e.type === 'candidate');
+    assert.equal(c.tag, 'swe-w2');
+    assert.equal(c.outcome, 'wanted');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
