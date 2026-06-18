@@ -191,3 +191,11 @@ export function ownershipCoverage({ instructionTexts, ownershipText, rolesText }
     rolesWithoutTags,
   };
 }
+
+/** Tag filenames must be lowercase-leading (so filename-sort == tag-sort). _intro.md is exempt. */
+export function tagFilenameLint(paths) {
+  return paths
+    .map((p) => ({ p, base: p.split('/').pop() }))
+    .filter(({ base }) => base !== '_intro.md' && !/^[a-z]/.test(base))
+    .map(({ p }) => p);
+}
