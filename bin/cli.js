@@ -57,21 +57,37 @@ if (outIdx !== -1 && (out === undefined || out.startsWith('--'))) {
   process.exit(1);
 }
 
-// A section's files are every *.md in instructions/<name>/, sorted for
-// deterministic output, unless the section pins an explicit `modules` order.
-const listFiles = (name) =>
-  readdirSync(join(pkgRoot, 'instructions', name))
-    .filter((f) => f.endsWith('.md'))
-    .sort()
-    .map((f) => `instructions/${name}/${f}`);
+// Recursive module lister: ordered { path, demote } for a section's subtree.
+// A branch dir (only subdirs) recurses alphabetically; a leaf dir emits
+// _intro.md first then tag files alphabetically. demote: _intro -> 1, tag -> 2.
+export function makeListModules(root) {
+  return function listModules(name) {
+    const out = [];
+    const walk = (absDir, relDir) => {
+      const entries = readdirSync(absDir, { withFileTypes: true });
+      const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+      if (dirs.length) {
+        for (const d of dirs) walk(join(absDir, d), `${relDir}/${d}`);
+        return;
+      }
+      const files = entries.filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name);
+      const ordered = files.filter((f) => f === '_intro.md')
+        .concat(files.filter((f) => f !== '_intro.md').sort());
+      for (const f of ordered) out.push({ path: `${relDir}/${f}`, demote: f === '_intro.md' ? 1 : 2 });
+    };
+    walk(join(root, 'instructions', name), `instructions/${name}`);
+    return out;
+  };
+}
 
-const { coreModulePaths, bundles } = resolveSections({
+const listModules = makeListModules(pkgRoot);
+const { coreModules, bundles } = resolveSections({
   sections: manifest.sections || [],
-  listFiles,
+  listModules,
 });
 
 for (const b of bundles) {
-  if (!b.modulePaths.length) {
+  if (!b.modules.length) {
     process.stderr.write(`agentsmith: warning -- section "${b.name}" has no .md files\n`);
   }
 }
@@ -79,12 +95,12 @@ for (const b of bundles) {
 const { commit, date } = sourceRevision();
 const built = buildOutputs({
   preamble: read(manifest.preamble),
-  modules: coreModulePaths.map(read),
+  modules: coreModules.map(({ path }) => read(path)),
   bundles: bundles.map((b) => ({
     name: b.name,
     title: b.title,
     when: b.when,
-    modules: b.modulePaths.map(read),
+    modules: b.modules.map(({ path }) => read(path)),
   })),
   source: manifest.source,
   commit,

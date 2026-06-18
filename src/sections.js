@@ -1,35 +1,37 @@
 /**
  * Split an ordered list of manifest sections into the always-loaded core and
- * the on-demand bundles. Pure: the directory lister is injected, so this is
+ * the on-demand bundles. Pure: the module lister is injected, so this is
  * testable without disk access. File I/O (reading the resolved paths) stays in
  * bin/cli.js.
  *
  * A section with no `when` is inlined into the core, in section order; a
  * section with a `when` becomes a bundle. A section's `modules` list, when
- * present, overrides the globbed `listFiles(name)` result verbatim.
+ * present, overrides the `listModules(name)` result; demote is derived from
+ * the basename (_intro.md -> 1, everything else -> 2).
  *
  * @param {object} opts
  * @param {{ name: string, when?: string, title?: string, modules?: string[] }[]} opts.sections
- * @param {(name: string) => string[]} opts.listFiles  Resolved, ordered paths for a section folder.
- * @returns {{ coreModulePaths: string[], bundles: { name, title, when, modulePaths: string[] }[] }}
+ * @param {(name: string) => { path: string, demote: number }[]} opts.listModules
+ *   Resolved, ordered descriptors for a section folder.
+ * @returns {{ coreModules: { path: string, demote: number }[], bundles: { name: string, title?: string, when: string, modules: { path: string, demote: number }[] }[] }}
  */
-export function resolveSections({ sections = [], listFiles }) {
-  const coreModulePaths = [];
+
+const demoteForPath = (p) => (p.split('/').pop() === '_intro.md' ? 1 : 2);
+
+export function resolveSections({ sections = [], listModules }) {
+  const coreModules = [];
   const bundles = [];
 
   for (const section of sections) {
-    const paths = section.modules ?? listFiles(section.name);
+    const mods = section.modules
+      ? section.modules.map((path) => ({ path, demote: demoteForPath(path) }))
+      : listModules(section.name);
     if (section.when == null) {
-      coreModulePaths.push(...paths);
+      coreModules.push(...mods);
     } else {
-      bundles.push({
-        name: section.name,
-        title: section.title,
-        when: section.when,
-        modulePaths: paths,
-      });
+      bundles.push({ name: section.name, title: section.title, when: section.when, modules: mods });
     }
   }
 
-  return { coreModulePaths, bundles };
+  return { coreModules, bundles };
 }
