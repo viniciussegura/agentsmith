@@ -8,7 +8,7 @@ const DETAIL_LABEL = {
 };
 const NO_DETAILS_VERDICTS = new Set(['adopt', 'park']);
 
-const state = { data: { round: '', entries: [] }, version: null, tags: [], sel: 0 };
+const state = { data: { round: '', entries: [], candidates: [], scorecard: null }, version: null, tags: [], sel: 0 };
 let saveTimer = null;
 
 const $ = (sel) => document.querySelector(sel);
@@ -27,7 +27,9 @@ function el(tag, props = {}, kids = []) {
 async function load() {
   try {
     const t = await (await fetch('/api/triage')).json();
-    state.data = t.data || { round: '', entries: [] };
+    state.data = t.data || { round: '', entries: [], candidates: [], scorecard: null };
+    state.data.candidates = state.data.candidates ?? [];
+    state.data.scorecard = state.data.scorecard ?? null;
     state.version = t.version;
     state.tags = (await (await fetch('/api/tags')).json()).tags || [];
     if (state.sel >= state.data.entries.length) state.sel = 0;
@@ -77,9 +79,66 @@ async function save() {
   }
 }
 
+const ICON = { strong: '🟢', good: '🔵', weak: '🟡', gaps: '🔴' };
+
+function renderScorecard() {
+  const host = $('#scorecard');
+  const sc = state.data.scorecard;
+  if (!sc) { host.replaceChildren(); return; }
+  const kids = [];
+  if (sc.lenses && sc.lenses.length && sc.perLens && sc.perLens.length) {
+    const head = el('div', { class: 'scrow head', style: `grid-template-columns:1.4fr repeat(${sc.lenses.length},1fr)` }, [
+      el('div', { class: 'sccell lbl', text: 'dimension' }),
+      ...sc.lenses.map((l) => el('div', { class: 'sccell lbl', text: l })),
+    ]);
+    const rows = sc.perLens.map((row) => el('div', { class: 'scrow', style: `grid-template-columns:1.4fr repeat(${sc.lenses.length},1fr)` }, [
+      el('div', { class: 'sccell lbl', text: row.dimension }),
+      ...row.cells.map((c) => el('div', { class: 'sccell', title: c.verdict, text: ICON[c.verdict] || '?' })),
+    ]));
+    kids.push(el('div', { class: 'scmatrix' }, [head, ...rows]));
+  }
+  if (sc.global && sc.global.length) {
+    kids.push(el('div', { class: 'scglobal' }, sc.global.map((g) =>
+      el('div', { class: 'scg' }, [el('span', { text: `${ICON[g.verdict] || '?'} ` }), el('span', { text: g.dimension })]))));
+  }
+  if (sc.details && sc.details.length) {
+    kids.push(el('div', { class: 'scdetails' }, sc.details.map((d) =>
+      el('div', { class: 'scd', text: `${d.dimension}${d.lens ? ' · ' + d.lens : ''} · ${d.file} · #${d.tag} · ${d.note}` }))));
+  }
+  if (sc.nits && sc.nits.length) {
+    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n) => el('div', { class: 'scn', text: `• ${n}` }))));
+  }
+  host.replaceChildren(el('details', { class: 'sccard', open: 'true' }, [
+    el('summary', { text: 'Scorecard' }), ...kids,
+  ]));
+}
+
+const PRI_RANK = { high: 0, medium: 1, low: 2 };
+function renderCandidates() {
+  const host = $('#candidates');
+  const cs = [...(state.data.candidates || [])].sort((a, b) =>
+    (PRI_RANK[a.priority] - PRI_RANK[b.priority]) || a.tag.toLowerCase().localeCompare(b.tag.toLowerCase()));
+  if (!cs.length) { host.replaceChildren(); return; }
+  const rows = cs.map((c) => {
+    const sel = el('select', { class: 'cverdict', onchange: (e) => {
+      c.decision = { verdict: e.target.value }; // park/wanted/reject; details left for the worksheet
+      scheduleSave();
+    } }, ['park', 'wanted', 'reject'].map((v) =>
+      el('option', { value: v, ...(c.decision?.verdict === v ? { selected: 'true' } : {}), text: v })));
+    return el('div', { class: 'crow' }, [
+      el('span', { class: `cpri ${c.priority}`, text: c.priority }),
+      el('span', { class: 'ctag', text: `#${c.tag}`, title: c.gap }),
+      sel,
+    ]);
+  });
+  host.replaceChildren(el('div', { class: 'chead', text: `Candidates (${cs.length})` }), ...rows);
+}
+
 function render() {
   const total = state.data.entries.length;
   $('#counter').textContent = total ? `${decidedCount()}/${total} decided` : '';
+  renderScorecard();
+  renderCandidates();
   if (!total) { $('#sidebar').replaceChildren(); $('#detail').replaceChildren(el('div', { class: 'empty', text: 'No entries. Run /instruction-review.' })); return; }
   renderSidebar();
   renderDetail();
