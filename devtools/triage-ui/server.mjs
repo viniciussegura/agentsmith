@@ -163,11 +163,15 @@ export function createServer({
         if (body.version !== token) {
           return send(res, 409, { error: 'stale version', version: token });
         }
-        const problems = [...validateFile(body.data), ...validateCrossRefs(body.data, {
+        // Migrate before validate/write/token so the on-disk form is always the
+        // canonical v3 shape and the returned token matches the next GET's token
+        // (no spurious 409 even if a client PUTs an un-migrated body).
+        const data = migrateWorksheet(body.data);
+        const problems = [...validateFile(data), ...validateCrossRefs(data, {
           liveTags: tagsProvider(),
         })];
         if (problems.length) return send(res, 400, { error: 'schema', problems });
-        const text = canonicalJSON(body.data);
+        const text = canonicalJSON(data);
         atomicWrite(triagePath, text);
         return send(res, 200, { version: versionToken(text) });
       });

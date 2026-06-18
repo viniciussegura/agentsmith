@@ -57,9 +57,9 @@ test('PUT creates the file (version null) then GET round-trips', async () => {
 
     const got = await (await fetch(`${base}/api/triage`)).json();
     assert.deepEqual(got.data, migrateWorksheet(data));
-    // GET version is based on the migrated (in-memory) form; PUT wrote the raw form —
-    // they differ, so we verify the GET version matches what migrateWorksheet produces.
-    assert.equal(got.version, versionToken(canonicalJSON(migrateWorksheet(data))));
+    // PUT migrates before write/token, so the version it returns equals the next
+    // GET's token — no spurious 409 on a subsequent save.
+    assert.equal(got.version, version);
   });
 });
 
