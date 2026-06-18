@@ -75,7 +75,11 @@ interface Candidate {
 |---|---|---|---|
 | `park` (default) | undecided | — | left in `candidates`; re-surfaces next round |
 | `wanted` | "draft this" | `/instruction-apply` agent | agent authors a house-style draft, writes it into `triage.json` as a new entry (`verdict: park`, `status: ready`, draft filled), and removes the candidate in one atomic write |
-| `reject` | "ignore this" | apply engine | splice from `candidates` + write one canonical decisions-log line so it does not re-surface | Each entry projects the proposal as typed fields plus a `decision` object (`verdict` defaulting to `park`; typed params `details`/`foldTarget`) and an `applyLog`. For a `strengthen` (and a text-changing `rehome`/`reowner`) the entry also carries a read-only **`current`** field -- the verbatim live `## #tag` section the draft replaces -- so the UI shows a before/after; it is review-surface only and `/instruction-apply` never reads it. `new-rule` has no `current`.
+| `reject` | "ignore this" | apply engine | splice from `candidates` + write one canonical decisions-log line so it does not re-surface |
+
+Each entry projects the proposal as typed fields plus a `decision` object (`verdict` defaulting to `park`; typed params `details`/`foldTarget`) and an `applyLog`.
+For a `strengthen` (and a text-changing `rehome`/`reowner`) the entry also carries a read-only **`current`** field -- the verbatim live `## #tag` section the draft replaces -- so the UI shows a before/after; it is review-surface only and `/instruction-apply` never reads it.
+`new-rule` has no `current`.
 
 ## Rubric
 
