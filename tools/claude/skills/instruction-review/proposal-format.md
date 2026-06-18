@@ -32,7 +32,50 @@ interface InstructionProposal {
 
 A `draft` is written **verbatim** into a `.md` by `/instruction-apply`, so author it in house markdown style -- `#code-markdown`: one sentence per line, hard-wrap only at sentence boundaries (never by column), lists/tables/fenced blocks left intact. (`#code-markdown`'s own trigger is "editing a `.md`"; a draft is the `.md`'s future content, so the style applies at authoring time.)
 
-The triage worksheet is the structured **`triage.json`** (`{ round, entries[] }`; schema + validator in `devtools/triage-ui/schema.mjs`, full shape in the instruction-review SKILL). Each entry projects the proposal as typed fields plus a `decision` object (`verdict` defaulting to `park`; typed params `details`/`foldTarget`) and an `applyLog`. For a `strengthen` (and a text-changing `rehome`/`reowner`) the entry also carries a read-only **`current`** field -- the verbatim live `## #tag` section the draft replaces -- so the UI shows a before/after; it is review-surface only and `/instruction-apply` never reads it. `new-rule` has no `current`.
+The triage worksheet is the structured **`triage.json`** (`{ round, scorecard, candidates, entries }`; schema + validator in `devtools/triage-ui/schema.mjs`, full shape in the instruction-review SKILL).
+
+### Persisted worksheet (scorecard + candidates)
+
+The worksheet carries two siblings to `entries` that the editor (reduce step) writes each round:
+
+```typescript
+type Verdict  = 'strong' | 'good' | 'weak' | 'gaps';
+type Priority = 'high' | 'medium' | 'low';
+
+interface Scorecard {
+  lenses: string[];           // column order for the matrix, e.g. ['swe','security','db','qa','docs','frontend','ux','ai','git']
+  perLens: PerLensRow[];      // one row per dimension (e.g. 'coverage', 'clarity', 'ownership')
+  global: GlobalRow[];        // one row per global dimension (e.g. 'cohesiveness', 'self-reference', 'lean-split', 'normative-voice')
+  details: Finding[];         // findings that drove weak/gaps cells
+  nits: string[];             // mechanical-nits list
+}
+interface PerLensRow { dimension: string; cells: Cell[]; }  // one cell per lens, positionally aligned
+interface Cell       { lens: string; verdict: Verdict; }
+interface GlobalRow  { dimension: string; verdict: Verdict; }
+interface Finding    { dimension: string; lens?: string; file: string; tag: string; note: string; }
+
+interface Candidate {
+  tag: string;
+  kind: 'new-rule' | 'strengthen' | 'rehome' | 'reowner';
+  role: string;
+  targetFile: string;
+  gap: string;
+  priority: Priority;
+  decision: { verdict: 'park' | 'wanted' | 'reject'; details?: string };
+  // NO `draft`, NO `applyLog` -- a candidate is not an entry.
+}
+```
+
+`Scorecard` is a per-round artifact: each round's reduce overwrites it.
+`scorecard` is `null` when the setup gate's "Stop and process" path runs (no reduce).
+
+`Candidate` verdict flow:
+
+| verdict | meaning | who acts | effect |
+|---|---|---|---|
+| `park` (default) | undecided | — | left in `candidates`; re-surfaces next round |
+| `wanted` | "draft this" | `/instruction-apply` agent | agent authors a house-style draft, writes it into `triage.json` as a new entry (`verdict: park`, `status: ready`, draft filled), and removes the candidate in one atomic write |
+| `reject` | "ignore this" | apply engine | splice from `candidates` + write one canonical decisions-log line so it does not re-surface | Each entry projects the proposal as typed fields plus a `decision` object (`verdict` defaulting to `park`; typed params `details`/`foldTarget`) and an `applyLog`. For a `strengthen` (and a text-changing `rehome`/`reowner`) the entry also carries a read-only **`current`** field -- the verbatim live `## #tag` section the draft replaces -- so the UI shows a before/after; it is review-surface only and `/instruction-apply` never reads it. `new-rule` has no `current`.
 
 ## Rubric
 

@@ -27,4 +27,11 @@ You consolidate proposals and produce the scorecard for the triage worksheet; yo
 
 ## Output
 
-Return (no file writes): the **consolidated, reconciled proposal set** for the worksheet, projected onto the `triage.json` entry schema (each entry's `decision` defaults to `{verdict:'park'}`, `applyLog: []`; each `strengthen` carrying its verbatim live-section snapshot in `current`); the **dimension scorecard**; the **mechanical-nits** list; and a short summary of what merged and what you dropped (already-decided / failed required-field) and why. `/instruction-apply`, not you, writes the decisions log and any adoption into `instructions/`.
+Return (no file writes) a single object `{ scorecard, candidates, entries }`:
+- `scorecard` — the dimension matrix: `{ lenses[], perLens[{dimension, cells[{lens, verdict}]}], global[{dimension, verdict}], details[{dimension, lens?, file, tag, note}], nits[] }`, verdict ∈ strong|good|weak|gaps.
+Cells align with `lenses` positionally.
+- `candidates` — every verified-but-undrafted proposal as `{ tag, kind, role, targetFile, gap, priority }` (priority high|medium|low), `decision` defaulting to `{verdict:'park'}`.
+No `draft`.
+- `entries` — the drafted proposals, projected onto the `triage.json` entry schema (each `decision` defaults to `{verdict:'park'}`, `applyLog: []`).
+
+`/instruction-apply`, not you, writes the decisions log and any adoption into `instructions/`.

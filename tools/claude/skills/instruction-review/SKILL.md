@@ -32,6 +32,8 @@ Not every code lens maps to instruction rules, so role **participation** is per-
 - **Parked-check gate.** If the worksheet `.agentsmith/instruction-review/triage.json` exists and has entries, present a three-option gate before auditing -- surface the counts `N` (total entries) and `K` (entries whose `decision.verdict` is a terminal `adopt|reject|fold|defer`, i.e. un-applied; `park` and `refine` are **excluded** from `K`):
   - **Ignore parked** -> archive the worksheet to `.agentsmith/instruction-review/triage.prev.json` (when `K > 0`, state "K un-applied decisions archived, not applied" -- never a silent drop), then start a fresh worksheet with only this round's new proposals.
   - **Consider parked** -> merge this round's fresh proposals additively, deduped in JSON terms: a fresh proposal whose tag is already **live in `node bin/cli.js --stdout`** or recorded in the **decisions log** is dropped; an indeterminate one is kept. A fresh proposal whose tag matches an existing `triage.json` entry is dropped (the existing, possibly hand-edited, entry wins) -- **except** it **replaces** an entry that is **untouched and still blocked** (`decision.verdict === 'park'` with empty `details` and `status.state !== 'ready'`), letting a now-resolved block re-enter as `ready`. A `park` entry carrying human `details` counts as hand-edited and is never overwritten.
+  `scorecard` is overwritten with the new round's (the old one described a prior subject and would be stale).
+  `candidates` merge by tag: a fresh candidate whose tag is already live or in the decisions log is dropped; a fresh candidate whose tag matches an existing entry is dropped (the drafted entry wins); a fresh candidate whose tag matches an existing candidate replaces it unless that candidate was hand-edited (`wanted` or `reject` verdict), which is preserved; a fresh entry whose tag matches an existing candidate drops that candidate (the drafted entry wins); candidates not revisited this round survive.
   - **Stop and process** -> abort the audit entirely (no fan-out / verify / reduce); the worksheet already is editable -- hand off to `/instruction-apply`. Recommend this when `K > 0`.
 
   If the worksheet is absent or has no entries, no gate; proceed.
@@ -61,8 +63,10 @@ Then write / refresh the triage worksheet `.agentsmith/instruction-review/triage
 Worksheet format -- a structured JSON file (schema + validator in `devtools/triage-ui/schema.mjs`), written via the canonical serializer (sorted keys, 2-space indent). Shape:
 
 ```ts
-{ round: string, entries: Entry[] }
+{ round: string, scorecard: Scorecard | null, candidates: Candidate[], entries: Entry[] }
 ```
+
+The skill writes all three: `scorecard` from the editor (the dimension matrix), `candidates` with each undrafted proposal carrying an assigned `priority` (high|medium|low) and `decision` defaulting to `{verdict:'park'}` and no `draft`, and `entries` with full drafts.
 
 Each `Entry` carries the common fields `{ tag, role, targetFile, status, gap, decision, applyLog }` plus its per-kind content:
 
@@ -82,7 +86,7 @@ A separate command consumes the worksheet and executes every decision in one non
 
 Worksheet path: `.agentsmith/instruction-review/triage.json` (gitignored, per-machine). The decision is a typed object `decision.verdict` (default `park`): `adopt` (the draft, into `instructions/`) · `reject` / `fold` / `defer` (the decisions log) · `refine` (surfaced for discussion, no write) · `park` (stays, re-surfaces next round). Parameters are typed fields: `decision.details` (reject reason / defer condition / refine question) and `decision.foldTarget` (fold); `decision.lastRoundReply` carries the prior answer for `refine` entries.
 
-The pipeline is implemented by `devtools/triage-ui/apply.mjs` (shared with the triage UI's POST /api/apply). The `/instruction-apply` command runs `node devtools/triage-ui/apply.mjs` and reports its output; it does **not** hand-edit files itself.
+The pipeline is implemented by `devtools/triage-ui/apply.mjs` (shared with the triage UI's POST /api/apply). The `/instruction-apply` command runs `node devtools/triage-ui/apply.mjs` and reports its output; it does **not** hand-edit files itself -- except for the `wanted`-candidate promotion step described below, which is the explicit exception.
 
 ### A1. Validate (one pass, before any write)
 
