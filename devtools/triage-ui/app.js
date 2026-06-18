@@ -256,32 +256,50 @@ function refreshConditional(e, detailsBox, detailsLabel, foldWrap, foldSelect) {
 }
 
 // Task 3: Apply button handler
-$('#apply').addEventListener('click', async () => {
-  if (!window.confirm('Apply all terminal decisions (adopt/reject/fold/defer) now? This writes instruction files and runs the test suite.')) return;
-  setSave('applying…');
+const applyBtn = $('#apply');
+applyBtn.addEventListener('click', async () => {
+  if (!window.confirm('Apply all terminal decisions (adopt/reject/fold/defer) now? This writes instruction files, runs the test suite per adopt, and commits the result.')) return;
+
+  // Disable + live elapsed timer so the slow run (node --test per adopt) reads
+  // as in-progress, not stuck. Per-entry progress prints to the triage terminal.
+  const t0 = Date.now();
+  const tick = () => { applyBtn.textContent = `Applying… ${Math.round((Date.now() - t0) / 1000)}s`; };
+  applyBtn.disabled = true;
+  tick();
+  const timer = setInterval(tick, 1000);
+  setSave('applying… (see terminal for per-entry progress)');
+
   try {
     const res = await fetch('/api/apply', { method: 'POST' });
     if (res.status === 200) {
-      const { report } = await res.json();
-      renderReport(report);
+      const { report, commit } = await res.json();
+      renderReport(report, null, commit);
       await load();
       setSave('applied', 'ok');
     } else if (res.status === 409) {
       const b = await res.json();
       const paths = (b.paths || []).join('\n  ');
       renderReport(null, `Apply refused: commit/stash these first:\n  ${paths}`);
+      setSave('not applied', 'err');
     } else if (res.status === 423) {
-      setSave('applying… (locked)', 'err');
+      renderReport(null, 'Apply already running (locked). Try again shortly.');
+      setSave('locked', 'err');
     } else {
       const b = await res.json().catch(() => ({}));
       renderReport(null, `Apply failed: ${b.error || res.statusText}`);
+      setSave('not applied', 'err');
     }
   } catch (err) {
     renderReport(null, `Apply failed: ${err.message}`);
+    setSave('not applied', 'err');
+  } finally {
+    clearInterval(timer);
+    applyBtn.disabled = false;
+    applyBtn.textContent = 'Apply decisions';
   }
 });
 
-function renderReport(report, errorMsg) {
+function renderReport(report, errorMsg, commit) {
   // Remove any existing report panel
   const old = $('#report-panel');
   if (old) old.remove();
@@ -298,6 +316,14 @@ function renderReport(report, errorMsg) {
           el('span', { class: 'report-val', text: String(report[k]) }),
         ]));
       }
+    }
+    if (commit?.sha) {
+      lines.push(el('div', { class: 'report-row' }, [
+        el('span', { class: 'report-key', text: 'committed' }),
+        el('span', { class: 'report-val', text: `${commit.sha} (${commit.summary})` }),
+      ]));
+    } else if (commit?.error) {
+      lines.push(el('div', { class: 'report-error', text: `commit failed: ${commit.error}` }));
     }
   }
 

@@ -102,6 +102,24 @@ test('a failed adopt restores the file, re-parks, and logs', async () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('onProgress emits start, begin, gate, and done for an adopt', async () => {
+  const { root, triagePath } = fixture([{
+    tag: 'swe-x', role: 'swe', targetFile: 'instructions/core/swe/swe-x.md',
+    status: { state: 'ready' }, gap: 'g', kind: 'strengthen',
+    draft: '# #swe-x New\n\nnew body', decision: { verdict: 'adopt' }, applyLog: [],
+  }]);
+  try {
+    const events = [];
+    await apply({ root, triagePath, gate: NOOP_GATE, onProgress: (ev) => events.push(ev) });
+    assert.deepEqual(events[0], { type: 'start', total: 1 });
+    assert.equal(events[1].phase, 'begin');
+    assert.equal(events[1].tag, 'swe-x');
+    assert.ok(events.some((e) => e.phase === 'gate'), 'gate event before runGate');
+    const done = events.find((e) => e.phase === 'done');
+    assert.equal(done.outcome, 'adopted');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('empty / missing worksheet reports nothing to apply', async () => {
   const { root, triagePath } = fixture([]);
   try {

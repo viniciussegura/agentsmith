@@ -80,6 +80,36 @@ function send(res, code, body, type = 'application/json; charset=utf-8') {
   res.end(payload);
 }
 
+/**
+ * Auto-commit the files an apply touched, so the working tree returns to clean
+ * and the next apply's clean-base preflight passes. Returns { sha, summary } on
+ * a commit, null when nothing committable changed, { error } on a git failure
+ * (the apply itself already succeeded — a commit failure is non-fatal).
+ */
+function commitApply(root, report) {
+  const committable = ['adopted', 'rejected', 'folded', 'deferred'];
+  const changed = committable.reduce((n, k) => n + (report[k]?.length || 0), 0);
+  if (!changed) return null;
+  const summary = committable.filter((k) => report[k]?.length).map((k) => `${k} ${report[k].length}`).join(', ');
+  const tags = committable.flatMap((k) => report[k] || []);
+  const msg = [
+    `🤖 chore(instructions): Apply triage (${summary})`,
+    '',
+    'Applied via the triage UI Apply button; each adopt gated on node --test.',
+    ...tags.map((t) => `- #${t}`),
+    '',
+    'Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>',
+  ].join('\n');
+  try {
+    execFileSync('git', ['add', 'instructions', 'docs/instruction-rules-decisions.md'], { cwd: root });
+    execFileSync('git', ['commit', '-m', msg], { cwd: root, stdio: 'pipe' });
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+    return { sha, summary };
+  } catch (err) {
+    return { error: (err.stderr ? err.stderr.toString() : '') || String(err.message || err) };
+  }
+}
+
 function liveTagsFromCli() {
   try {
     const out = execSync('node bin/cli.js --stdout', { cwd: REPO_ROOT, encoding: 'utf8' });
@@ -141,14 +171,25 @@ export function createServer({
     }
     if (path === '/api/apply' && req.method === 'POST') {
       if (applying) return send(res, 423, { error: 'applying' });
-      const dirty = execFileSync('git', ['status', '--porcelain', 'instructions', 'instructions/ownership.yaml'],
+      // Clean-base preflight over every path the apply (and its auto-commit) may
+      // touch, so the follow-up commit can never sweep in unrelated edits.
+      const dirty = execFileSync('git', ['status', '--porcelain', 'instructions', 'docs/instruction-rules-decisions.md'],
         { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
       if (dirty) return send(res, 409, { error: 'dirty base', paths: dirty.split('\n') });
       applying = true;
       try {
+        // Per-entry progress goes to the terminal running `npm run triage`.
+        const onProgress = (ev) => {
+          if (ev.type === 'start') console.log(`[apply] ${ev.total} entr${ev.total === 1 ? 'y' : 'ies'}…`);
+          else if (ev.phase === 'begin') console.log(`[apply] [${ev.i + 1}/${ev.total}] #${ev.tag} (${ev.verdict})`);
+          else if (ev.phase === 'gate') console.log('[apply]         running node --test…');
+          else if (ev.phase === 'done') console.log(`[apply]         -> ${ev.outcome}`);
+        };
         // Pass live #tags so a `fold` entry's foldTarget passes cross-ref validation.
-        const report = await apply({ root: REPO_ROOT, triagePath, liveTags: tagsProvider() });
-        return send(res, 200, { report, version: currentToken(triagePath) });
+        const report = await apply({ root: REPO_ROOT, triagePath, liveTags: tagsProvider(), onProgress });
+        const commit = report.error ? null : commitApply(REPO_ROOT, report);
+        if (commit?.sha) console.log(`[apply] committed ${commit.sha} (${commit.summary})`);
+        return send(res, 200, { report, version: currentToken(triagePath), commit });
       } catch (err) {
         return send(res, 500, { error: String(err.message || err) });
       } finally { applying = false; }

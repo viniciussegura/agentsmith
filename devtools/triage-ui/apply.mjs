@@ -78,10 +78,13 @@ function defaultGate(root, testTimeoutMs) {
  * @param {(root:number)=>void} [opts.gate]  Adopt gate (default: regenerate + node --test). Pass () => {} to skip.
  * @param {string[]} [opts.liveTags]   Live #tags for fold cross-ref validation (default []).
  * @param {number} [opts.testTimeoutMs]
+ * @param {(ev:object)=>void} [opts.onProgress]  Progress callback: {type:'start',total} |
+ *        {type:'entry',phase:'begin'|'gate'|'done',i,total,tag,verdict,outcome?}.
  * @returns {Promise<object>} report
  */
-export async function apply({ root, triagePath, gate, liveTags = [], testTimeoutMs = 120000 }) {
+export async function apply({ root, triagePath, gate, liveTags = [], testTimeoutMs = 120000, onProgress }) {
   const runGate = gate || ((r) => defaultGate(r, testTimeoutMs));
+  const emit = typeof onProgress === 'function' ? onProgress : () => {};
   const ownershipPath = join(root, 'instructions/ownership.yaml');
   const decisionsPath = join(root, 'docs/instruction-rules-decisions.md');
 
@@ -97,28 +100,33 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
 
   const report = { adopted: [], rejected: [], folded: [], deferred: [], refined: [], parked: [], skipped: [], failed: [] };
   let entries = file.entries;
+  const total = entries.length;
   const rewrite = () => atomicWrite(triagePath, canonicalJSON({ ...file, entries }));
   let i = 0;
+  emit({ type: 'start', total });
 
   while (i < entries.length) {
     const e = entries[i];
     const v = e.decision?.verdict || 'park';
     const splice = () => { entries = entries.filter((x) => x !== e); rewrite(); };
+    const done = (outcome) => emit({ type: 'entry', phase: 'done', i, total, tag: e.tag, verdict: v, outcome });
+    emit({ type: 'entry', phase: 'begin', i, total, tag: e.tag, verdict: v });
 
-    if (v === 'refine') { report.refined.push({ tag: e.tag, details: e.decision.details, reply: e.lastRoundReply }); i++; continue; }
-    if (v === 'park') { report.parked.push(e.tag); i++; continue; }
-    if (e.kind === 'rehome' || e.kind === 'reowner') { report.skipped.push(e.tag); i++; continue; }
+    if (v === 'refine') { report.refined.push({ tag: e.tag, details: e.decision.details, reply: e.lastRoundReply }); done('refined'); i++; continue; }
+    if (v === 'park') { report.parked.push(e.tag); done('parked'); i++; continue; }
+    if (e.kind === 'rehome' || e.kind === 'reowner') { report.skipped.push(e.tag); done('skipped'); i++; continue; }
 
     if (v === 'reject' || v === 'fold' || v === 'defer') {
       try { ensureDecisionLine(decisionsPath, v, e); }
-      catch (err) { report.failed.push({ tag: e.tag, reason: String(err.message || err) }); i++; continue; }
+      catch (err) { report.failed.push({ tag: e.tag, reason: String(err.message || err) }); done('failed'); i++; continue; }
       report[{ reject: 'rejected', fold: 'folded', defer: 'deferred' }[v]].push(e.tag);
+      done({ reject: 'rejected', fold: 'folded', defer: 'deferred' }[v]);
       splice();
       continue;
     }
 
     if (v === 'adopt') {
-      if (e.status?.state !== 'ready') { report.failed.push({ tag: e.tag, reason: `status not ready (${e.status?.state})` }); i++; continue; }
+      if (e.status?.state !== 'ready') { report.failed.push({ tag: e.tag, reason: `status not ready (${e.status?.state})` }); done('failed'); i++; continue; }
       const abs = join(root, e.targetFile);
       const snap = new Map();
       snap.set(abs, existsSync(abs) ? read(abs) : null);
@@ -127,6 +135,7 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
         mkdirSync(dirname(abs), { recursive: true });
         writeFileSync(abs, e.draft.replace(/\n+$/, '') + '\n');
         if (e.kind === 'new-rule') ensureOwnerRow(ownershipPath, e.tag, e.role);
+        emit({ type: 'entry', phase: 'gate', i, total, tag: e.tag, verdict: v });
         runGate(root);
       } catch (err) {
         for (const [p, c] of snap) { if (c === null) rmSync(p, { force: true }); else writeFileSync(p, c); }
@@ -135,14 +144,17 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
         e.applyLog.push(`apply failed ${file.round}: ${msg.slice(0, 500)}`);
         rewrite();
         report.failed.push({ tag: e.tag, reason: msg.split('\n')[0].slice(0, 200) });
+        done('failed');
         i++;
         continue;
       }
       report.adopted.push(e.tag);
+      done('adopted');
       splice();
       continue;
     }
     report.parked.push(e.tag);
+    done('parked');
     i++;
   }
   return report;
@@ -158,7 +170,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const out = execFileSync('node', ['bin/cli.js', '--stdout'], { cwd: root, encoding: 'utf8' });
     liveTags = [...out.matchAll(/^#{1,6}\s+(#\S+)/gm)].map((m) => m[1]);
   } catch { /* leave empty; only fold entries need it */ }
-  apply({ root, triagePath, liveTags })
+  const onProgress = (ev) => {
+    if (ev.type === 'start') process.stderr.write(`applying ${ev.total} entr${ev.total === 1 ? 'y' : 'ies'}…\n`);
+    else if (ev.phase === 'begin') process.stderr.write(`  [${ev.i + 1}/${ev.total}] #${ev.tag} (${ev.verdict})\n`);
+    else if (ev.phase === 'gate') process.stderr.write(`        running node --test…\n`);
+    else if (ev.phase === 'done') process.stderr.write(`        -> ${ev.outcome}\n`);
+  };
+  apply({ root, triagePath, liveTags, onProgress })
     .then((r) => { console.log(JSON.stringify(r, null, 2)); })
     .catch((err) => { console.error(err); process.exit(1); });
 }
