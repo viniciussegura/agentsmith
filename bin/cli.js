@@ -124,8 +124,11 @@ if (built.dangling.length) {
 }
 
 if (built.crossBoundary.length) {
+  const list = built.crossBoundary
+    .map((c) => `#${c.from || '(core preamble)'} -> bundle-only #${c.tag}`)
+    .join(', ');
   process.stderr.write(
-    `agentsmith: warning -- core references bundle-only #tag(s): ${built.crossBoundary.join(', ')}\n`,
+    `agentsmith: warning -- core rule references a bundle-only #tag: ${list}\n`,
   );
 }
 

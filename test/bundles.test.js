@@ -71,7 +71,7 @@ test('coreToBundleRefs flags a core reference to a bundle-only tag', () => {
     coreText: '## #swe-x X\n\nSee #front-a11y for UI rules.',
     bundleTexts: ['## #front-a11y Accessibility\n\nTarget WCAG.'],
   });
-  assert.deepEqual(result, ['front-a11y'], 'core cannot rely on a tag only the bundle defines');
+  assert.deepEqual(result, [{ tag: 'front-a11y', from: 'swe-x' }], 'core cannot rely on a tag only the bundle defines; names the rule that raised it');
 });
 
 test('coreToBundleRefs does not flag bundle-to-core references', () => {

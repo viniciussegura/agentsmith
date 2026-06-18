@@ -87,7 +87,7 @@ test('core references to bundle-only tags are surfaced as cross-boundary', () =>
     layout: 'lean',
     placement: 'nested',
   });
-  assert.ok(out.crossBoundary.includes('front-y'), 'core leaning on a bundle tag is flagged');
+  assert.ok(out.crossBoundary.some((c) => c.tag === 'front-y' && c.from === 'core-x'), 'core leaning on a bundle tag is flagged with the offending rule');
   assert.ok(!out.dangling.includes('front-y'), 'the tag still resolves, so it is not dangling');
 });
 
