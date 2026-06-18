@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createServer } from '../devtools/triage-ui/server.mjs';
-import { canonicalJSON, versionToken } from '../devtools/triage-ui/schema.mjs';
+import { createServer, hasCommittableChanges } from '../devtools/triage-ui/server.mjs';
+import { canonicalJSON, versionToken, migrateWorksheet } from '../devtools/triage-ui/schema.mjs';
 
 const validFile = () => ({
   round: '2026-06-17',
@@ -52,13 +52,14 @@ test('PUT creates the file (version null) then GET round-trips', async () => {
     });
     assert.equal(put.status, 200);
     const { version } = await put.json();
-    assert.equal(version, versionToken(canonicalJSON(data)));
     assert.ok(existsSync(triagePath));
     assert.ok(!existsSync(`${triagePath}.tmp`)); // atomic: temp cleaned up
 
     const got = await (await fetch(`${base}/api/triage`)).json();
-    assert.deepEqual(got.data, data);
-    assert.equal(got.version, version);
+    assert.deepEqual(got.data, migrateWorksheet(data));
+    // GET version is based on the migrated (in-memory) form; PUT wrote the raw form —
+    // they differ, so we verify the GET version matches what migrateWorksheet produces.
+    assert.equal(got.version, versionToken(canonicalJSON(migrateWorksheet(data))));
   });
 });
 
@@ -173,6 +174,31 @@ test('GET /api/rule returns text for an existing instructions file, exists:false
     // Another traversal attempt -> 400
     const r4 = await fetch(`${base}/api/rule?targetFile=../../etc/passwd`);
     assert.equal(r4.status, 400);
+  });
+});
+
+test('hasCommittableChanges: true for ignored-only, false for wanted-only', () => {
+  assert.equal(hasCommittableChanges({ adopted: [], rejected: [], folded: [], deferred: [], ignored: ['x'], wanted: [] }), true);
+  assert.equal(hasCommittableChanges({ adopted: [], rejected: [], folded: [], deferred: [], ignored: [], wanted: ['y'] }), false);
+});
+
+test('PUT round-trips a file carrying scorecard + candidates', async () => {
+  const triagePath = tmpTriage();
+  await withServer({ triagePath }, async (base) => {
+    const data = {
+      round: '2026-06-18',
+      scorecard: { lenses: ['swe'], perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'good' }] }], global: [{ dimension: 'cohesiveness', verdict: 'strong' }], details: [], nits: [] },
+      candidates: [{ tag: 'swe-c', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-c.md', gap: 'g', priority: 'high', decision: { verdict: 'park' } }],
+      entries: [],
+    };
+    const put = await fetch(`${base}/api/triage`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data, version: null }),
+    });
+    assert.equal(put.status, 200);
+    const got = await (await fetch(`${base}/api/triage`)).json();
+    assert.deepEqual(got.data.candidates, data.candidates);
+    assert.deepEqual(got.data.scorecard, data.scorecard);
   });
 });
 

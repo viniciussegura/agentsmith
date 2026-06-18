@@ -80,6 +80,11 @@ function send(res, code, body, type = 'application/json; charset=utf-8') {
   res.end(payload);
 }
 
+/** True when the apply report changed a committed file (decisions log or instructions). */
+export function hasCommittableChanges(report) {
+  return ['adopted', 'rejected', 'folded', 'deferred', 'ignored'].some((k) => (report[k]?.length || 0) > 0);
+}
+
 /**
  * Auto-commit the files an apply touched, so the working tree returns to clean
  * and the next apply's clean-base preflight passes. Returns { sha, summary } on
@@ -87,15 +92,14 @@ function send(res, code, body, type = 'application/json; charset=utf-8') {
  * (the apply itself already succeeded — a commit failure is non-fatal).
  */
 function commitApply(root, report) {
-  const committable = ['adopted', 'rejected', 'folded', 'deferred'];
-  const changed = committable.reduce((n, k) => n + (report[k]?.length || 0), 0);
-  if (!changed) return null;
+  const committable = ['adopted', 'rejected', 'folded', 'deferred', 'ignored'];
+  if (!hasCommittableChanges(report)) return null;
   const summary = committable.filter((k) => report[k]?.length).map((k) => `${k} ${report[k].length}`).join(', ');
   const tags = committable.flatMap((k) => report[k] || []);
   const msg = [
     `🤖 chore(instructions): Apply triage (${summary})`,
     '',
-    'Applied via the triage UI Apply button; each adopt gated on node --test.',
+    'Applied via the triage UI Apply button; adopts gated on node --test.',
     ...tags.map((t) => `- #${t}`),
     '',
     'Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>',
@@ -181,6 +185,7 @@ export function createServer({
         // Per-entry progress goes to the terminal running `npm run triage`.
         const onProgress = (ev) => {
           if (ev.type === 'start') console.log(`[apply] ${ev.total} entr${ev.total === 1 ? 'y' : 'ies'}…`);
+          else if (ev.type === 'candidate') console.log(`[apply] candidate #${ev.tag} -> ${ev.outcome}`);
           else if (ev.phase === 'begin') console.log(`[apply] [${ev.i + 1}/${ev.total}] #${ev.tag} (${ev.verdict})`);
           else if (ev.phase === 'gate') console.log('[apply]         running node --test…');
           else if (ev.phase === 'done') console.log(`[apply]         -> ${ev.outcome}`);
