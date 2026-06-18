@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generate } from '../src/generate.js';
+import { generate, demoteHeadings } from '../src/generate.js';
 
 test('concatenates preamble then modules in order', () => {
   const out = generate({
@@ -98,4 +98,18 @@ test('does not demote headings inside fenced code blocks', () => {
 
   assert.match(out, /^## Title$/m, 'real heading demoted');
   assert.match(out, /^# Not a heading$/m, 'fenced content untouched');
+});
+
+test('demoteHeadings shifts by N levels and clamps at h6', () => {
+  assert.equal(demoteHeadings('# A', 2), '### A');
+  assert.equal(demoteHeadings('## B', 2), '#### B');
+  assert.equal(demoteHeadings('##### E', 2), '###### E'); // clamp 5+2 -> 6
+  assert.equal(demoteHeadings('###### F', 2), '###### F'); // already h6
+  assert.equal(demoteHeadings('# A', 1), '## A');
+});
+
+test('demoteHeadings leaves fenced headings untouched at by=2', () => {
+  const out = demoteHeadings('# T\n\n```md\n# X\n```', 2);
+  assert.match(out, /^### T$/m);
+  assert.match(out, /^# X$/m);
 });
