@@ -168,7 +168,17 @@ export function validateScorecard(sc, where = 'scorecard') {
       p.push(`${where}.details[${i}]: needs file/tag/note`);
     }
   });
-  if (!Array.isArray(sc.nits) || !sc.nits.every(isStr)) p.push(`${where}: "nits" must be a string[]`);
+  // A nit is a string (legacy) or { text, fix?: 'auto' }. `fix:'auto'` flags it
+  // for the /instruction-apply agent to fix; absence means the human fixes it.
+  if (!Array.isArray(sc.nits)) {
+    p.push(`${where}: "nits" must be an array`);
+  } else {
+    sc.nits.forEach((n, i) => {
+      if (isStr(n)) return;
+      if (!isObj(n) || !nonEmpty(n.text)) p.push(`${where}.nits[${i}]: must be a string or { text, fix? }`);
+      else if ('fix' in n && n.fix !== undefined && n.fix !== 'auto') p.push(`${where}.nits[${i}]: "fix" must be "auto"`);
+    });
+  }
   return p;
 }
 
@@ -275,9 +285,15 @@ export function migrateWorksheet(file) {
     }
     return rest;
   });
+  // Normalize scorecard nits to objects ({text, fix?}) so they can carry the
+  // human-fix / agent-fix action; legacy string nits become { text }.
+  let scorecard = file.scorecard ?? null;
+  if (isObj(scorecard) && Array.isArray(scorecard.nits)) {
+    scorecard = { ...scorecard, nits: scorecard.nits.map((n) => (isObj(n) ? n : { text: String(n) })) };
+  }
   return {
     ...file,
-    scorecard: file.scorecard ?? null,
+    scorecard,
     candidates: Array.isArray(file.candidates) ? file.candidates : [],
     entries,
   };

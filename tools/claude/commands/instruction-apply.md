@@ -35,5 +35,7 @@ After the engine exits, for each tag in the `wanted` list, perform the **single-
 If validation fails or the write 400s, neither mutation persists (the candidate stays `wanted`).
 Promotion never adopts -- the gate is the later human-driven `adopt`, which keeps the existing per-entry snapshot recovery.
 
-Report the engine's JSON result: **adopted / rejected / folded / deferred / refined / parked / skipped / failed / wanted / ignored**. For each `refine` entry, surface its `decision.details` (the open question) and `decision.lastRoundReply` (the prior answer, if any) so discussion can happen this turn.
-For each `wanted` candidate, confirm whether its promotion to a parked entry succeeded.
+After the promotions, handle the `nits` list (scorecard nits the human flagged "you fix" with `fix:'auto'`, surfaced in the report). For each, the agent makes the mechanical fix the nit names -- a typo, a dead path, stray whitespace, a broken link -- then removes that nit from `scorecard.nits` in one atomic write of the migrated worksheet. A nit the agent cannot safely fix is left in place and reported. (Nits the human keeps for themselves carry no `fix` flag and are not in the report.)
+
+Report the engine's JSON result: **adopted / rejected / folded / deferred / refined / parked / skipped / failed / wanted / ignored / nits**. For each `refine` entry, surface its `decision.details` (the open question) and `decision.lastRoundReply` (the prior answer, if any) so discussion can happen this turn.
+For each `wanted` candidate, confirm whether its promotion to a parked entry succeeded; for each `nits` entry, confirm whether the agent fixed it.

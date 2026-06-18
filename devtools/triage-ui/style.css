@@ -141,9 +141,11 @@ textarea.details { min-height: 60px; }
 .finding-note { color: var(--fg); margin-top: 4px; }
 
 .scnits .scn { color: var(--fg); margin: 4px 0; display: flex; align-items: baseline; gap: 6px; }
-.scnits .scn-bullet { color: var(--muted); flex-shrink: 0; }
+.scnits .scn.auto { color: var(--accent); }
+.scnits .scn-bullet { flex-shrink: 0; }
 .scnits .scn-text { flex: 1; }
-.nit-done { margin-left: auto; cursor: pointer; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; font-size: 10px; padding: 0 7px; flex-shrink: 0; }
+.nit-fix, .nit-done { cursor: pointer; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; font-size: 10px; padding: 0 7px; flex-shrink: 0; }
+.nit-fix:hover, .nit-fix.on { color: var(--accent); border-color: var(--accent); }
 .nit-done:hover { color: var(--add-fg); border-color: var(--add-fg); }
 
 /* Refine reply panel */

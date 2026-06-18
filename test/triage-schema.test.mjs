@@ -243,3 +243,15 @@ test('migrateWorksheet v3 adds scorecard:null + candidates:[] and stays idempote
   assert.deepEqual(m.candidates, []);
   assert.deepEqual(migrateWorksheet(m), m);
 });
+
+test('migrateWorksheet normalizes string nits to { text } objects (idempotent)', () => {
+  const m = migrateWorksheet({ round: 'r', entries: [], scorecard: { lenses: [], perLens: [], global: [], details: [], nits: ['a typo', { text: 'b', fix: 'auto' }] } });
+  assert.deepEqual(m.scorecard.nits, [{ text: 'a typo' }, { text: 'b', fix: 'auto' }]);
+  assert.deepEqual(migrateWorksheet(m).scorecard.nits, m.scorecard.nits);
+});
+
+test('validateScorecard accepts string + {text,fix} nits, rejects bad fix / missing text', () => {
+  assert.deepEqual(validateScorecard(baseScorecard({ nits: ['x', { text: 'y' }, { text: 'z', fix: 'auto' }] })), []);
+  assert.ok(validateScorecard(baseScorecard({ nits: [{ text: 'y', fix: 'later' }] })).some((m) => m.includes('fix')));
+  assert.ok(validateScorecard(baseScorecard({ nits: [{ fix: 'auto' }] })).some((m) => m.includes('string or')));
+});

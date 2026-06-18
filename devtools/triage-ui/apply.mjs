@@ -92,7 +92,11 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
   const file = migrateWorksheet(JSON.parse(read(triagePath)));
   const hasEntries = Array.isArray(file.entries) && file.entries.length > 0;
   const hasCandidates = Array.isArray(file.candidates) && file.candidates.length > 0;
-  if (!hasEntries && !hasCandidates) return { error: 'nothing to apply' };
+  // Nits flagged fix:'auto' are surfaced for the agent to fix (engine can't).
+  const autoNits = (file.scorecard?.nits || [])
+    .filter((n) => n && typeof n === 'object' && n.fix === 'auto')
+    .map((n) => n.text);
+  if (!hasEntries && !hasCandidates && autoNits.length === 0) return { error: 'nothing to apply' };
 
   // rehome/reowner are deferred (reported skipped, untouched), so their cross-refs
   // (e.g. reowner.proposedOwner) are out of scope -- exclude them from the gate.
@@ -100,7 +104,7 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
   const problems = [...validateFile(file), ...validateCrossRefs(xrefFile, { liveTags, resolvableOwners: [] })];
   if (problems.length) return { error: 'invalid', problems };
 
-  const report = { adopted: [], rejected: [], folded: [], deferred: [], refined: [], parked: [], skipped: [], wanted: [], ignored: [], failed: [] };
+  const report = { adopted: [], rejected: [], folded: [], deferred: [], refined: [], parked: [], skipped: [], wanted: [], ignored: [], nits: autoNits, failed: [] };
   let entries = file.entries;
   let candidates = Array.isArray(file.candidates) ? file.candidates : [];
   const total = entries.length;

@@ -143,10 +143,17 @@ function createCandidateFromFinding(d) {
   scheduleSave();
 }
 
-// Check off a mechanical nit (remove it as it's addressed). Nits are ephemeral
-// round artifacts, so dismissing makes the list a working checklist.
+// "I fix": check off a mechanical nit (remove it once addressed). Nits are
+// ephemeral round artifacts, so dismissing makes the list a working checklist.
 function dismissNit(i) {
   state.data.scorecard.nits.splice(i, 1);
+  renderScorecardDetail();
+  scheduleSave();
+}
+// "you fix": flag/unflag a nit for the /instruction-apply agent to fix.
+function toggleNitFix(i) {
+  const n = state.data.scorecard.nits[i];
+  if (n.fix === 'auto') delete n.fix; else n.fix = 'auto';
   renderScorecardDetail();
   scheduleSave();
 }
@@ -263,12 +270,15 @@ function renderScorecardDetail() {
   }
   if (sc.nits?.length) {
     kids.push(el('label', { class: 'field', text: 'mechanical nits' }));
-    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n, i) =>
-      el('div', { class: 'scn' }, [
-        el('span', { class: 'scn-bullet', text: '•' }),
-        el('span', { class: 'scn-text' }, richText(n)),
-        el('button', { class: 'nit-done', title: 'Mark this nit done (remove it)', text: '✓', onclick: () => dismissNit(i) }),
-      ]))));
+    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n, i) => {
+      const auto = n.fix === 'auto';
+      return el('div', { class: `scn ${auto ? 'auto' : ''}` }, [
+        el('span', { class: 'scn-bullet', text: auto ? '🤖' : '•' }),
+        el('span', { class: 'scn-text' }, richText(n.text || '')),
+        el('button', { class: `nit-fix ${auto ? 'on' : ''}`, title: auto ? 'Flagged for the agent to fix on /instruction-apply (click to unflag)' : 'Flag for the agent to fix (you fix)', text: 'you fix', onclick: () => toggleNitFix(i) }),
+        el('button', { class: 'nit-done', title: 'I fixed it — remove', text: '✓ I fix', onclick: () => dismissNit(i) }),
+      ]);
+    })));
   }
   $('#detail').replaceChildren(...kids);
 }

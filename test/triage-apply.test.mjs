@@ -120,6 +120,17 @@ test('onProgress emits start, begin, gate, and done for an adopt', async () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('auto-flagged nit is surfaced in report.nits; manual nit is not', async () => {
+  const { root, triagePath } = fixture([]);
+  const f = JSON.parse(readFileSync(triagePath, 'utf8'));
+  f.scorecard = { lenses: [], perLens: [], global: [], details: [], nits: [{ text: 'fix dead path in X', fix: 'auto' }, { text: 'manual one' }] };
+  writeFileSync(triagePath, JSON.stringify(f, null, 2) + '\n');
+  try {
+    const report = await apply({ root, triagePath, gate: NOOP_GATE });
+    assert.deepEqual(report.nits, ['fix dead path in X']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('empty / missing worksheet reports nothing to apply', async () => {
   const { root, triagePath } = fixture([]);
   try {
