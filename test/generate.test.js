@@ -113,3 +113,22 @@ test('demoteHeadings leaves fenced headings untouched at by=2', () => {
   assert.match(out, /^### T$/m);
   assert.match(out, /^# X$/m);
 });
+
+test('generate accepts {text, demote} module items', () => {
+  const out = generate({
+    preamble: '# Root',
+    modules: [
+      { text: '# Group\n\nprose', demote: 1 },
+      { text: '# #tag Title\n\nbody', demote: 2 },
+    ],
+    source: 's',
+  });
+  assert.match(out, /^# Root$/m);
+  assert.match(out, /^## Group$/m);      // _intro: h1 -> h2
+  assert.match(out, /^### #tag Title$/m); // tag: h1 -> h3
+});
+
+test('generate still accepts plain-string modules (demote 1)', () => {
+  const out = generate({ preamble: '# R', modules: ['# G\n\nx'], source: 's' });
+  assert.match(out, /^## G$/m);
+});

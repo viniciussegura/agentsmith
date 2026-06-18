@@ -20,7 +20,8 @@ export function generate({ preamble, modules = [], source, commit, date }) {
     "     Edit the source instructions and re-run the generator. -->",
   ].join("\n");
 
-  const blocks = [String(preamble), ...modules.map((m) => demoteHeadings(m))]
+  const norm = (m) => (typeof m === 'string' ? { text: m, demote: 1 } : m);
+  const blocks = [String(preamble), ...modules.map(norm).map((m) => demoteHeadings(m.text, m.demote))]
     .map((block) => block.trim())
     .filter(Boolean);
 
