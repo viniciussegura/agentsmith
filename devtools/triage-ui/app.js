@@ -7,8 +7,12 @@ const DETAIL_LABEL = {
   park: 'Note (optional)', adopt: 'Note (optional)',
 };
 const NO_DETAILS_VERDICTS = new Set(['adopt', 'park']);
+const ICON = { strong: '🟢', good: '🔵', weak: '🟡', gaps: '🔴' };
+const PRI_RANK = { high: 0, medium: 1, low: 2 };
 
-const state = { data: { round: '', entries: [], candidates: [], scorecard: null }, version: null, tags: [], sel: 0 };
+// view selects what the main pane shows: the scorecard, one proposal (entry), or
+// one candidate. idx indexes entries[] (proposal) or sortedCandidates() (candidate).
+const state = { data: { round: '', entries: [], candidates: [], scorecard: null }, version: null, tags: [], view: { kind: 'empty', idx: 0 } };
 let saveTimer = null;
 
 const $ = (sel) => document.querySelector(sel);
@@ -24,6 +28,10 @@ function el(tag, props = {}, kids = []) {
   return n;
 }
 
+const sortedCandidates = () => [...(state.data.candidates || [])].sort((a, b) =>
+  (PRI_RANK[a.priority] - PRI_RANK[b.priority]) || a.tag.toLowerCase().localeCompare(b.tag.toLowerCase()));
+const decidedCount = () => state.data.entries.filter((e) => e.decision?.verdict && e.decision.verdict !== 'park').length;
+
 async function load() {
   try {
     const t = await (await fetch('/api/triage')).json();
@@ -32,7 +40,6 @@ async function load() {
     state.data.scorecard = state.data.scorecard ?? null;
     state.version = t.version;
     state.tags = (await (await fetch('/api/tags')).json()).tags || [];
-    if (state.sel >= state.data.entries.length) state.sel = 0;
     render();
   } catch (err) {
     // No backend (e.g. opened as a static file / IDE preview): show how to run it.
@@ -79,148 +86,195 @@ async function save() {
   }
 }
 
-const ICON = { strong: '🟢', good: '🔵', weak: '🟡', gaps: '🔴' };
-
-function renderScorecard() {
-  const host = $('#scorecard');
-  const sc = state.data.scorecard;
-  if (!sc) { host.replaceChildren(); return; }
-  const kids = [];
-  if (sc.lenses && sc.lenses.length && sc.perLens && sc.perLens.length) {
-    const head = el('div', { class: 'scrow head', style: `grid-template-columns:1.4fr repeat(${sc.lenses.length},1fr)` }, [
-      el('div', { class: 'sccell lbl', text: 'dimension' }),
-      ...sc.lenses.map((l) => el('div', { class: 'sccell lbl', text: l })),
-    ]);
-    const rows = sc.perLens.map((row) => el('div', { class: 'scrow', style: `grid-template-columns:1.4fr repeat(${sc.lenses.length},1fr)` }, [
-      el('div', { class: 'sccell lbl', text: row.dimension }),
-      ...row.cells.map((c) => el('div', { class: 'sccell', title: c.verdict, text: ICON[c.verdict] || '?' })),
-    ]));
-    kids.push(el('div', { class: 'scmatrix' }, [head, ...rows]));
-  }
-  if (sc.global && sc.global.length) {
-    kids.push(el('div', { class: 'scglobal' }, sc.global.map((g) =>
-      el('div', { class: 'scg' }, [el('span', { text: `${ICON[g.verdict] || '?'} ` }), el('span', { text: g.dimension })]))));
-  }
-  if (sc.details && sc.details.length) {
-    kids.push(el('div', { class: 'scdetails' }, sc.details.map((d) =>
-      el('div', { class: 'scd', text: `${d.dimension}${d.lens ? ' · ' + d.lens : ''} · ${d.file} · #${d.tag} · ${d.note}` }))));
-  }
-  if (sc.nits && sc.nits.length) {
-    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n) => el('div', { class: 'scn', text: `• ${n}` }))));
-  }
-  host.replaceChildren(el('details', { class: 'sccard', open: 'true' }, [
-    el('summary', { text: 'Scorecard' }), ...kids,
-  ]));
+// --- selection / routing ---
+function pickDefaultView() {
+  if (state.data.scorecard) return { kind: 'scorecard', idx: 0 };
+  if (state.data.entries.length) return { kind: 'proposal', idx: 0 };
+  if (sortedCandidates().length) return { kind: 'candidate', idx: 0 };
+  return { kind: 'empty', idx: 0 };
 }
-
-const PRI_RANK = { high: 0, medium: 1, low: 2 };
-function renderCandidates() {
-  const host = $('#candidates');
-  const cs = [...(state.data.candidates || [])].sort((a, b) =>
-    (PRI_RANK[a.priority] - PRI_RANK[b.priority]) || a.tag.toLowerCase().localeCompare(b.tag.toLowerCase()));
-  if (!cs.length) { host.replaceChildren(); return; }
-  const rows = cs.map((c) => {
-    const sel = el('select', { class: 'cverdict', onchange: (e) => {
-      c.decision = { verdict: e.target.value }; // park/wanted/reject; details left for the worksheet
-      scheduleSave();
-    } }, ['park', 'wanted', 'reject'].map((v) =>
-      el('option', { value: v, ...(c.decision?.verdict === v ? { selected: 'true' } : {}), text: v })));
-    return el('div', { class: 'crow' }, [
-      el('span', { class: `cpri ${c.priority}`, text: c.priority }),
-      el('span', { class: 'ctag', text: `#${c.tag}`, title: c.gap }),
-      sel,
-    ]);
-  });
-  host.replaceChildren(el('div', { class: 'chead', text: `Candidates (${cs.length})` }), ...rows);
+function viewValid() {
+  const v = state.view;
+  if (!v) return false;
+  if (v.kind === 'scorecard') return !!state.data.scorecard;
+  if (v.kind === 'proposal') return v.idx < state.data.entries.length;
+  if (v.kind === 'candidate') return v.idx < sortedCandidates().length;
+  if (v.kind === 'empty') return !state.data.scorecard && !state.data.entries.length && !sortedCandidates().length;
+  return false;
 }
+function select(kind, idx) { state.view = { kind, idx }; renderSidebar(); renderDetail(); }
 
 function render() {
-  const total = state.data.entries.length;
-  $('#counter').textContent = total ? `${decidedCount()}/${total} decided` : '';
-  renderScorecard();
-  renderCandidates();
-  if (!total) { $('#sidebar').replaceChildren(); $('#detail').replaceChildren(el('div', { class: 'empty', text: 'No entries. Run /instruction-review.' })); return; }
+  if (!viewValid()) state.view = pickDefaultView();
   renderSidebar();
   renderDetail();
 }
 
-const decidedCount = () => state.data.entries.filter((e) => e.decision?.verdict && e.decision.verdict !== 'park').length;
-
 function renderSidebar() {
-  $('#counter').textContent = `${decidedCount()}/${state.data.entries.length} decided`;
-  const rows = state.data.entries.map((e, i) => {
-    const v = e.decision?.verdict || 'park';
-    return el('div', { class: `row ${i === state.sel ? 'active' : ''}`, onclick: () => { state.sel = i; renderSidebar(); renderDetail(); } }, [
+  const entries = state.data.entries;
+  $('#counter').textContent = entries.length ? `${decidedCount()}/${entries.length} decided` : '';
+  const v = state.view;
+  const kids = [];
+
+  if (state.data.scorecard) {
+    kids.push(el('div', { class: `scitem ${v.kind === 'scorecard' ? 'active' : ''}`, onclick: () => select('scorecard', 0) },
+      [el('span', { text: '▤ Scorecard' })]));
+  }
+
+  kids.push(el('div', { class: 'sechead', text: `Proposals (${entries.length})` }));
+  entries.forEach((e, i) => {
+    const ver = e.decision?.verdict || 'park';
+    kids.push(el('div', { class: `row ${v.kind === 'proposal' && v.idx === i ? 'active' : ''}`, onclick: () => select('proposal', i) }, [
       el('span', { class: 'tag', text: `#${e.tag}` }),
       el('span', { class: 'kind', text: e.kind }),
-      el('span', { class: `badge ${v}`, text: v }),
-    ]);
+      el('span', { class: `badge ${ver}`, text: ver }),
+    ]));
   });
-  $('#sidebar').replaceChildren(...rows);
+
+  const cs = sortedCandidates();
+  kids.push(el('div', { class: 'sechead', text: `Candidates (${cs.length})` }));
+  cs.forEach((c, i) => {
+    const ver = c.decision?.verdict || 'park';
+    kids.push(el('div', { class: `row ${v.kind === 'candidate' && v.idx === i ? 'active' : ''}`, onclick: () => select('candidate', i) }, [
+      el('span', { class: `cpri ${c.priority}`, text: c.priority }),
+      el('span', { class: 'tag', text: `#${c.tag}` }),
+      el('span', { class: `badge ${ver}`, text: ver }),
+    ]));
+  });
+
+  $('#sidebar').replaceChildren(...kids);
 }
 
-// Task 1: fetch the live rule text from the server, cached on e._live
-async function liveCurrent(e) {
-  if (e._live !== undefined) return e._live;
-  if (e.kind === 'new-rule') return (e._live = '');
-  try {
-    const r = await (await fetch(`/api/rule?targetFile=${encodeURIComponent(e.targetFile)}`)).json();
-    return (e._live = r.exists ? r.text : '');
-  } catch { return (e._live = ''); }
+function navbar(idx, total, go) {
+  const prev = el('button', { class: 'nav', text: '◀ Prev', onclick: () => go(idx - 1) });
+  const next = el('button', { class: 'nav', text: 'Next ▶', onclick: () => go(idx + 1) });
+  prev.disabled = idx <= 0;
+  next.disabled = idx >= total - 1;
+  return el('div', { class: 'navbar' }, [prev, el('span', { class: 'pos', text: `${idx + 1} / ${total}` }), next]);
 }
 
-// Task 1: curText is passed in so renderDiff doesn't re-fetch on every keystroke
-function renderDiff(entry, curText) {
-  const rows = lineDiff(curText || '', entry.draft || '');
-  const cell = (text, cls) => el('div', { class: `cell ${cls}`, text: text ?? '' });
-  const out = [el('div', { class: 'drow head' }, [cell('current', 'lbl'), cell('draft', 'lbl')])];
-  let dels = [];
-  let adds = [];
-  const flush = () => {
-    for (let k = 0; k < Math.max(dels.length, adds.length); k++) {
-      out.push(el('div', { class: 'drow' }, [
-        cell(dels[k], dels[k] === undefined ? 'empty' : 'del'),
-        cell(adds[k], adds[k] === undefined ? 'empty' : 'add'),
-      ]));
-    }
-    dels = []; adds = [];
-  };
-  for (const r of rows) {
-    if (r.type === 'same') { flush(); out.push(el('div', { class: 'drow' }, [cell(r.text, 'same'), cell(r.text, 'same')])); }
-    else if (r.type === 'del') dels.push(r.text);
-    else adds.push(r.text);
+function renderDetail() {
+  const v = state.view;
+  if (v.kind === 'scorecard') return renderScorecardDetail();
+  if (v.kind === 'candidate') return renderCandidateDetail();
+  if (v.kind === 'proposal') return renderProposalDetail();
+  $('#detail').replaceChildren(el('div', { class: 'empty', text: 'No proposals or candidates. Run /instruction-review.' }));
+  return undefined;
+}
+
+// --- scorecard focused view (main area) ---
+function renderScorecardDetail() {
+  const sc = state.data.scorecard;
+  if (!sc) { $('#detail').replaceChildren(el('div', { class: 'empty', text: 'No scorecard.' })); return; }
+  const kids = [el('h2', { text: 'Scorecard' })];
+  if (sc.lenses?.length && sc.perLens?.length) {
+    const cols = `grid-template-columns:1.4fr repeat(${sc.lenses.length},1fr)`;
+    const head = el('div', { class: 'scrow head', style: cols }, [
+      el('div', { class: 'sccell lbl', text: 'dimension' }),
+      ...sc.lenses.map((l) => el('div', { class: 'sccell lbl', text: l })),
+    ]);
+    const rows = sc.perLens.map((row) => el('div', { class: 'scrow', style: cols }, [
+      el('div', { class: 'sccell lbl', text: row.dimension }),
+      ...row.cells.map((c) => el('div', { class: 'sccell', title: `${c.lens}: ${c.verdict}`, text: ICON[c.verdict] || '?' })),
+    ]));
+    kids.push(el('div', { class: 'scmatrix' }, [head, ...rows]));
   }
-  flush();
-  return el('div', { class: 'diff sxs' }, out);
+  if (sc.global?.length) {
+    kids.push(el('label', { class: 'field', text: 'global' }));
+    kids.push(el('div', { class: 'scglobal' }, sc.global.map((g) =>
+      el('div', { class: 'scg', title: g.verdict }, [el('span', { text: `${ICON[g.verdict] || '?'} ` }), el('span', { text: g.dimension })]))));
+  }
+  if (sc.details?.length) {
+    kids.push(el('label', { class: 'field', text: 'findings' }));
+    kids.push(el('div', { class: 'scdetails' }, sc.details.map((d) =>
+      el('div', { class: 'scd', text: `${d.dimension}${d.lens ? ' · ' + d.lens : ''} · ${d.file} · #${d.tag} · ${d.note}` }))));
+  }
+  if (sc.nits?.length) {
+    kids.push(el('label', { class: 'field', text: 'mechanical nits' }));
+    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n) => el('div', { class: 'scn', text: `• ${n}` }))));
+  }
+  $('#detail').replaceChildren(...kids);
 }
 
-// Task 1: renderDetail is now async; fetches live current once, caches on e._live
-async function renderDetail() {
-  const e = state.data.entries[state.sel];
+// --- candidate focused view (main area): tag + verdict selector + nav ---
+let candidateRefs = null;
+function renderCandidateDetail() {
+  const cs = sortedCandidates();
+  const c = cs[state.view.idx];
+  if (!c) return;
+
+  const reasonLabel = el('label', { class: 'field', text: 'Reason (optional)' });
+  const reasonBox = el('textarea', { class: 'details', oninput: () => { applyCandidate(c); scheduleSave(); } });
+  reasonBox.value = c.decision?.details || '';
+
+  const radios = el('div', { class: 'verdicts' }, ['park', 'wanted', 'reject'].map((vv) => {
+    const input = el('input', { type: 'radio', name: 'cverdict', value: vv, onchange: () => { applyCandidate(c); scheduleSave(); } });
+    if ((c.decision?.verdict || 'park') === vv) input.checked = true;
+    return el('label', {}, [input, el('span', { text: vv })]);
+  }));
+
+  candidateRefs = { c, reasonBox, reasonLabel };
+
+  const nav = navbar(state.view.idx, cs.length, (i) => select('candidate', i));
+
+  $('#detail').replaceChildren(
+    el('div', { class: 'meta', text: `candidate · ${c.kind} · ${c.role} · ${c.targetFile} · priority: ${c.priority}` }),
+    el('h2', { text: `#${c.tag}` }),
+    el('div', { class: 'gap', text: c.gap || '' }),
+    el('label', { class: 'field', text: 'Verdict' }),
+    radios,
+    reasonLabel,
+    reasonBox,
+    nav,
+  );
+  refreshCandidateReason(c.decision?.verdict || 'park');
+}
+
+function selectedCandidateVerdict() {
+  const checked = document.querySelector('input[name="cverdict"]:checked');
+  return checked ? checked.value : 'park';
+}
+function refreshCandidateReason(verdict) {
+  if (!candidateRefs) return;
+  const show = verdict === 'reject';
+  candidateRefs.reasonLabel.style.display = show ? '' : 'none';
+  candidateRefs.reasonBox.style.display = show ? '' : 'none';
+}
+function applyCandidate(c) {
+  const verdict = selectedCandidateVerdict();
+  const d = { verdict };
+  const reason = candidateRefs?.reasonBox.value.trim();
+  // park/wanted carry no details (schema); reject may carry an optional reason.
+  if (verdict === 'reject' && reason) d.details = reason;
+  c.decision = d;
+  refreshCandidateReason(verdict);
+}
+
+// --- proposal (entry) focused view ---
+async function renderProposalDetail() {
+  const idx = state.view.idx;
+  const e = state.data.entries[idx];
   if (!e) return;
 
-  // Fetch live text ONCE; reuse e._live for in-place diff re-renders.
-  // Guard against a fast-navigation race: if the selection changed while the
-  // fetch was in flight, abandon this (stale) render so it can't overwrite the
-  // newer one.
-  const mySel = state.sel;
+  // Fetch live text ONCE; reuse e._live for in-place diff re-renders. Guard a
+  // fast-navigation race: if the view moved while the fetch was in flight,
+  // abandon this stale render.
+  const my = idx;
   const curText = await liveCurrent(e);
-  if (state.sel !== mySel) return;
+  if (state.view.kind !== 'proposal' || state.view.idx !== my) return;
 
   const diffNode = renderDiff(e, curText);
-
   let currentDiff = diffNode;
+
   const draft = el('textarea', { class: 'draft' });
   draft.value = e.draft || '';
   draft.addEventListener('input', () => {
     e.draft = draft.value;
-    // Reuse cached e._live — do NOT re-fetch
     const fresh = renderDiff(e, e._live);
     currentDiff.replaceWith(fresh);
     currentDiff = fresh;
     scheduleSave();
   });
-  // The full-text editor is collapsed by default; the side-by-side diff is the primary view.
   const draftWrap = el('div', { class: 'editor hidden' }, [draft]);
   const editToggle = el('button', { class: 'nav small', text: '✎ Edit draft', onclick: () => {
     const hidden = draftWrap.classList.toggle('hidden');
@@ -242,13 +296,10 @@ async function renderDetail() {
     return el('label', {}, [input, el('span', { text: v })]);
   }));
 
-  // expose nodes for applyDecision/refreshConditional
   detailRefs = { e, detailsBox, foldSelect, verdicts };
-
   const detailsLabel = el('label', { class: 'field', text: DETAIL_LABEL[e.decision?.verdict || 'park'] });
   detailRefs.detailsLabel = detailsLabel;
 
-  // Task 2: refine reply panel — shows the human question and agent answer (read-only)
   const refineReply = (e.decision?.verdict === 'refine' && (e.decision?.details || e.lastRoundReply))
     ? el('div', { class: 'reply' }, [
         e.decision?.details ? el('div', { class: 'reply-q', text: e.decision.details }) : null,
@@ -256,12 +307,7 @@ async function renderDetail() {
       ])
     : null;
 
-  const total = state.data.entries.length;
-  const prev = el('button', { class: 'nav', text: '◀ Prev', onclick: () => goTo(state.sel - 1) });
-  const next = el('button', { class: 'nav', text: 'Next ▶', onclick: () => goTo(state.sel + 1) });
-  prev.disabled = state.sel === 0;
-  next.disabled = state.sel === total - 1;
-  const nav = el('div', { class: 'navbar' }, [prev, el('span', { class: 'pos', text: `${state.sel + 1} / ${total}` }), next]);
+  const nav = navbar(idx, state.data.entries.length, (i) => select('proposal', i));
 
   // filter(Boolean): refineReply is null for non-refine entries, and
   // replaceChildren() would coerce a null arg into a literal "null" text node.
@@ -294,7 +340,6 @@ function applyDecision(e) {
   const verdict = selectedVerdict();
   const details = detailRefs.detailsBox.value.trim();
   const d = { verdict };
-  // Task 2: adopt/park produce { verdict } with no details
   if (verdict === 'fold') { if (detailRefs.foldSelect.value) d.foldTarget = detailRefs.foldSelect.value; if (details) d.details = details; }
   else if (['reject', 'defer', 'refine'].includes(verdict)) { if (details) d.details = details; }
   // adopt/park: no details field
@@ -302,7 +347,6 @@ function applyDecision(e) {
   if (detailRefs.detailsLabel) detailRefs.detailsLabel.textContent = DETAIL_LABEL[verdict];
 }
 
-// Task 2: hide detailsBox + detailsLabel for adopt/park
 function refreshConditional(e, detailsBox, detailsLabel, foldWrap, foldSelect) {
   const verdict = selectedVerdict();
   foldWrap.replaceChildren();
@@ -314,13 +358,46 @@ function refreshConditional(e, detailsBox, detailsLabel, foldWrap, foldSelect) {
   detailsBox.style.display = hideDetails ? 'none' : '';
 }
 
-// Task 3: Apply button handler
+// Task 1: fetch the live rule text from the server, cached on e._live
+async function liveCurrent(e) {
+  if (e._live !== undefined) return e._live;
+  if (e.kind === 'new-rule') return (e._live = '');
+  try {
+    const r = await (await fetch(`/api/rule?targetFile=${encodeURIComponent(e.targetFile)}`)).json();
+    return (e._live = r.exists ? r.text : '');
+  } catch { return (e._live = ''); }
+}
+
+// curText is passed in so renderDiff doesn't re-fetch on every keystroke
+function renderDiff(entry, curText) {
+  const rows = lineDiff(curText || '', entry.draft || '');
+  const cell = (text, cls) => el('div', { class: `cell ${cls}`, text: text ?? '' });
+  const out = [el('div', { class: 'drow head' }, [cell('current', 'lbl'), cell('draft', 'lbl')])];
+  let dels = [];
+  let adds = [];
+  const flush = () => {
+    for (let k = 0; k < Math.max(dels.length, adds.length); k++) {
+      out.push(el('div', { class: 'drow' }, [
+        cell(dels[k], dels[k] === undefined ? 'empty' : 'del'),
+        cell(adds[k], adds[k] === undefined ? 'empty' : 'add'),
+      ]));
+    }
+    dels = []; adds = [];
+  };
+  for (const r of rows) {
+    if (r.type === 'same') { flush(); out.push(el('div', { class: 'drow' }, [cell(r.text, 'same'), cell(r.text, 'same')])); }
+    else if (r.type === 'del') dels.push(r.text);
+    else adds.push(r.text);
+  }
+  flush();
+  return el('div', { class: 'diff sxs' }, out);
+}
+
+// Apply button handler
 const applyBtn = $('#apply');
 applyBtn.addEventListener('click', async () => {
   if (!window.confirm('Apply all terminal decisions (adopt/reject/fold/defer) now? This writes instruction files, runs the test suite per adopt, and commits the result.')) return;
 
-  // Disable + live elapsed timer so the slow run (node --test per adopt) reads
-  // as in-progress, not stuck. Per-entry progress prints to the triage terminal.
   const t0 = Date.now();
   const tick = () => { applyBtn.textContent = `Applying… ${Math.round((Date.now() - t0) / 1000)}s`; };
   applyBtn.disabled = true;
@@ -359,7 +436,6 @@ applyBtn.addEventListener('click', async () => {
 });
 
 function renderReport(report, errorMsg, commit) {
-  // Remove any existing report panel
   const old = $('#report-panel');
   if (old) old.remove();
 
@@ -396,20 +472,19 @@ function renderReport(report, errorMsg, commit) {
   document.querySelector('header').after(panel);
 }
 
-// Task 1: goTo now awaits the async renderDetail
-async function goTo(i) {
-  const n = state.data.entries.length;
-  if (!n) return;
-  state.sel = Math.max(0, Math.min(n - 1, i));
-  renderSidebar();
-  await renderDetail();
-}
-
-// Arrow keys navigate when focus isn't in an editable field.
-document.addEventListener('keydown', async (ev) => {
+// Arrow keys navigate within the current section when focus isn't in a field.
+document.addEventListener('keydown', (ev) => {
   if (['TEXTAREA', 'SELECT', 'INPUT'].includes(document.activeElement?.tagName)) return;
-  if (ev.key === 'ArrowLeft') await goTo(state.sel - 1);
-  else if (ev.key === 'ArrowRight') await goTo(state.sel + 1);
+  const v = state.view;
+  if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+  const step = ev.key === 'ArrowLeft' ? -1 : 1;
+  if (v.kind === 'proposal') {
+    const n = state.data.entries.length;
+    select('proposal', Math.max(0, Math.min(n - 1, v.idx + step)));
+  } else if (v.kind === 'candidate') {
+    const n = sortedCandidates().length;
+    select('candidate', Math.max(0, Math.min(n - 1, v.idx + step)));
+  }
 });
 
 load();

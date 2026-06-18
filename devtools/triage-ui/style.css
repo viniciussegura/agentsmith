@@ -19,10 +19,7 @@ header h1 { font-size: 15px; margin: 0; font-weight: 600; }
 .save.err { color: var(--del-fg); }
 main { flex: 1; display: flex; min-height: 0; }
 
-#sidebar {
-  width: 300px; flex-shrink: 0; overflow-y: auto;
-  border-right: 1px solid var(--border); background: var(--panel);
-}
+#sidebar { background: var(--panel); }
 .row {
   display: flex; align-items: center; gap: 8px; padding: 7px 12px;
   cursor: pointer; border-bottom: 1px solid var(--border);
@@ -38,7 +35,7 @@ main { flex: 1; display: flex; min-height: 0; }
 .badge.park { color: var(--muted); }
 .badge.adopt { color: var(--add-fg); border-color: var(--add-fg); }
 .badge.reject { color: var(--del-fg); border-color: var(--del-fg); }
-.badge.fold, .badge.defer, .badge.refine { color: var(--accent); border-color: var(--accent); }
+.badge.fold, .badge.defer, .badge.refine, .badge.wanted { color: var(--accent); border-color: var(--accent); }
 
 #detail { flex: 1; overflow-y: auto; padding: 16px 24px; }
 #detail .meta { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
@@ -103,29 +100,28 @@ textarea.details { min-height: 60px; }
 .report-val { color: var(--fg); }
 .report-error { color: var(--del-fg); white-space: pre-wrap; }
 
-/* Sidebar column wrapping scorecard + sidebar + candidates */
-#sidebar-col { width: 300px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
-#sidebar-col #sidebar { width: auto; border-right: none; }
+/* Sidebar column: scorecard item + Proposals + Candidates sections */
+#sidebar-col { width: 300px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--border); background: var(--panel); }
 
-/* Scorecard matrix panel */
-.sccard { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
-.sccard summary { cursor: pointer; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-.scmatrix { margin: 8px 0; display: grid; gap: 1px; }
-.scrow { display: grid; grid-template-columns: 1.4fr repeat(var(--cols, 9), 1fr); gap: 1px; }
-.sccell { padding: 2px 4px; text-align: center; }
-.sccell.lbl { color: var(--muted); font-size: 10px; text-align: left; overflow: hidden; text-overflow: ellipsis; }
-.scglobal { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
-.scdetails .scd, .scnits .scn { color: var(--muted); margin: 2px 0; }
+.scitem { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border); color: var(--accent); }
+.scitem:hover { background: #2d2d30; }
+.scitem.active { background: #094771; }
+.sechead { padding: 7px 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 
-/* Candidate list */
-.chead { padding: 7px 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.crow { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-bottom: 1px solid var(--border); }
-.crow .ctag { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cpri { font-size: 9px; padding: 1px 5px; border-radius: 8px; border: 1px solid var(--border); text-transform: uppercase; }
+/* Priority chip on candidate sidebar rows */
+.cpri { font-size: 9px; padding: 1px 5px; border-radius: 8px; border: 1px solid var(--border); text-transform: uppercase; flex-shrink: 0; }
 .cpri.high { color: var(--del-fg); border-color: var(--del-fg); }
 .cpri.medium { color: var(--accent); }
 .cpri.low { color: var(--muted); }
-.cverdict { width: auto; padding: 2px 4px; font-size: 11px; }
+
+/* Scorecard focused view (rendered in #detail) */
+.scmatrix { margin: 10px 0; display: grid; gap: 1px; max-width: 760px; }
+.scrow { display: grid; grid-template-columns: 1.4fr repeat(9, 1fr); gap: 1px; }
+.sccell { padding: 3px 4px; text-align: center; }
+.sccell.lbl { color: var(--muted); font-size: 11px; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+.scrow.head .sccell.lbl { text-transform: uppercase; letter-spacing: .03em; }
+.scglobal { display: flex; flex-wrap: wrap; gap: 12px; margin: 6px 0; }
+.scdetails .scd, .scnits .scn { color: var(--muted); margin: 3px 0; }
 
 /* Refine reply panel */
 .reply {
