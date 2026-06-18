@@ -367,7 +367,7 @@ function renderReport(report, errorMsg, commit) {
   if (errorMsg) {
     lines.push(el('div', { class: 'report-error', text: errorMsg }));
   } else if (report) {
-    const keys = ['adopted', 'rejected', 'folded', 'deferred', 'refined', 'parked', 'skipped', 'failed'];
+    const keys = ['adopted', 'rejected', 'folded', 'deferred', 'refined', 'parked', 'skipped', 'wanted', 'ignored', 'failed'];
     for (const k of keys) {
       if (report[k] !== undefined) {
         lines.push(el('div', { class: 'report-row' }, [
