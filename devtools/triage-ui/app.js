@@ -6,6 +6,7 @@ const DETAIL_LABEL = {
   refine: 'Input / question (required)', fold: 'Reason (required)',
   park: 'Note (optional)', adopt: 'Note (optional)',
 };
+const NO_DETAILS_VERDICTS = new Set(['adopt', 'park']);
 
 const state = { data: { round: '', entries: [] }, version: null, tags: [], sel: 0 };
 let saveTimer = null;
@@ -56,6 +57,7 @@ async function save() {
     body: JSON.stringify({ data: state.data, version: state.version }),
   });
   if (res.status === 200) { state.version = (await res.json()).version; setSave('saved', 'ok'); renderSidebar(); }
+  else if (res.status === 423) { setSave('applying… will retry', 'err'); setTimeout(save, 1500); }
   else if (res.status === 409) { setSave('changed on disk — reloading', 'err'); await load(); }
   else { const b = await res.json(); setSave(`not saved: ${b.problems ? b.problems[0] : b.error}`, 'err'); }
 }
@@ -83,8 +85,19 @@ function renderSidebar() {
   $('#sidebar').replaceChildren(...rows);
 }
 
-function renderDiff(entry) {
-  const rows = lineDiff(entry.current || '', entry.draft || '');
+// Task 1: fetch the live rule text from the server, cached on e._live
+async function liveCurrent(e) {
+  if (e._live !== undefined) return e._live;
+  if (e.kind === 'new-rule') return (e._live = '');
+  try {
+    const r = await (await fetch(`/api/rule?targetFile=${encodeURIComponent(e.targetFile)}`)).json();
+    return (e._live = r.exists ? r.text : '');
+  } catch { return (e._live = ''); }
+}
+
+// Task 1: curText is passed in so renderDiff doesn't re-fetch on every keystroke
+function renderDiff(entry, curText) {
+  const rows = lineDiff(curText || '', entry.draft || '');
   const cell = (text, cls) => el('div', { class: `cell ${cls}`, text: text ?? '' });
   const out = [el('div', { class: 'drow head' }, [cell('current', 'lbl'), cell('draft', 'lbl')])];
   let dels = [];
@@ -107,17 +120,23 @@ function renderDiff(entry) {
   return el('div', { class: 'diff sxs' }, out);
 }
 
-function renderDetail() {
+// Task 1: renderDetail is now async; fetches live current once, caches on e._live
+async function renderDetail() {
   const e = state.data.entries[state.sel];
   if (!e) return;
-  const diffNode = renderDiff(e);
+
+  // Fetch live text ONCE; reuse e._live for in-place diff re-renders
+  const curText = await liveCurrent(e);
+
+  const diffNode = renderDiff(e, curText);
 
   let currentDiff = diffNode;
   const draft = el('textarea', { class: 'draft' });
   draft.value = e.draft || '';
   draft.addEventListener('input', () => {
     e.draft = draft.value;
-    const fresh = renderDiff(e);          // re-render the diff in place, keep textarea focus
+    // Reuse cached e._live — do NOT re-fetch
+    const fresh = renderDiff(e, e._live);
     currentDiff.replaceWith(fresh);
     currentDiff = fresh;
     scheduleSave();
@@ -139,7 +158,7 @@ function renderDetail() {
   if (e.decision?.foldTarget) foldSelect.value = e.decision.foldTarget;
 
   const verdicts = el('div', { class: 'verdicts' }, VERDICTS.map((v) => {
-    const input = el('input', { type: 'radio', name: 'verdict', value: v, onchange: () => { applyDecision(e); refreshConditional(e, detailsBox, foldWrap, foldSelect); scheduleSave(); } });
+    const input = el('input', { type: 'radio', name: 'verdict', value: v, onchange: () => { applyDecision(e); refreshConditional(e, detailsBox, detailsLabel, foldWrap, foldSelect); scheduleSave(); } });
     if ((e.decision?.verdict || 'park') === v) input.checked = true;
     return el('label', {}, [input, el('span', { text: v })]);
   }));
@@ -149,6 +168,14 @@ function renderDetail() {
 
   const detailsLabel = el('label', { class: 'field', text: DETAIL_LABEL[e.decision?.verdict || 'park'] });
   detailRefs.detailsLabel = detailsLabel;
+
+  // Task 2: refine reply panel — shows the human question and agent answer (read-only)
+  const refineReply = (e.decision?.verdict === 'refine' && (e.decision?.details || e.lastRoundReply))
+    ? el('div', { class: 'reply' }, [
+        e.decision?.details ? el('div', { class: 'reply-q', text: e.decision.details }) : null,
+        e.lastRoundReply ? el('div', { class: 'reply-a', text: e.lastRoundReply }) : null,
+      ])
+    : null;
 
   const total = state.data.entries.length;
   const prev = el('button', { class: 'nav', text: '◀ Prev', onclick: () => goTo(state.sel - 1) });
@@ -169,9 +196,10 @@ function renderDetail() {
     detailsLabel,
     detailsBox,
     foldWrap,
+    refineReply,
     nav,
   );
-  refreshConditional(e, detailsBox, foldWrap, foldSelect);
+  refreshConditional(e, detailsBox, detailsLabel, foldWrap, foldSelect);
 }
 
 let detailRefs = null;
@@ -185,34 +213,102 @@ function applyDecision(e) {
   const verdict = selectedVerdict();
   const details = detailRefs.detailsBox.value.trim();
   const d = { verdict };
+  // Task 2: adopt/park produce { verdict } with no details
   if (verdict === 'fold') { if (detailRefs.foldSelect.value) d.foldTarget = detailRefs.foldSelect.value; if (details) d.details = details; }
   else if (['reject', 'defer', 'refine'].includes(verdict)) { if (details) d.details = details; }
-  else if (details) d.details = details; // park/adopt optional note
+  // adopt/park: no details field
   e.decision = d;
   if (detailRefs.detailsLabel) detailRefs.detailsLabel.textContent = DETAIL_LABEL[verdict];
 }
 
-function refreshConditional(e, detailsBox, foldWrap, foldSelect) {
+// Task 2: hide detailsBox + detailsLabel for adopt/park
+function refreshConditional(e, detailsBox, detailsLabel, foldWrap, foldSelect) {
   const verdict = selectedVerdict();
   foldWrap.replaceChildren();
   if (verdict === 'fold') {
     foldWrap.append(el('label', { class: 'field', text: 'Fold target (#tag)' }), foldSelect);
   }
+  const hideDetails = NO_DETAILS_VERDICTS.has(verdict);
+  detailsLabel.style.display = hideDetails ? 'none' : '';
+  detailsBox.style.display = hideDetails ? 'none' : '';
 }
 
-function goTo(i) {
+// Task 3: Apply button handler
+$('#apply').addEventListener('click', async () => {
+  if (!window.confirm('Apply all terminal decisions (adopt/reject/fold/defer) now? This writes instruction files and runs the test suite.')) return;
+  setSave('applying…');
+  try {
+    const res = await fetch('/api/apply', { method: 'POST' });
+    if (res.status === 200) {
+      const { report } = await res.json();
+      renderReport(report);
+      await load();
+      setSave('applied', 'ok');
+    } else if (res.status === 409) {
+      const b = await res.json();
+      const paths = (b.paths || []).join('\n  ');
+      renderReport(null, `Apply refused: commit/stash these first:\n  ${paths}`);
+    } else if (res.status === 423) {
+      setSave('applying… (locked)', 'err');
+    } else {
+      const b = await res.json().catch(() => ({}));
+      renderReport(null, `Apply failed: ${b.error || res.statusText}`);
+    }
+  } catch (err) {
+    renderReport(null, `Apply failed: ${err.message}`);
+  }
+});
+
+function renderReport(report, errorMsg) {
+  // Remove any existing report panel
+  const old = $('#report-panel');
+  if (old) old.remove();
+
+  const lines = [];
+  if (errorMsg) {
+    lines.push(el('div', { class: 'report-error', text: errorMsg }));
+  } else if (report) {
+    const keys = ['adopted', 'rejected', 'folded', 'deferred', 'refined', 'parked', 'skipped', 'failed'];
+    for (const k of keys) {
+      if (report[k] !== undefined) {
+        lines.push(el('div', { class: 'report-row' }, [
+          el('span', { class: 'report-key', text: k }),
+          el('span', { class: 'report-val', text: String(report[k]) }),
+        ]));
+      }
+    }
+    if (report.tags && report.tags.length) {
+      lines.push(el('div', { class: 'report-row' }, [
+        el('span', { class: 'report-key', text: 'tags' }),
+        el('span', { class: 'report-val', text: report.tags.join(', ') }),
+      ]));
+    }
+  }
+
+  const panel = el('div', { class: 'report', id: 'report-panel' }, [
+    el('div', { class: 'report-head' }, [
+      el('span', { text: errorMsg ? 'Apply error' : 'Apply report' }),
+      el('button', { class: 'nav small', text: '✕', onclick: () => panel.remove() }),
+    ]),
+    ...lines,
+  ]);
+  document.querySelector('header').after(panel);
+}
+
+// Task 1: goTo now awaits the async renderDetail
+async function goTo(i) {
   const n = state.data.entries.length;
   if (!n) return;
   state.sel = Math.max(0, Math.min(n - 1, i));
   renderSidebar();
-  renderDetail();
+  await renderDetail();
 }
 
 // Arrow keys navigate when focus isn't in an editable field.
-document.addEventListener('keydown', (ev) => {
+document.addEventListener('keydown', async (ev) => {
   if (['TEXTAREA', 'SELECT', 'INPUT'].includes(document.activeElement?.tagName)) return;
-  if (ev.key === 'ArrowLeft') goTo(state.sel - 1);
-  else if (ev.key === 'ArrowRight') goTo(state.sel + 1);
+  if (ev.key === 'ArrowLeft') await goTo(state.sel - 1);
+  else if (ev.key === 'ArrowRight') await goTo(state.sel + 1);
 });
 
 load();
