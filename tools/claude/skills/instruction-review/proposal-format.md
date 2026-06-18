@@ -88,8 +88,13 @@ The rubric is the nine dimensions of the single-agent fallback `prompts/review-i
 **Per-lens** -- each participating role applies these within its domain:
 
 - **Coverage** -- a rule the domain expects that is missing or too weak.
-- **Clarity / terseness / efficiency / enforceability** -- of the rules already in the role's domain.
+- **Clarity** -- unambiguous for human and agent; no overloaded section, vague scope, or undefined term.
+- **Terseness** -- token-conscious; no recitation of common knowledge, no spec-level detail that belongs in a doc, no redundancy.
+- **Efficiency** -- applicable systematically; file-anchored, checkable rules over aspirational prose.
+- **Enforceability** -- lint-able / CI-checkable, and the set states the rule is enforced.
 - **Ownership & placement** -- whether a rule the role owns (or believes belongs to its lens) is owned by the right role and located in the best file; raise a `rehome` or `reowner` where not.
+
+These six per-lens dimensions are scored separately (clarity, terseness, efficiency, and enforceability are not merged): they co-vary but a split lets "terse but unclear" or "clear but unenforceable" surface at a glance.
 
 **Global / structural** -- **not** per-lens; the editor runs these once in reduce, and **no role duplicates them**:
 
@@ -104,7 +109,7 @@ The rubric is the nine dimensions of the single-agent fallback `prompts/review-i
 
 The reduce step does not just write proposals -- it **accounts for every rubric dimension** and the round's present step surfaces the result, so a dimension is never silently skipped (the failure this scorecard exists to prevent).
 
-The editor emits, for **each** rubric dimension (the five per-lens, consolidated across roles, plus the four global/structural), a one-line verdict -- **Strong / Good / Weak / Gaps** -- followed by the specific findings that drove it, each citing `file` and `#tag`. A `Weak`/`Gaps` verdict ties to the proposal(s) it produced. The mechanical nits are listed separately as a short actionable list.
+The editor emits, for **each** rubric dimension (the six per-lens -- coverage, clarity, terseness, efficiency, enforceability, ownership & placement -- consolidated across roles, plus the four global/structural), a one-line verdict -- **Strong / Good / Weak / Gaps** -- followed by the specific findings that drove it, each citing `file` and `#tag`. A `Weak`/`Gaps` verdict ties to the proposal(s) it produced. The mechanical nits are listed separately as a short actionable list.
 
 This mirrors the fallback prompt's output format. The scorecard and nits are **presented to the user, not committed** -- the only committed file is the decisions log.
 
