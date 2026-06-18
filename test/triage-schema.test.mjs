@@ -6,6 +6,7 @@ import {
   validateCrossRefs,
   canonicalJSON,
   versionToken,
+  migrateWorksheet,
 } from '../devtools/triage-ui/schema.mjs';
 
 const baseStrengthen = () => ({
@@ -57,8 +58,7 @@ test('per-kind required fields enforced', () => {
   const newRuleNoDraft = { ...baseStrengthen(), kind: 'new-rule', current: undefined, draft: undefined };
   assert.ok(validateEntry(newRuleNoDraft).some((m) => m.includes('new-rule requires "draft"')));
 
-  const strengthenNoCurrent = { ...baseStrengthen(), current: undefined };
-  assert.ok(validateEntry(strengthenNoCurrent).some((m) => m.includes('strengthen requires "current"')));
+  // v2: strengthen no longer requires "current" — no assertion for that
 
   const newRuleWithCurrent = { ...baseStrengthen(), kind: 'new-rule', current: 'x' };
   assert.ok(validateEntry(newRuleWithCurrent).some((m) => m.includes('must not carry "current"')));
@@ -130,6 +130,38 @@ test('canonicalJSON: sorted keys, 2-space, trailing newline, stable', () => {
   assert.equal(a, '{\n  "a": {\n    "c": 3,\n    "d": 2\n  },\n  "b": 1\n}\n');
   // key order in source does not matter
   assert.equal(canonicalJSON({ a: { c: 3, d: 2 }, b: 1 }), a);
+});
+
+test('v2: details forbidden on adopt/park', () => {
+  const base = { tag: 't', role: 'swe', targetFile: 'instructions/core/swe/t.md',
+    status: { state: 'ready' }, gap: 'g', kind: 'new-rule', draft: '# #t', applyLog: [] };
+  assert.notDeepEqual(validateEntry({ ...base, decision: { verdict: 'adopt', details: 'x' } }), []);
+  assert.deepEqual(validateEntry({ ...base, decision: { verdict: 'adopt' } }), []);
+});
+
+test('v2: strengthen no longer requires current', () => {
+  const e = { tag: 't', role: 'swe', targetFile: 'f', status: { state: 'ready' }, gap: 'g',
+    kind: 'strengthen', draft: '# #t', decision: { verdict: 'park' }, applyLog: [] };
+  assert.deepEqual(validateEntry(e), []);
+});
+
+test('v2: lastRoundReply must be a string when present', () => {
+  const e = { tag: 't', role: 'swe', targetFile: 'f', status: { state: 'ready' }, gap: 'g',
+    kind: 'new-rule', draft: '# #t', decision: { verdict: 'refine', details: 'q' }, applyLog: [], lastRoundReply: 5 };
+  assert.notDeepEqual(validateEntry(e), []);
+  assert.deepEqual(validateEntry({ ...e, lastRoundReply: '' }), []);
+});
+
+test('migrateWorksheet strips current + adopt/park details, idempotent', () => {
+  const wrk = { round: 'r', entries: [
+    { tag: 'a', role: 'swe', targetFile: 'f', status: { state: 'ready' }, gap: 'g', kind: 'strengthen',
+      current: '# #a old', draft: '# #a new', decision: { verdict: 'adopt', details: 'note' }, applyLog: [] },
+  ] };
+  const m = migrateWorksheet(wrk);
+  assert.equal(m.entries[0].current, undefined);
+  assert.equal(m.entries[0].decision.details, undefined);
+  assert.deepEqual(validateFile(m), []);
+  assert.deepEqual(migrateWorksheet(m), m);
 });
 
 test('versionToken: stable under reformat, changes on content edit', () => {

@@ -74,6 +74,13 @@ export function validateEntry(entry, where = 'entry') {
     if (d.verdict !== 'fold' && 'foldTarget' in d && d.foldTarget !== undefined) {
       p.push(`${at}: "decision.foldTarget" only allowed for verdict fold`);
     }
+    if (['adopt', 'park'].includes(d.verdict) && 'details' in d && d.details !== undefined) {
+      p.push(`${at}: "decision.details" not allowed for verdict ${d.verdict}`);
+    }
+  }
+
+  if ('lastRoundReply' in entry && entry.lastRoundReply !== undefined && !isStr(entry.lastRoundReply)) {
+    p.push(`${at}: "lastRoundReply" must be a string`);
   }
 
   // kind + per-kind required fields
@@ -86,7 +93,6 @@ export function validateEntry(entry, where = 'entry') {
         if (entry.current !== undefined) p.push(`${at}: new-rule must not carry "current"`);
         break;
       case 'strengthen':
-        if (!nonEmpty(entry.current)) p.push(`${at}: strengthen requires "current"`);
         if (!nonEmpty(entry.draft)) p.push(`${at}: strengthen requires "draft"`);
         break;
       case 'rehome':
@@ -172,4 +178,20 @@ export function canonicalJSON(obj) {
 export function versionToken(fileText) {
   const parsed = JSON.parse(fileText);
   return createHash('sha256').update(canonicalJSON(parsed)).digest('hex');
+}
+
+/** Bring a pre-v2 worksheet object to v2: drop `current`, drop adopt/park details. Idempotent. */
+export function migrateWorksheet(file) {
+  if (!isObj(file) || !Array.isArray(file.entries)) return file;
+  const entries = file.entries.map((e) => {
+    if (!isObj(e)) return e;
+    const { current, ...rest } = e;
+    const d = rest.decision;
+    if (isObj(d) && ['adopt', 'park'].includes(d.verdict) && 'details' in d) {
+      const { details, ...dr } = d;
+      rest.decision = dr;
+    }
+    return rest;
+  });
+  return { ...file, entries };
 }
