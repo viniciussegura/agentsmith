@@ -19,10 +19,25 @@ test('the generator never installs devtools/ into a consumer .claude', () => {
   assert.ok(!plan.some((p) => p.src.startsWith('devtools/')));
 });
 
+test('planToolInstall never installs devtools/restructure/ into a consumer .claude', () => {
+  const plan = planToolInstall([
+    'devtools/restructure/some-script.mjs',
+    'devtools/restructure/nested/helper.js',
+    'tools/claude/skills/instruction-review/SKILL.md',
+  ]);
+  // only the tools/<ai>/ path is installed; nothing from devtools/restructure/
+  assert.equal(plan.length, 1);
+  assert.ok(plan[0].dest.startsWith('.claude/'));
+  assert.ok(!plan.some((p) => p.src.startsWith('devtools/restructure/')));
+});
+
 test('npm pack does not publish devtools/', () => {
   const out = execSync('npm pack --dry-run --json', { cwd: ROOT, encoding: 'utf8' });
   const files = JSON.parse(out).flatMap((p) => p.files.map((f) => f.path));
   assert.ok(files.length > 0, 'npm pack listed files');
   assert.ok(!files.some((f) => f.replace(/\\/g, '/').startsWith('devtools/')),
     `devtools/ must not be packed; got: ${files.filter((f) => f.includes('devtools')).join(', ')}`);
+  // explicit guard for devtools/restructure/
+  assert.ok(!files.some((f) => f.replace(/\\/g, '/').startsWith('devtools/restructure/')),
+    `devtools/restructure/ must not be packed; got: ${files.filter((f) => f.includes('devtools/restructure')).join(', ')}`);
 });
