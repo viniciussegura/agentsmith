@@ -37,3 +37,16 @@ test('listModules: branch dir recurses alpha; _intro first; demote by role', () 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('listModules: a dir mixing subdirs and .md files fails loud', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lm-mix-'));
+  try {
+    mkdirSync(join(root, 'instructions/core/sub'), { recursive: true });
+    writeFileSync(join(root, 'instructions/core/sub/_intro.md'), '# Sub');
+    writeFileSync(join(root, 'instructions/core/stray.md'), '# #stray'); // sibling of a subdir
+    const listModules = makeListModules(root);
+    assert.throws(() => listModules('core'), /mixed branch\/leaf dir/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
-import { resolveSections } from '../src/sections.js';
+import { resolveSections, demoteForBasename } from '../src/sections.js';
 import { planToolInstall } from '../src/tools.js';
 import { userImport } from '../src/userimport.js';
 import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
@@ -66,14 +66,20 @@ export function makeListModules(root) {
     const walk = (absDir, relDir) => {
       const entries = readdirSync(absDir, { withFileTypes: true });
       const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+      const files = entries.filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name);
+      if (dirs.length && files.length) {
+        // The tree is two-level by construction: a dir is EITHER a branch (only
+        // subdirs) OR a leaf group (_intro.md + tag files). A mix would silently
+        // drop the files, so fail loud rather than miscompile the output.
+        throw new Error(`agentsmith: mixed branch/leaf dir (subdirs + .md files): ${relDir}`);
+      }
       if (dirs.length) {
         for (const d of dirs) walk(join(absDir, d), `${relDir}/${d}`);
         return;
       }
-      const files = entries.filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name);
       const ordered = files.filter((f) => f === '_intro.md')
         .concat(files.filter((f) => f !== '_intro.md').sort());
-      for (const f of ordered) out.push({ path: `${relDir}/${f}`, demote: f === '_intro.md' ? 1 : 2 });
+      for (const f of ordered) out.push({ path: `${relDir}/${f}`, demote: demoteForBasename(f) });
     };
     walk(join(root, 'instructions', name), `instructions/${name}`);
     return out;

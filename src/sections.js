@@ -16,7 +16,12 @@
  * @returns {{ coreModules: { path: string, demote: number }[], bundles: { name: string, title?: string, when: string, modules: { path: string, demote: number }[] }[] }}
  */
 
-const demoteForPath = (p) => (p.split('/').pop() === '_intro.md' ? 1 : 2);
+/** Role-based demote level from a file's basename: an _intro.md is a group
+ * heading (demote 1), every other file is a rule (demote 2). Single source of
+ * truth, shared with the recursive lister in bin/cli.js. */
+export const demoteForBasename = (base) => (base === '_intro.md' ? 1 : 2);
+
+const demoteForPath = (p) => demoteForBasename(p.split('/').pop());
 
 export function resolveSections({ sections = [], listModules }) {
   const coreModules = [];
