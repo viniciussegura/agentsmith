@@ -24,6 +24,9 @@ import { createHash } from 'node:crypto';
 export const KINDS = ['new-rule', 'strengthen', 'rehome', 'reowner'];
 export const VERDICTS = ['park', 'adopt', 'reject', 'fold', 'defer', 'refine'];
 export const STATES = ['ready', 'blocked', 'conditional'];
+export const PRIORITIES = ['high', 'medium', 'low'];
+export const CANDIDATE_VERDICTS = ['park', 'wanted', 'reject'];
+export const SCORECARD_VERDICTS = ['strong', 'good', 'weak', 'gaps'];
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isStr = (v) => typeof v === 'string';
@@ -107,6 +110,68 @@ export function validateEntry(entry, where = 'entry') {
   return p;
 }
 
+/** Validate one candidate (a draft-less, surfaced proposal). Returns problem strings. */
+export function validateCandidate(c, where = 'candidate') {
+  const p = [];
+  if (!isObj(c)) return [`${where}: not an object`];
+  const at = nonEmpty(c.tag) ? `candidate "${c.tag}"` : where;
+  if (!nonEmpty(c.tag)) p.push(`${at}: missing/empty "tag"`);
+  if (!nonEmpty(c.role)) p.push(`${at}: missing/empty "role"`);
+  if (!nonEmpty(c.targetFile)) p.push(`${at}: missing/empty "targetFile"`);
+  if (!nonEmpty(c.gap)) p.push(`${at}: missing/empty "gap"`);
+  if (!KINDS.includes(c.kind)) p.push(`${at}: "kind" must be one of ${KINDS.join('|')}`);
+  if (!PRIORITIES.includes(c.priority)) p.push(`${at}: "priority" must be one of ${PRIORITIES.join('|')}`);
+  if ('draft' in c) p.push(`${at}: a candidate must not carry "draft"`);
+  const d = c.decision;
+  if (!isObj(d) || !CANDIDATE_VERDICTS.includes(d.verdict)) {
+    p.push(`${at}: "decision.verdict" must be one of ${CANDIDATE_VERDICTS.join('|')}`);
+  } else if (d.verdict === 'reject') {
+    if ('details' in d && d.details !== undefined && !isStr(d.details)) p.push(`${at}: "decision.details" must be a string`);
+  } else if ('details' in d && d.details !== undefined) {
+    p.push(`${at}: "decision.details" not allowed for verdict ${d.verdict}`);
+  }
+  return p;
+}
+
+/** Validate the scorecard (null allowed). Enforces matrix alignment; dimension names are open. */
+export function validateScorecard(sc, where = 'scorecard') {
+  if (sc === null || sc === undefined) return [];
+  const p = [];
+  if (!isObj(sc)) return [`${where}: must be an object or null`];
+  const okLenses = Array.isArray(sc.lenses) && sc.lenses.every(isStr);
+  if (!okLenses) p.push(`${where}: "lenses" must be a string[]`);
+  const lenses = okLenses ? sc.lenses : [];
+  const checkVerdict = (v, w) => {
+    if (!SCORECARD_VERDICTS.includes(v)) p.push(`${w}: verdict must be one of ${SCORECARD_VERDICTS.join('|')}`);
+  };
+  if (!Array.isArray(sc.perLens)) p.push(`${where}: "perLens" must be an array`);
+  else sc.perLens.forEach((row, i) => {
+    const rw = `${where}.perLens[${i}]`;
+    if (!isObj(row) || !nonEmpty(row.dimension)) { p.push(`${rw}: missing "dimension"`); return; }
+    if (!Array.isArray(row.cells)) { p.push(`${rw}: "cells" must be an array`); return; }
+    if (row.cells.length !== lenses.length) p.push(`${rw}: cells.length (${row.cells.length}) != lenses.length (${lenses.length})`);
+    row.cells.forEach((cell, j) => {
+      if (!isObj(cell)) { p.push(`${rw}.cells[${j}]: not an object`); return; }
+      if (lenses[j] !== undefined && cell.lens !== lenses[j]) p.push(`${rw}.cells[${j}]: lens "${cell.lens}" != lenses[${j}]`);
+      checkVerdict(cell.verdict, `${rw}.cells[${j}]`);
+    });
+  });
+  if (!Array.isArray(sc.global)) p.push(`${where}: "global" must be an array`);
+  else sc.global.forEach((row, i) => {
+    const rw = `${where}.global[${i}]`;
+    if (!isObj(row) || !nonEmpty(row.dimension)) p.push(`${rw}: missing "dimension"`);
+    else checkVerdict(row.verdict, rw);
+  });
+  if (!Array.isArray(sc.details)) p.push(`${where}: "details" must be an array`);
+  else sc.details.forEach((f, i) => {
+    if (!isObj(f) || !nonEmpty(f.file) || !nonEmpty(f.tag) || !nonEmpty(f.note)) {
+      p.push(`${where}.details[${i}]: needs file/tag/note`);
+    }
+  });
+  if (!Array.isArray(sc.nits) || !sc.nits.every(isStr)) p.push(`${where}: "nits" must be a string[]`);
+  return p;
+}
+
 /** Validate the whole file structure (excludes cross-references). */
 export function validateFile(file) {
   const p = [];
@@ -124,6 +189,22 @@ export function validateFile(file) {
       seen.add(e.tag);
     }
   });
+  if ('scorecard' in file) p.push(...validateScorecard(file.scorecard, 'scorecard'));
+  if ('candidates' in file) {
+    if (!Array.isArray(file.candidates)) {
+      p.push('file: "candidates" must be an array');
+    } else {
+      const cseen = new Set();
+      file.candidates.forEach((c, i) => {
+        p.push(...validateCandidate(c, `candidates[${i}]`));
+        if (isObj(c) && nonEmpty(c.tag)) {
+          if (cseen.has(c.tag)) p.push(`candidate "${c.tag}": duplicate tag`);
+          cseen.add(c.tag);
+          if (seen.has(c.tag)) p.push(`tag "${c.tag}": present in both entries and candidates`);
+        }
+      });
+    }
+  }
   return p;
 }
 
@@ -180,10 +261,11 @@ export function versionToken(fileText) {
   return createHash('sha256').update(canonicalJSON(parsed)).digest('hex');
 }
 
-/** Bring a pre-v2 worksheet object to v2: drop `current`, drop adopt/park details. Idempotent. */
+/** Bring a pre-v2/v3 worksheet object to v3 canonical form. Idempotent. */
 export function migrateWorksheet(file) {
-  if (!isObj(file) || !Array.isArray(file.entries)) return file;
-  const entries = file.entries.map((e) => {
+  if (!isObj(file)) return file;
+  const entriesIn = Array.isArray(file.entries) ? file.entries : [];
+  const entries = entriesIn.map((e) => {
     if (!isObj(e)) return e;
     const { current, ...rest } = e;
     const d = rest.decision;
@@ -193,5 +275,10 @@ export function migrateWorksheet(file) {
     }
     return rest;
   });
-  return { ...file, entries };
+  return {
+    ...file,
+    scorecard: file.scorecard ?? null,
+    candidates: Array.isArray(file.candidates) ? file.candidates : [],
+    entries,
+  };
 }

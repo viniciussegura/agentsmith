@@ -7,6 +7,7 @@ import {
   canonicalJSON,
   versionToken,
   migrateWorksheet,
+  validateCandidate, validateScorecard, PRIORITIES, CANDIDATE_VERDICTS, SCORECARD_VERDICTS,
 } from '../devtools/triage-ui/schema.mjs';
 
 const baseStrengthen = () => ({
@@ -174,4 +175,71 @@ test('versionToken: stable under reformat, changes on content edit', () => {
   const edited = structuredClone(obj);
   edited.entries[0].gap = 'context REDEFINED!!'; // different content
   assert.notEqual(versionToken(JSON.stringify(obj)), versionToken(JSON.stringify(edited)));
+});
+
+const baseCandidate = (over = {}) => ({
+  tag: 'swe-x', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-x.md',
+  gap: 'g', priority: 'high', decision: { verdict: 'park' }, ...over,
+});
+
+test('validateCandidate accepts a well-formed park candidate', () => {
+  assert.deepEqual(validateCandidate(baseCandidate()), []);
+});
+
+test('validateCandidate rejects bad priority, bad verdict, stray draft, details on non-reject', () => {
+  assert.ok(validateCandidate(baseCandidate({ priority: 'urgent' })).some((m) => m.includes('priority')));
+  assert.ok(validateCandidate(baseCandidate({ decision: { verdict: 'maybe' } })).some((m) => m.includes('verdict')));
+  assert.ok(validateCandidate(baseCandidate({ draft: 'x' })).some((m) => m.includes('draft')));
+  assert.ok(validateCandidate(baseCandidate({ decision: { verdict: 'wanted', details: 'no' } })).some((m) => m.includes('details')));
+});
+
+test('validateCandidate allows optional details on reject', () => {
+  assert.deepEqual(validateCandidate(baseCandidate({ decision: { verdict: 'reject', details: 'dupe' } })), []);
+  assert.deepEqual(validateCandidate(baseCandidate({ decision: { verdict: 'reject' } })), []);
+});
+
+const baseScorecard = (over = {}) => ({
+  lenses: ['swe', 'qa'],
+  perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'good' }, { lens: 'qa', verdict: 'weak' }] }],
+  global: [{ dimension: 'cohesiveness', verdict: 'strong' }],
+  details: [{ dimension: 'coverage', lens: 'qa', file: 'f', tag: 't', note: 'n' }],
+  nits: ['x'], ...over,
+});
+
+test('validateScorecard accepts null and a well-formed scorecard', () => {
+  assert.deepEqual(validateScorecard(null), []);
+  assert.deepEqual(validateScorecard(baseScorecard()), []);
+  assert.deepEqual(validateScorecard({ lenses: [], perLens: [], global: [], details: [], nits: [] }), []);
+});
+
+test('validateScorecard rejects bad verdict and matrix misalignment', () => {
+  assert.ok(validateScorecard(baseScorecard({
+    perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'nope' }, { lens: 'qa', verdict: 'good' }] }],
+  })).some((m) => m.includes('verdict')));
+  // wrong cell count
+  assert.ok(validateScorecard(baseScorecard({
+    perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'good' }] }],
+  })).some((m) => m.includes('cells.length')));
+  // wrong cell lens vs lenses[i]
+  assert.ok(validateScorecard(baseScorecard({
+    perLens: [{ dimension: 'coverage', cells: [{ lens: 'qa', verdict: 'good' }, { lens: 'swe', verdict: 'good' }] }],
+  })).some((m) => m.includes('!= lenses')));
+});
+
+test('validateFile is lenient on absent scorecard/candidates but flags present-malformed + dup/overlap', () => {
+  const ok = { round: 'r', entries: [baseStrengthen()] };
+  assert.deepEqual(validateFile(ok), []); // no scorecard/candidates keys -> still valid
+  const dup = { round: 'r', entries: [], candidates: [baseCandidate(), baseCandidate()] };
+  assert.ok(validateFile(dup).some((m) => m.includes('duplicate tag')));
+  const overlap = { round: 'r', entries: [baseStrengthen()], candidates: [baseCandidate({ tag: baseStrengthen().tag })] };
+  assert.ok(validateFile(overlap).some((m) => m.includes('both entries and candidates')));
+  const badSc = { round: 'r', entries: [], scorecard: { lenses: 'no', perLens: [], global: [], details: [], nits: [] } };
+  assert.ok(validateFile(badSc).some((m) => m.includes('lenses')));
+});
+
+test('migrateWorksheet v3 adds scorecard:null + candidates:[] and stays idempotent', () => {
+  const m = migrateWorksheet({ round: 'r', entries: [] });
+  assert.equal(m.scorecard, null);
+  assert.deepEqual(m.candidates, []);
+  assert.deepEqual(migrateWorksheet(m), m);
 });
