@@ -104,6 +104,41 @@ function viewValid() {
 }
 function select(kind, idx) { state.view = { kind, idx }; renderSidebar(); renderDetail(); }
 
+// --- scorecard finding/nit presentation helpers ---
+// Locate the proposal (entry) or candidate that would address a #tag, so a
+// finding can link to the actionable item that fixes it.
+function tagLocation(tag) {
+  const ei = state.data.entries.findIndex((e) => e.tag === tag);
+  if (ei >= 0) return { kind: 'proposal', idx: ei };
+  const ci = sortedCandidates().findIndex((c) => c.tag === tag);
+  if (ci >= 0) return { kind: 'candidate', idx: ci };
+  return null;
+}
+// A #tag chip: clickable (jumps to the proposal/candidate) when one exists,
+// otherwise a muted chip flagged "no proposal yet" — i.e. a gap to add one.
+function tagChip(tag) {
+  const loc = tagLocation(tag);
+  if (loc) {
+    return el('button', { class: 'chip chip-tag chip-link', title: `Go to ${loc.kind} #${tag}`, text: `#${tag}`, onclick: () => select(loc.kind, loc.idx) });
+  }
+  return el('span', { class: 'chip chip-tag chip-orphan', title: 'no proposal or candidate addresses this yet', text: `#${tag}` });
+}
+// Inline-format free text: turn `code` spans and #tags into styled nodes; a #tag
+// becomes an actionable chip when it resolves to a worksheet item.
+function richText(s) {
+  const nodes = [];
+  const re = /(`[^`]+`)|(#[a-z][a-z0-9-]+)/gi;
+  let last = 0; let m;
+  while ((m = re.exec(s))) {
+    if (m.index > last) nodes.push(document.createTextNode(s.slice(last, m.index)));
+    if (m[1]) nodes.push(el('code', { class: 'inline-code', text: m[1].slice(1, -1) }));
+    else nodes.push(tagChip(m[2].slice(1)));
+    last = re.lastIndex;
+  }
+  if (last < s.length) nodes.push(document.createTextNode(s.slice(last)));
+  return nodes;
+}
+
 function render() {
   if (!viewValid()) state.view = pickDefaultView();
   renderSidebar();
@@ -187,11 +222,20 @@ function renderScorecardDetail() {
   if (sc.details?.length) {
     kids.push(el('label', { class: 'field', text: 'findings' }));
     kids.push(el('div', { class: 'scdetails' }, sc.details.map((d) =>
-      el('div', { class: 'scd', text: `${d.dimension}${d.lens ? ' · ' + d.lens : ''} · ${d.file} · #${d.tag} · ${d.note}` }))));
+      el('div', { class: 'finding' }, [
+        el('div', { class: 'finding-meta' }, [
+          el('span', { class: 'chip chip-dim', text: d.dimension }),
+          d.lens ? el('span', { class: 'chip chip-role', text: d.lens }) : null,
+          tagChip(d.tag),
+          d.file ? el('code', { class: 'finding-file', text: d.file }) : null,
+        ].filter(Boolean)),
+        el('div', { class: 'finding-note' }, richText(d.note || '')),
+      ]))));
   }
   if (sc.nits?.length) {
     kids.push(el('label', { class: 'field', text: 'mechanical nits' }));
-    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n) => el('div', { class: 'scn', text: `• ${n}` }))));
+    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n) =>
+      el('div', { class: 'scn' }, [el('span', { class: 'scn-bullet', text: '•' }), el('span', {}, richText(n))]))));
   }
   $('#detail').replaceChildren(...kids);
 }
