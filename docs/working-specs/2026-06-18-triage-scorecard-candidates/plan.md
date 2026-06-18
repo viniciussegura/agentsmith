@@ -458,6 +458,17 @@ EOF
 - Modify: `devtools/triage-ui/server.mjs`
 - Test: `test/triage-server.test.mjs`
 
+- [ ] **Step 0: Fix the pre-existing round-trip test for the v3 shape**
+
+`migrateWorksheet` (Task 1) now adds `scorecard:null`+`candidates:[]` on read, so the existing test "PUT creates the file (version null) then GET round-trips" (around line 45) — which asserts `assert.deepEqual(got.data, data)` where `data = validFile()` (no v3 keys) — now fails. Fix it by comparing against the migrated form. Add `migrateWorksheet` to the imports and change that assertion:
+
+```js
+// was: assert.deepEqual(got.data, data);
+assert.deepEqual(got.data, migrateWorksheet(data));
+```
+
+(`migrateWorksheet(data)` is `{ ...data, scorecard: null, candidates: [], entries: data.entries }`.) Re-run `node --test test/triage-server.test.mjs` to confirm this existing test passes again before adding the new ones.
+
 - [ ] **Step 1: Write failing test**
 
 Append to `test/triage-server.test.mjs` (add `hasCommittableChanges` to the schema/server import as appropriate — it will be exported from `server.mjs`):
