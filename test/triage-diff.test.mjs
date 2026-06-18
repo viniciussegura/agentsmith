@@ -45,6 +45,15 @@ test('an inserted line keeps surrounding lines as same', () => {
   ]);
 });
 
+test('trailing newlines do not add phantom blank rows', () => {
+  // current (read from disk) ends in '\n'; draft (textarea) does not.
+  const rows = lineDiff('a\nb\n', 'a\nb');
+  assert.deepEqual(rows, [
+    { type: 'same', text: 'a' },
+    { type: 'same', text: 'b' },
+  ]);
+});
+
 test('round-trip of the line types covers every row', () => {
   const rows = lineDiff('a\nb', 'a\nx');
   assert.equal(rows.filter((r) => r.type === 'same').length, 1);

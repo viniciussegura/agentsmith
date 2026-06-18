@@ -50,16 +50,31 @@ function scheduleSave() {
   saveTimer = setTimeout(save, 600);
 }
 
+// Serialize saves: two PUTs racing with the same state.version would make the
+// second 409 ("stale version"), forcing a load() that rebuilds the detail pane
+// mid-edit — collapsing the draft editor and stealing focus. While one save is
+// in flight, later requests set pendingSave and a single follow-up save runs
+// (with the updated version) once it returns.
+let saving = false;
+let pendingSave = false;
+
 async function save() {
+  if (saving) { pendingSave = true; return; }
+  saving = true;
   setSave('saving…');
-  const res = await fetch('/api/triage', {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: state.data, version: state.version }),
-  });
-  if (res.status === 200) { state.version = (await res.json()).version; setSave('saved', 'ok'); renderSidebar(); }
-  else if (res.status === 423) { setSave('applying… will retry', 'err'); setTimeout(save, 1500); }
-  else if (res.status === 409) { setSave('changed on disk — reloading', 'err'); await load(); }
-  else { const b = await res.json(); setSave(`not saved: ${b.problems ? b.problems[0] : b.error}`, 'err'); }
+  try {
+    const res = await fetch('/api/triage', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: state.data, version: state.version }),
+    });
+    if (res.status === 200) { state.version = (await res.json()).version; setSave('saved', 'ok'); renderSidebar(); }
+    else if (res.status === 423) { setSave('applying… will retry', 'err'); setTimeout(save, 1500); }
+    else if (res.status === 409) { setSave('changed on disk — reloading', 'err'); await load(); }
+    else { const b = await res.json(); setSave(`not saved: ${b.problems ? b.problems[0] : b.error}`, 'err'); }
+  } finally {
+    saving = false;
+    if (pendingSave) { pendingSave = false; save(); }
+  }
 }
 
 function render() {
@@ -189,7 +204,9 @@ async function renderDetail() {
   next.disabled = state.sel === total - 1;
   const nav = el('div', { class: 'navbar' }, [prev, el('span', { class: 'pos', text: `${state.sel + 1} / ${total}` }), next]);
 
-  $('#detail').replaceChildren(
+  // filter(Boolean): refineReply is null for non-refine entries, and
+  // replaceChildren() would coerce a null arg into a literal "null" text node.
+  $('#detail').replaceChildren(...[
     el('div', { class: 'meta', text: `${e.kind} · ${e.role} · ${e.targetFile} · status: ${e.status?.state}` }),
     el('h2', { text: `#${e.tag}` }),
     el('div', { class: 'gap', text: e.gap || '' }),
@@ -203,7 +220,7 @@ async function renderDetail() {
     foldWrap,
     refineReply,
     nav,
-  );
+  ].filter(Boolean));
   refreshConditional(e, detailsBox, detailsLabel, foldWrap, foldSelect);
 }
 

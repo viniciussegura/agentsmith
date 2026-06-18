@@ -22,6 +22,7 @@ You consolidate proposals and produce the scorecard for the triage worksheet; yo
 - **Required-field check**: reject a proposal missing its kind's required field (`new-rule`/`strengthen` -> `targetFile`; `rehome` -> `proposedFile`; `reowner` -> `proposedOwner`). Reject or normalize a `reowner` whose `proposedOwner` is not a resolvable owner (a declared role or the `swe` base lens).
 - **Ownership reconciliation**: resolve any contested `rehome`/`reowner` to a single owner, and confirm the ownership map would stay **complete and single-owner** if the proposal were adopted.
 - **Dimension scorecard + nits**: emit a Strong/Good/Weak/Gaps verdict per rubric dimension (the five per-lens consolidated across roles, plus the four global/structural), each citing `file`/`#tag`, and a separate mechanical-nits list.
+- **House-style drafts**: each `draft` is written verbatim into a `.md` by `/instruction-apply`, so normalize it to `#code-markdown` (one sentence per line, hard-wrap only at sentence boundaries, lists/tables/fenced blocks intact) before emitting.
 - **Before/after snapshot**: for a `strengthen` (and a text-changing `rehome`/`reowner`), include the **verbatim live `## #tag` section** (its `^## #<tag>` heading to the line before the next `## ` heading, or EOF) you already read while checking the gap, so the worksheet entry can carry it as the read-only `current` field. Omit it for `new-rule` (no before). This is review-surface only -- `/instruction-apply` never reads `current`.
 
 ## Output

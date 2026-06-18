@@ -10,8 +10,15 @@
  */
 
 export function lineDiff(current, draft) {
-  const a = current == null || current === '' ? [] : String(current).split('\n');
-  const b = draft == null || draft === '' ? [] : String(draft).split('\n');
+  // Strip a trailing newline before splitting: files read from disk end in
+  // '\n', which split() turns into a phantom trailing '' line. Diffing that
+  // against a draft without one produced a spurious blank del/add row at the
+  // bottom of every diff.
+  const norm = (s) => (s == null ? '' : String(s).replace(/\n+$/, ''));
+  const at = norm(current);
+  const bt = norm(draft);
+  const a = at === '' ? [] : at.split('\n');
+  const b = bt === '' ? [] : bt.split('\n');
 
   // LCS length table over lines.
   const n = a.length;

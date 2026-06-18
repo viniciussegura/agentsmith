@@ -30,6 +30,8 @@ interface InstructionProposal {
 
 **Required per kind** (the reduce step rejects a proposal missing its kind's field): `new-rule` and `strengthen` require `targetFile`; `new-rule` also requires `draft` once concrete; `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must be a **resolvable owner** (a declared role, the `swe` base lens, or a known non-review marker -- else the editor rejects/normalizes it).
 
+A `draft` is written **verbatim** into a `.md` by `/instruction-apply`, so author it in house markdown style -- `#code-markdown`: one sentence per line, hard-wrap only at sentence boundaries (never by column), lists/tables/fenced blocks left intact. (`#code-markdown`'s own trigger is "editing a `.md`"; a draft is the `.md`'s future content, so the style applies at authoring time.)
+
 The triage worksheet is the structured **`triage.json`** (`{ round, entries[] }`; schema + validator in `devtools/triage-ui/schema.mjs`, full shape in the instruction-review SKILL). Each entry projects the proposal as typed fields plus a `decision` object (`verdict` defaulting to `park`; typed params `details`/`foldTarget`) and an `applyLog`. For a `strengthen` (and a text-changing `rehome`/`reowner`) the entry also carries a read-only **`current`** field -- the verbatim live `## #tag` section the draft replaces -- so the UI shows a before/after; it is review-surface only and `/instruction-apply` never reads it. `new-rule` has no `current`.
 
 ## Rubric
