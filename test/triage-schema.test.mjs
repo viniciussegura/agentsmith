@@ -274,3 +274,40 @@ test('deriveVerdict: empty -> strong, worst-rank wins, duplicates collapse', () 
   assert.equal(deriveVerdict([{ verdict: 'weak' }, { verdict: 'weak' }]), 'weak');
   assert.equal(SCORECARD_RANK.strong < SCORECARD_RANK.good && SCORECARD_RANK.weak < SCORECARD_RANK.gaps, true);
 });
+
+test('validateScorecard: cell verdict must equal worst-of-its-findings', () => {
+  // qa cell says 'good' but its only finding is 'weak' -> mismatch
+  const bad = baseScorecard({
+    perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'strong' }, { lens: 'qa', verdict: 'good' }] }],
+  });
+  assert.ok(validateScorecard(bad).some((m) => m.includes('derived')));
+  // a consistent card has no equality problem
+  assert.deepEqual(validateScorecard(baseScorecard()), []);
+});
+
+test('validateScorecard: a non-strong cell with zero findings is rejected (derives strong)', () => {
+  const bad = baseScorecard({
+    perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'weak' }, { lens: 'qa', verdict: 'weak' }] }],
+  });
+  // swe cell 'weak' has no finding -> derives 'strong' -> mismatch
+  assert.ok(validateScorecard(bad).some((m) => m.includes('perLens[0].cells[0]') && m.includes('derived "strong"')));
+});
+
+test('validateScorecard: global row verdict must equal worst-of-lens-absent-findings', () => {
+  const bad = baseScorecard({
+    global: [{ dimension: 'cohesiveness', verdict: 'weak' }],
+    details: [
+      { dimension: 'coverage', lens: 'qa', file: 'f', tag: 't', verdict: 'weak', note: 'n' },
+    ],
+  });
+  assert.ok(validateScorecard(bad).some((m) => m.includes('global[0]') && m.includes('derived "strong"')));
+  // a lens:null finding rolls into the global row
+  const ok = baseScorecard({
+    global: [{ dimension: 'cohesiveness', verdict: 'gaps' }],
+    details: [
+      { dimension: 'coverage', lens: 'qa', file: 'f', tag: 't', verdict: 'weak', note: 'n' },
+      { dimension: 'cohesiveness', lens: null, file: 'f', tag: 'u', verdict: 'gaps', note: 'n' },
+    ],
+  });
+  assert.deepEqual(validateScorecard(ok), []);
+});

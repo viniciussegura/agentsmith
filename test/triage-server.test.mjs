@@ -195,7 +195,7 @@ test('PUT round-trips a file carrying scorecard + candidates', async () => {
   await withServer({ triagePath }, async (base) => {
     const data = {
       round: '2026-06-18',
-      scorecard: { lenses: ['swe'], perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'good' }] }], global: [{ dimension: 'cohesiveness', verdict: 'strong' }], details: [], nits: [] },
+      scorecard: { lenses: ['swe'], perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'strong' }] }], global: [{ dimension: 'cohesiveness', verdict: 'strong' }], details: [], nits: [] },
       candidates: [{ tag: 'swe-c', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-c.md', gap: 'g', priority: 'high', decision: { verdict: 'park' } }],
       entries: [],
     };

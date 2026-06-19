@@ -185,6 +185,29 @@ export function validateScorecard(sc, where = 'scorecard') {
       p.push(`${where}.details[${i}]: "verdict" must be one of ${SCORECARD_VERDICTS.join('|')}`);
     }
   });
+  // Equality enforcement (net-new): each stored cell/global verdict must equal the
+  // worst of its matching findings (else 'strong'). Loose `== null` for the global
+  // match because a migrated global finding has no `lens` key (f.lens === undefined).
+  const findings = Array.isArray(sc.details) ? sc.details.filter(isObj) : [];
+  const matching = (dim, lens) => findings.filter((f) =>
+    f.dimension === dim && (lens == null ? f.lens == null : f.lens === lens));
+  if (Array.isArray(sc.perLens)) sc.perLens.forEach((row, i) => {
+    if (!isObj(row) || !Array.isArray(row.cells)) return;
+    row.cells.forEach((cell, j) => {
+      if (!isObj(cell) || !SCORECARD_VERDICTS.includes(cell.verdict)) return; // bad verdict already flagged
+      const want = deriveVerdict(matching(row.dimension, cell.lens));
+      if (cell.verdict !== want) {
+        p.push(`${where}.perLens[${i}].cells[${j}]: verdict "${cell.verdict}" != derived "${want}" from its findings`);
+      }
+    });
+  });
+  if (Array.isArray(sc.global)) sc.global.forEach((row, i) => {
+    if (!isObj(row) || !SCORECARD_VERDICTS.includes(row.verdict)) return;
+    const want = deriveVerdict(matching(row.dimension, null));
+    if (row.verdict !== want) {
+      p.push(`${where}.global[${i}]: verdict "${row.verdict}" != derived "${want}" from its findings`);
+    }
+  });
   // A nit is a string (legacy) or { text, fix?: 'auto' }. `fix:'auto'` flags it
   // for the /instruction-apply agent to fix; absence means the human fixes it.
   if (!Array.isArray(sc.nits)) {
