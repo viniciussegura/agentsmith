@@ -37,6 +37,7 @@ owners:
   swe-dead-code: swe
   swe-reference-spec: swe
   swe-async: swe
+  swe-decomposition: swe
 
   # security
   swe-security: security
@@ -49,6 +50,7 @@ owners:
   be-api-first: db
   be-api-versioning: db
   be-schema-migration: db
+  be-api-error-envelope: db
 
   # docs
   swe-docs-drift: docs
@@ -74,6 +76,7 @@ owners:
   ui-validation: ux
   ui-empty-state-guidance: ux
   ui-destructive-confirm: ux
+  ui-overlay-focus-flow: ux
 
   # ai -- meta lens: agent behavior, planning, memory, the review engine (instruction-review only)
   ai-conversational: ai
@@ -85,6 +88,7 @@ owners:
   ai-review-engine: ai
   ai-review-board: ai
   ai-instruction-review: ai
+  ai-plan-deviation: ai
 
   # git -- meta lens: VCS workflow, commits, branches, PRs (instruction-review only)
   git-title: git

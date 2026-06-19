@@ -22,4 +22,10 @@ Each component carries:
 
 **MUST** use these shared components wherever a canonical state is displayed; never render a one-off inline spinner, empty placeholder, or error banner that duplicates their behavior (#swe-reuse).
 
+Accessibility contract for the shared components:
+
+- a loading indicator carries an accessible name (`aria-label` or visually-hidden text) and `role="status"`;
+- an error state uses `role="alert"` (or `aria-live="assertive"`) so it is announced without focus;
+- empty and informational states use `role="status"` (polite), never `role="alert"`.
+
 Follow #swe-display-messages for what the visible text says.

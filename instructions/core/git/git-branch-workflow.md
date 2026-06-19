@@ -12,8 +12,9 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
 - **One session, one branch.**
   Within a conversation / session, all work continues on the branch the session is operating on.
   An AI assistant **MUST NOT** create or switch to a new branch mid-session unless the user explicitly approves it.
-- A branch name should reflect its unit of work.
-  When the tooling allows it, the session name should match the branch.
+- A branch name reflects its unit of work and uses `kebab-case` -- lowercase letters, digits, hyphens; no spaces, underscores, or uppercase -- at most ~60 characters.
+  A `<type>/` prefix matching the Conventional-Commit type (`feat/`, `fix/`, `docs/`, `chore/`, `refactor/`) is preferred.
+  When the tooling allows it, the session name matches the branch.
 - Commit and push granularity is free -- as many as the logical units demand.
   Pre-merge granularity is free; squash collapses it at merge.
 - **Never** rewrite published history.
