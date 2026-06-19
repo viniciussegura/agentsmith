@@ -8,6 +8,7 @@ import {
   versionToken,
   migrateWorksheet,
   validateCandidate, validateScorecard, PRIORITIES, CANDIDATE_VERDICTS, SCORECARD_VERDICTS,
+  deriveVerdict, SCORECARD_RANK,
 } from '../devtools/triage-ui/schema.mjs';
 
 const baseStrengthen = () => ({
@@ -256,4 +257,12 @@ test('validateScorecard accepts string + {text,fix} nits, rejects bad fix / miss
   assert.deepEqual(validateScorecard(baseScorecard({ nits: ['x', { text: 'y' }, { text: 'z', fix: 'auto' }] })), []);
   assert.ok(validateScorecard(baseScorecard({ nits: [{ text: 'y', fix: 'later' }] })).some((m) => m.includes('fix')));
   assert.ok(validateScorecard(baseScorecard({ nits: [{ fix: 'auto' }] })).some((m) => m.includes('string or')));
+});
+
+test('deriveVerdict: empty -> strong, worst-rank wins, duplicates collapse', () => {
+  assert.equal(deriveVerdict([]), 'strong');
+  assert.equal(deriveVerdict([{ verdict: 'good' }]), 'good');
+  assert.equal(deriveVerdict([{ verdict: 'good' }, { verdict: 'gaps' }, { verdict: 'weak' }]), 'gaps');
+  assert.equal(deriveVerdict([{ verdict: 'weak' }, { verdict: 'weak' }]), 'weak');
+  assert.equal(SCORECARD_RANK.strong < SCORECARD_RANK.good && SCORECARD_RANK.weak < SCORECARD_RANK.gaps, true);
 });

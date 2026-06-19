@@ -28,6 +28,22 @@ export const PRIORITIES = ['high', 'medium', 'low'];
 export const CANDIDATE_VERDICTS = ['park', 'wanted', 'reject'];
 export const SCORECARD_VERDICTS = ['strong', 'good', 'weak', 'gaps'];
 
+export const SCORECARD_RANK = { strong: 0, good: 1, weak: 2, gaps: 3 };
+const RANK_VERDICT = ['strong', 'good', 'weak', 'gaps'];
+
+/**
+ * Worst verdict among an ALREADY-FILTERED finding list, 'strong' when empty.
+ * The caller filters by (dimension, lens) first — deriveVerdict does not filter.
+ */
+export function deriveVerdict(filteredFindings) {
+  let worst = 0;
+  for (const f of filteredFindings || []) {
+    const r = SCORECARD_RANK[f && f.verdict];
+    if (r > worst) worst = r;
+  }
+  return RANK_VERDICT[worst];
+}
+
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isStr = (v) => typeof v === 'string';
 const nonEmpty = (v) => isStr(v) && v.trim() !== '';
