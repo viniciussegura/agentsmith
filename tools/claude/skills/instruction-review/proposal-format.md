@@ -52,7 +52,7 @@ interface Scorecard {
 interface PerLensRow { dimension: string; cells: Cell[]; }  // one cell per lens, positionally aligned
 interface Cell       { lens: string; verdict: Verdict; }
 interface GlobalRow  { dimension: string; verdict: Verdict; }
-interface Finding    { dimension: string; lens?: string; file: string; tag: string; note: string; }
+interface Finding    { dimension: string; lens?: string; file: string; tag: string; verdict: Verdict; note: string; }
 
 interface Candidate {
   tag: string;
@@ -109,7 +109,9 @@ These six per-lens dimensions are scored separately (clarity, terseness, efficie
 
 The reduce step does not just write proposals -- it **accounts for every rubric dimension** and the round's present step surfaces the result, so a dimension is never silently skipped (the failure this scorecard exists to prevent).
 
-The editor emits, for **each** rubric dimension (the six per-lens -- coverage, clarity, terseness, efficiency, enforceability, ownership & placement -- consolidated across roles, plus the four global/structural), a one-line verdict -- **Strong / Good / Weak / Gaps** -- followed by the specific findings that drove it, each citing `file` and `#tag`. A `Weak`/`Gaps` verdict ties to the proposal(s) it produced. The mechanical nits are listed separately as a short actionable list.
+For **each** rubric dimension (the six per-lens -- coverage, clarity, terseness, efficiency, enforceability, ownership & placement -- consolidated across roles, plus the four global/structural), the editor emits one `Finding` per rule that scores below **Strong**, each citing `file`, `#tag`, and its own `verdict` -- **Strong / Good / Weak / Gaps**. The cell (and global) verdict is then the **worst** of those findings, and **Strong** when there are none. A `Weak`/`Gaps` finding ties to the proposal(s) it produced. The mechanical nits are listed separately as a short actionable list.
+
+The per-rule findings come from the fan-out reviewers; the editor only consolidates and rolls them up -- it never asserts a cell verdict independently of its findings. A clean rule produces no finding (and so contributes **Strong**).
 
 This mirrors the fallback prompt's output format. The scorecard and nits are **presented to the user, not committed** -- the only committed file is the decisions log.
 
