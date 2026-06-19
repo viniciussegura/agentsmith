@@ -210,6 +210,32 @@ test('PUT round-trips a file carrying scorecard + candidates', async () => {
   });
 });
 
+test('PUT with cells stale relative to findings is recomputed (no 409/400) and stored consistent', async () => {
+  const triagePath = tmpTriage();
+  await withServer({ triagePath }, async (base) => {
+    const data = {
+      round: '2026-06-19',
+      // swe cell stored 'good' but the finding says 'gaps' — stale. migrate must
+      // recompute the cell to 'gaps' before validateFile, so this is a 200 not 400.
+      scorecard: {
+        lenses: ['swe'],
+        perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'good' }] }],
+        global: [],
+        details: [{ dimension: 'coverage', lens: 'swe', file: 'f', tag: 't', verdict: 'gaps', note: 'n' }],
+        nits: [],
+      },
+      candidates: [], entries: [],
+    };
+    const put = await fetch(`${base}/api/triage`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data, version: null }),
+    });
+    assert.equal(put.status, 200);
+    const got = await (await fetch(`${base}/api/triage`)).json();
+    assert.equal(got.data.scorecard.perLens[0].cells[0].verdict, 'gaps'); // recomputed
+  });
+});
+
 // F8/F9: POST /api/apply lock (423)
 // The `applying` flag is module-local inside createServer's closure. Testing the
 // 423 path via concurrent in-process requests would require a real async apply
