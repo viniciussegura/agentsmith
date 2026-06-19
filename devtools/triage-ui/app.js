@@ -13,7 +13,7 @@ const CAND_NOTE_LABEL = { park: 'Note (optional)', wanted: 'Drafting note (optio
 
 // view selects what the main pane shows: the scorecard, one proposal (entry), or
 // one candidate. idx indexes entries[] (proposal) or sortedCandidates() (candidate).
-const state = { data: { round: '', entries: [], candidates: [], scorecard: null }, version: null, tags: [], view: { kind: 'empty', idx: 0 } };
+const state = { data: { round: '', entries: [], candidates: [], scorecard: null }, version: null, tags: [], view: { kind: 'empty', idx: 0 }, scFilter: null };
 let saveTimer = null;
 
 const $ = (sel) => document.querySelector(sel);
@@ -103,7 +103,12 @@ function viewValid() {
   if (v.kind === 'empty') return !state.data.scorecard && !state.data.entries.length && !sortedCandidates().length;
   return false;
 }
-function select(kind, idx) { state.view = { kind, idx }; renderSidebar(); renderDetail(); }
+function select(kind, idx) {
+  if (kind !== 'scorecard') state.scFilter = null;
+  state.view = { kind, idx };
+  renderSidebar();
+  renderDetail();
+}
 
 // --- scorecard finding/nit presentation helpers ---
 // Locate the proposal (entry) or candidate that would address a #tag, so a
@@ -233,6 +238,16 @@ function renderDetail() {
   return undefined;
 }
 
+// Toggle the scorecard drill-down filter. Clicking a cell filters the findings
+// list to its (dimension, lens); clicking the same cell clears it. Loose `==`
+// for lens so a global row (lens null) matches a migrated global finding (undefined).
+function toggleScFilter(dimension, lens) {
+  const f = state.scFilter;
+  if (f && f.dimension === dimension && f.lens == lens) state.scFilter = null;
+  else state.scFilter = { dimension, lens: lens ?? null };
+  renderScorecardDetail();
+}
+
 // --- scorecard focused view (main area) ---
 function renderScorecardDetail() {
   const sc = state.data.scorecard;
@@ -246,20 +261,46 @@ function renderScorecardDetail() {
     ]);
     const rows = sc.perLens.map((row) => el('div', { class: 'scrow', style: cols }, [
       el('div', { class: 'sccell lbl', text: row.dimension }),
-      ...row.cells.map((c) => el('div', { class: 'sccell', title: `${c.lens}: ${c.verdict}`, text: ICON[c.verdict] || '?' })),
+      ...row.cells.map((c) => {
+        const clickable = c.verdict !== 'strong';
+        const sel = state.scFilter && state.scFilter.dimension === row.dimension && state.scFilter.lens == c.lens;
+        return el('div', {
+          class: `sccell ${clickable ? 'clickable' : ''} ${sel ? 'selected' : ''}`,
+          title: `${c.lens}: ${c.verdict}`,
+          text: ICON[c.verdict] || '?',
+          ...(clickable ? { onclick: () => toggleScFilter(row.dimension, c.lens) } : {}),
+        });
+      }),
     ]));
     kids.push(el('div', { class: 'scmatrix' }, [head, ...rows]));
   }
   if (sc.global?.length) {
     kids.push(el('label', { class: 'field', text: 'global' }));
-    kids.push(el('div', { class: 'scglobal' }, sc.global.map((g) =>
-      el('div', { class: 'scg', title: g.verdict }, [el('span', { text: `${ICON[g.verdict] || '?'} ` }), el('span', { text: g.dimension })]))));
+    kids.push(el('div', { class: 'scglobal' }, sc.global.map((g) => {
+      const clickable = g.verdict !== 'strong';
+      const sel = state.scFilter && state.scFilter.dimension === g.dimension && state.scFilter.lens == null;
+      return el('div', {
+        class: `scg ${clickable ? 'clickable' : ''} ${sel ? 'selected' : ''}`,
+        title: g.verdict,
+        ...(clickable ? { onclick: () => toggleScFilter(g.dimension, null) } : {}),
+      }, [el('span', { text: `${ICON[g.verdict] || '?'} ` }), el('span', { text: g.dimension })]);
+    })));
   }
-  if (sc.details?.length) {
-    kids.push(el('label', { class: 'field', text: 'findings' }));
-    kids.push(el('div', { class: 'scdetails' }, sc.details.map((d) =>
+  // strong findings carry no signal and are never shown; orphans (no declared
+  // cell) only show unfiltered. Loose `==` on lens for the global/migrated case.
+  let findings = (sc.details || []).filter((d) => d.verdict !== 'strong');
+  if (state.scFilter) {
+    findings = findings.filter((d) => d.dimension === state.scFilter.dimension && d.lens == state.scFilter.lens);
+  }
+  if (findings.length) {
+    const lbl = state.scFilter
+      ? `findings — ${state.scFilter.dimension}${state.scFilter.lens ? ' / ' + state.scFilter.lens : ' (global)'} (click the cell again to clear)`
+      : 'findings';
+    kids.push(el('label', { class: 'field', text: lbl }));
+    kids.push(el('div', { class: 'scdetails' }, findings.map((d) =>
       el('div', { class: 'finding' }, [
         el('div', { class: 'finding-meta' }, [
+          el('span', { class: `chip chip-verdict chip-${d.verdict}`, text: d.verdict }),
           el('span', { class: 'chip chip-dim', text: d.dimension }),
           d.lens ? el('span', { class: 'chip chip-role', text: d.lens }) : null,
           tagChip(d.tag),
