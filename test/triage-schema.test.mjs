@@ -203,9 +203,9 @@ test('validateCandidate allows optional free-text details on any verdict', () =>
 
 const baseScorecard = (over = {}) => ({
   lenses: ['swe', 'qa'],
-  perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'good' }, { lens: 'qa', verdict: 'weak' }] }],
+  perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'strong' }, { lens: 'qa', verdict: 'weak' }] }],
   global: [{ dimension: 'cohesiveness', verdict: 'strong' }],
-  details: [{ dimension: 'coverage', lens: 'qa', file: 'f', tag: 't', note: 'n' }],
+  details: [{ dimension: 'coverage', lens: 'qa', file: 'f', tag: 't', verdict: 'weak', note: 'n' }],
   nits: ['x'], ...over,
 });
 
@@ -227,6 +227,13 @@ test('validateScorecard rejects bad verdict and matrix misalignment', () => {
   assert.ok(validateScorecard(baseScorecard({
     perLens: [{ dimension: 'coverage', cells: [{ lens: 'qa', verdict: 'good' }, { lens: 'swe', verdict: 'good' }] }],
   })).some((m) => m.includes('!= lenses')));
+});
+
+test('validateScorecard: a finding requires verdict and dimension', () => {
+  const noVerdict = baseScorecard({ details: [{ dimension: 'coverage', lens: 'qa', file: 'f', tag: 't', note: 'n' }] });
+  assert.ok(validateScorecard(noVerdict).some((m) => m.includes('verdict')));
+  const noDim = baseScorecard({ details: [{ lens: 'qa', file: 'f', tag: 't', verdict: 'weak', note: 'n' }] });
+  assert.ok(validateScorecard(noDim).some((m) => m.includes('dimension')));
 });
 
 test('validateFile is lenient on absent scorecard/candidates but flags present-malformed + dup/overlap', () => {

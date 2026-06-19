@@ -179,8 +179,11 @@ export function validateScorecard(sc, where = 'scorecard') {
   });
   if (!Array.isArray(sc.details)) p.push(`${where}: "details" must be an array`);
   else sc.details.forEach((f, i) => {
-    if (!isObj(f) || !nonEmpty(f.file) || !nonEmpty(f.tag) || !nonEmpty(f.note)) {
-      p.push(`${where}.details[${i}]: needs file/tag/note`);
+    if (!isObj(f) || !nonEmpty(f.dimension) || !nonEmpty(f.file) || !nonEmpty(f.tag) || !nonEmpty(f.note)) {
+      p.push(`${where}.details[${i}]: needs dimension/file/tag/note`);
+    }
+    if (!isObj(f) || !SCORECARD_VERDICTS.includes(f.verdict)) {
+      p.push(`${where}.details[${i}]: "verdict" must be one of ${SCORECARD_VERDICTS.join('|')}`);
     }
   });
   // A nit is a string (legacy) or { text, fix?: 'auto' }. `fix:'auto'` flags it
