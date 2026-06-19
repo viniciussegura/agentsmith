@@ -91,8 +91,7 @@ interface ReviewRoundInfo {
 
 ## Instruction review
 
-The entity the instruction-review application (`#ai-instruction-review`) raises: a proposed change to the instruction set itself, rolled into the backlog `docs/future-work/proposed-instruction-rules.md`.
-This application proposes only -- it never edits instruction sources.
+The entity the instruction-review application (`#ai-instruction-review`) raises: a proposed change to the instruction set, triaged via an editable worksheet and applied through a separate human-gated step.
 
 ```typescript
 type ProposalKind =
@@ -119,3 +118,5 @@ interface InstructionProposal {
 ```
 
 Required-per-kind: `new-rule` and `strengthen` require `targetFile` (`new-rule` also `draft` once concrete); `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must resolve to a declared role, the `swe` base lens, or a known non-review marker.
+
+Persistence: the open queue, drafts, scorecard, and candidates are ephemeral in `.agentsmith/instruction-review/triage.json` (gitignored, per-machine); the single committed output is the decisions log `docs/instruction-rules-decisions.md`. Applying decisions to `instructions/` sources is the separate, human-gated `/instruction-apply` step -- a round alone never edits instruction sources.
