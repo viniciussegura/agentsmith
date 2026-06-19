@@ -29,7 +29,6 @@ export const CANDIDATE_VERDICTS = ['park', 'wanted', 'reject'];
 export const SCORECARD_VERDICTS = ['strong', 'good', 'weak', 'gaps'];
 
 export const SCORECARD_RANK = { strong: 0, good: 1, weak: 2, gaps: 3 };
-const RANK_VERDICT = ['strong', 'good', 'weak', 'gaps'];
 
 /**
  * Worst verdict among an ALREADY-FILTERED finding list, 'strong' when empty.
@@ -41,7 +40,7 @@ export function deriveVerdict(filteredFindings) {
     const r = SCORECARD_RANK[f && f.verdict];
     if (r > worst) worst = r;
   }
-  return RANK_VERDICT[worst];
+  return SCORECARD_VERDICTS[worst];
 }
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);

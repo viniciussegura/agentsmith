@@ -261,6 +261,7 @@ test('validateScorecard accepts string + {text,fix} nits, rejects bad fix / miss
 
 test('deriveVerdict: empty -> strong, worst-rank wins, duplicates collapse', () => {
   assert.equal(deriveVerdict([]), 'strong');
+  assert.equal(deriveVerdict(null), 'strong');
   assert.equal(deriveVerdict([{ verdict: 'good' }]), 'good');
   assert.equal(deriveVerdict([{ verdict: 'good' }, { verdict: 'gaps' }, { verdict: 'weak' }]), 'gaps');
   assert.equal(deriveVerdict([{ verdict: 'weak' }, { verdict: 'weak' }]), 'weak');
