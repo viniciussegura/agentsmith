@@ -181,8 +181,7 @@ export function validateScorecard(sc, where = 'scorecard') {
   else sc.details.forEach((f, i) => {
     if (!isObj(f) || !nonEmpty(f.dimension) || !nonEmpty(f.file) || !nonEmpty(f.tag) || !nonEmpty(f.note)) {
       p.push(`${where}.details[${i}]: needs dimension/file/tag/note`);
-    }
-    if (!isObj(f) || !SCORECARD_VERDICTS.includes(f.verdict)) {
+    } else if (!SCORECARD_VERDICTS.includes(f.verdict)) {
       p.push(`${where}.details[${i}]: "verdict" must be one of ${SCORECARD_VERDICTS.join('|')}`);
     }
   });
