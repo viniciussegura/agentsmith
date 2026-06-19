@@ -108,6 +108,14 @@ test('unparseable file is never overwritten (PUT -> 409)', async () => {
   });
 });
 
+test('static assets are served with Cache-Control: no-store', async () => {
+  await withServer({ triagePath: tmpTriage() }, async (base) => {
+    const r = await fetch(`${base}/`);
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('cache-control'), 'no-store');
+  });
+});
+
 test('GET /api/tags returns injected tags', async () => {
   await withServer({ triagePath: tmpTriage() }, async (base) => {
     const body = await (await fetch(`${base}/api/tags`)).json();

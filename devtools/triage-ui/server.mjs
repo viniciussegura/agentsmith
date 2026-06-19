@@ -74,9 +74,9 @@ function atomicWrite(path, text) {
   renameSync(tmp, path);
 }
 
-function send(res, code, body, type = 'application/json; charset=utf-8') {
+function send(res, code, body, type = 'application/json; charset=utf-8', extraHeaders = {}) {
   const payload = type.startsWith('application/json') ? JSON.stringify(body) : body;
-  res.writeHead(code, { 'Content-Type': type });
+  res.writeHead(code, { 'Content-Type': type, ...extraHeaders });
   res.end(payload);
 }
 
@@ -209,7 +209,9 @@ export function createServer({
       const rel = path === '/' ? 'index.html' : path.slice(1);
       const file = join(staticDir, rel);
       if (!existsSync(file)) return send(res, 404, 'not found', 'text/plain');
-      return send(res, 200, readFileSync(file), MIME[extname(file)] || 'application/octet-stream');
+      // Dev tool: never let the browser cache assets, so a plain reload always
+      // picks up edited app.js / style.css / index.html (no stale-cache skeleton).
+      return send(res, 200, readFileSync(file), MIME[extname(file)] || 'application/octet-stream', { 'Cache-Control': 'no-store' });
     }
 
     return send(res, 404, { error: 'not found' });
