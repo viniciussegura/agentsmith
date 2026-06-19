@@ -186,16 +186,18 @@ test('validateCandidate accepts a well-formed park candidate', () => {
   assert.deepEqual(validateCandidate(baseCandidate()), []);
 });
 
-test('validateCandidate rejects bad priority, bad verdict, stray draft, details on non-reject', () => {
+test('validateCandidate rejects bad priority, bad verdict, stray draft, non-string details', () => {
   assert.ok(validateCandidate(baseCandidate({ priority: 'urgent' })).some((m) => m.includes('priority')));
   assert.ok(validateCandidate(baseCandidate({ decision: { verdict: 'maybe' } })).some((m) => m.includes('verdict')));
   assert.ok(validateCandidate(baseCandidate({ draft: 'x' })).some((m) => m.includes('draft')));
-  assert.ok(validateCandidate(baseCandidate({ decision: { verdict: 'wanted', details: 'no' } })).some((m) => m.includes('details')));
+  assert.ok(validateCandidate(baseCandidate({ decision: { verdict: 'wanted', details: 42 } })).some((m) => m.includes('details')));
 });
 
-test('validateCandidate allows optional details on reject', () => {
+test('validateCandidate allows optional free-text details on any verdict', () => {
   assert.deepEqual(validateCandidate(baseCandidate({ decision: { verdict: 'reject', details: 'dupe' } })), []);
-  assert.deepEqual(validateCandidate(baseCandidate({ decision: { verdict: 'reject' } })), []);
+  assert.deepEqual(validateCandidate(baseCandidate({ decision: { verdict: 'wanted', details: 'keep this rule language-agnostic, not UI-specific' } })), []);
+  assert.deepEqual(validateCandidate(baseCandidate({ decision: { verdict: 'park', details: 'revisit after v2' } })), []);
+  assert.deepEqual(validateCandidate(baseCandidate({ decision: { verdict: 'park' } })), []);
 });
 
 const baseScorecard = (over = {}) => ({

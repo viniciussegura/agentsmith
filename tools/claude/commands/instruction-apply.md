@@ -27,7 +27,7 @@ The engine (shared with the triage UI's POST /api/apply) handles entries and can
 
 After the engine exits, for each tag in the `wanted` list, perform the **single-atomic-write promotion** (this is the explicit exception where the agent writes `triage.json` directly):
 1. Read `.agentsmith/instruction-review/triage.json` and migrate it with `migrateWorksheet` (so the base is the canonical v3 form, including any reject-candidate splices the engine just made).
-2. Author a house-style (`#code-markdown`) draft for the candidate.
+2. Author a house-style (`#code-markdown`) draft for the candidate, **incorporating the candidate's `decision.details`** when present -- it is the human's free-text drafting guidance (e.g. "keep this rule language-agnostic, not UI-specific").
 3. Build the promoted entry in memory: `kind`/`role`/`targetFile`/`gap` inherited from the candidate; `draft` filled non-empty; `status: {state:'ready'}`; `decision: {verdict:'park'}`; `applyLog: []`.
 4. Construct the next file object with the entry **added** and the candidate **removed** in one object literal.
 5. Validate locally with `validateFile` (must be problem-free).

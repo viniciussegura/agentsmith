@@ -125,10 +125,10 @@ export function validateCandidate(c, where = 'candidate') {
   const d = c.decision;
   if (!isObj(d) || !CANDIDATE_VERDICTS.includes(d.verdict)) {
     p.push(`${at}: "decision.verdict" must be one of ${CANDIDATE_VERDICTS.join('|')}`);
-  } else if (d.verdict === 'reject') {
-    if ('details' in d && d.details !== undefined && !isStr(d.details)) p.push(`${at}: "decision.details" must be a string`);
-  } else if ('details' in d && d.details !== undefined) {
-    p.push(`${at}: "decision.details" not allowed for verdict ${d.verdict}`);
+  } else if ('details' in d && d.details !== undefined && !isStr(d.details)) {
+    // details is a free-text note on any candidate verdict: reject reason,
+    // drafting guidance for a wanted candidate, or a park reminder.
+    p.push(`${at}: "decision.details" must be a string`);
   }
   return p;
 }

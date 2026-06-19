@@ -9,6 +9,7 @@ const DETAIL_LABEL = {
 const NO_DETAILS_VERDICTS = new Set(['adopt', 'park']);
 const ICON = { strong: '🟢', good: '🔵', weak: '🟡', gaps: '🔴' };
 const PRI_RANK = { high: 0, medium: 1, low: 2 };
+const CAND_NOTE_LABEL = { park: 'Note (optional)', wanted: 'Drafting note (optional)', reject: 'Reason (optional)' };
 
 // view selects what the main pane shows: the scorecard, one proposal (entry), or
 // one candidate. idx indexes entries[] (proposal) or sortedCandidates() (candidate).
@@ -290,9 +291,9 @@ function renderCandidateDetail() {
   const c = cs[state.view.idx];
   if (!c) return;
 
-  const reasonLabel = el('label', { class: 'field', text: 'Reason (optional)' });
-  const reasonBox = el('textarea', { class: 'details', oninput: () => { applyCandidate(c); scheduleSave(); } });
-  reasonBox.value = c.decision?.details || '';
+  const noteLabel = el('label', { class: 'field', text: CAND_NOTE_LABEL[c.decision?.verdict || 'park'] });
+  const noteBox = el('textarea', { class: 'details', placeholder: 'Free-text note — guidance for drafting a wanted rule, a reject reason, or a reminder', oninput: () => { applyCandidate(c); scheduleSave(); } });
+  noteBox.value = c.decision?.details || '';
 
   const radios = el('div', { class: 'verdicts' }, ['park', 'wanted', 'reject'].map((vv) => {
     const input = el('input', { type: 'radio', name: 'cverdict', value: vv, onchange: () => { applyCandidate(c); scheduleSave(); } });
@@ -300,7 +301,7 @@ function renderCandidateDetail() {
     return el('label', {}, [input, el('span', { text: vv })]);
   }));
 
-  candidateRefs = { c, reasonBox, reasonLabel };
+  candidateRefs = { c, noteBox, noteLabel };
 
   const nav = navbar(state.view.idx, cs.length, (i) => select('candidate', i));
 
@@ -310,31 +311,25 @@ function renderCandidateDetail() {
     el('div', { class: 'gap', text: c.gap || '' }),
     el('label', { class: 'field', text: 'Verdict' }),
     radios,
-    reasonLabel,
-    reasonBox,
+    noteLabel,
+    noteBox,
     nav,
   );
-  refreshCandidateReason(c.decision?.verdict || 'park');
 }
 
 function selectedCandidateVerdict() {
   const checked = document.querySelector('input[name="cverdict"]:checked');
   return checked ? checked.value : 'park';
 }
-function refreshCandidateReason(verdict) {
-  if (!candidateRefs) return;
-  const show = verdict === 'reject';
-  candidateRefs.reasonLabel.style.display = show ? '' : 'none';
-  candidateRefs.reasonBox.style.display = show ? '' : 'none';
-}
 function applyCandidate(c) {
   const verdict = selectedCandidateVerdict();
   const d = { verdict };
-  const reason = candidateRefs?.reasonBox.value.trim();
-  // park/wanted carry no details (schema); reject may carry an optional reason.
-  if (verdict === 'reject' && reason) d.details = reason;
+  // Free-text note allowed on any candidate verdict (drafting guidance / reject
+  // reason / park reminder); it rides along to /instruction-apply.
+  const note = candidateRefs?.noteBox.value.trim();
+  if (note) d.details = note;
   c.decision = d;
-  refreshCandidateReason(verdict);
+  if (candidateRefs) candidateRefs.noteLabel.textContent = CAND_NOTE_LABEL[verdict];
 }
 
 // --- proposal (entry) focused view ---
