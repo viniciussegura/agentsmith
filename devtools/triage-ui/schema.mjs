@@ -311,6 +311,46 @@ export function versionToken(fileText) {
   return createHash('sha256').update(canonicalJSON(parsed)).digest('hex');
 }
 
+/** Look up a finding's cell/global verdict in the PRE-recompute stored matrix. */
+function storedVerdict(sc, dim, lens) {
+  if (lens == null) {
+    const row = (Array.isArray(sc.global) ? sc.global : []).find((g) => isObj(g) && g.dimension === dim);
+    return row && row.verdict;
+  }
+  const row = (Array.isArray(sc.perLens) ? sc.perLens : []).find((r) => isObj(r) && r.dimension === dim);
+  const cell = row && Array.isArray(row.cells) ? row.cells.find((c) => isObj(c) && c.lens === lens) : null;
+  return cell && cell.verdict;
+}
+
+/**
+ * Bring a scorecard to canonical v-next form: (1) normalize lens:null->absent,
+ * (2) default a missing finding verdict to its cell's stored verdict (else 'weak'),
+ * (3) recompute every cell/global verdict from the findings. Idempotent.
+ */
+function migrateScorecard(sc) {
+  if (!isObj(sc)) return sc;
+  // 1 + 2: normalize lens, default verdict from the PRE-recompute stored matrix.
+  const details = Array.isArray(sc.details) ? sc.details.map((f) => {
+    if (!isObj(f)) return f;
+    const g = { ...f };
+    if (g.lens == null) delete g.lens;                 // null or undefined -> absent
+    if (g.verdict == null) g.verdict = storedVerdict(sc, g.dimension, g.lens) ?? 'weak';
+    return g;
+  }) : sc.details;
+  const live = Array.isArray(details) ? details.filter(isObj) : [];
+  const matching = (dim, lens) => live.filter((f) =>
+    f.dimension === dim && (lens == null ? f.lens == null : f.lens === lens));
+  // 3: recompute cells + global from the now-verdict-bearing findings.
+  const perLens = Array.isArray(sc.perLens) ? sc.perLens.map((row) =>
+    (isObj(row) && Array.isArray(row.cells))
+      ? { ...row, cells: row.cells.map((c) => isObj(c) ? { ...c, verdict: deriveVerdict(matching(row.dimension, c.lens)) } : c) }
+      : row) : sc.perLens;
+  const global = Array.isArray(sc.global) ? sc.global.map((row) =>
+    isObj(row) ? { ...row, verdict: deriveVerdict(matching(row.dimension, null)) } : row) : sc.global;
+  const nits = Array.isArray(sc.nits) ? sc.nits.map((n) => (isObj(n) ? n : { text: String(n) })) : sc.nits;
+  return { ...sc, details, perLens, global, nits };
+}
+
 /** Bring a pre-v2/v3 worksheet object to v3 canonical form. Idempotent. */
 export function migrateWorksheet(file) {
   if (!isObj(file)) return file;
@@ -325,12 +365,7 @@ export function migrateWorksheet(file) {
     }
     return rest;
   });
-  // Normalize scorecard nits to objects ({text, fix?}) so they can carry the
-  // human-fix / agent-fix action; legacy string nits become { text }.
-  let scorecard = file.scorecard ?? null;
-  if (isObj(scorecard) && Array.isArray(scorecard.nits)) {
-    scorecard = { ...scorecard, nits: scorecard.nits.map((n) => (isObj(n) ? n : { text: String(n) })) };
-  }
+  const scorecard = isObj(file.scorecard) ? migrateScorecard(file.scorecard) : (file.scorecard ?? null);
   return {
     ...file,
     scorecard,

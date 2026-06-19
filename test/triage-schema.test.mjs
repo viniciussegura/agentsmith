@@ -311,3 +311,54 @@ test('validateScorecard: global row verdict must equal worst-of-lens-absent-find
   });
   assert.deepEqual(validateScorecard(ok), []);
 });
+
+test('migrateWorksheet: scorecard finding verdict defaults to its cell verdict; cells recomputed; severity preserved', () => {
+  const old = {
+    round: 'r', entries: [],
+    scorecard: {
+      lenses: ['swe'],
+      perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'gaps' }] }],
+      global: [{ dimension: 'cohesiveness', verdict: 'strong' }],
+      details: [{ dimension: 'coverage', lens: 'swe', file: 'f', tag: 't', note: 'n' }], // no verdict
+      nits: ['a typo'],
+    },
+  };
+  const m = migrateWorksheet(old);
+  assert.equal(m.scorecard.details[0].verdict, 'gaps');         // defaulted from cell
+  assert.equal(m.scorecard.perLens[0].cells[0].verdict, 'gaps'); // recomputed, preserved
+  assert.deepEqual(validateScorecard(m.scorecard), []);          // self-consistent
+  assert.deepEqual(migrateWorksheet(m).scorecard, m.scorecard);  // idempotent
+});
+
+test('migrateWorksheet: scorecard migration composes lens-normalize + verdict-default + nit-objectify in one pass', () => {
+  const old = {
+    round: 'r', entries: [],
+    scorecard: {
+      lenses: ['swe'],
+      perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'strong' }] }],
+      global: [{ dimension: 'cohesiveness', verdict: 'weak' }],
+      details: [{ dimension: 'cohesiveness', lens: null, file: 'f', tag: 't', note: 'n' }], // lens:null, no verdict
+      nits: ['plain string', { text: 'obj', fix: 'auto' }],
+    },
+  };
+  const m = migrateWorksheet(old);
+  assert.equal('lens' in m.scorecard.details[0], false);        // lens:null -> absent
+  assert.equal(m.scorecard.details[0].verdict, 'weak');         // defaulted from global row
+  assert.equal(m.scorecard.global[0].verdict, 'weak');          // recomputed
+  assert.deepEqual(m.scorecard.nits, [{ text: 'plain string' }, { text: 'obj', fix: 'auto' }]);
+  assert.deepEqual(validateScorecard(m.scorecard), []);
+});
+
+test('migrateWorksheet: a stored non-strong cell with zero findings recomputes to strong', () => {
+  const old = {
+    round: 'r', entries: [],
+    scorecard: {
+      lenses: ['swe'],
+      perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'weak' }] }],
+      global: [], details: [], nits: [],
+    },
+  };
+  const m = migrateWorksheet(old);
+  assert.equal(m.scorecard.perLens[0].cells[0].verdict, 'strong');
+  assert.deepEqual(validateScorecard(m.scorecard), []);
+});
