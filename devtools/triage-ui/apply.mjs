@@ -110,14 +110,17 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
   const total = entries.length;
   const rewrite = () => atomicWrite(triagePath, canonicalJSON({ ...file, entries, candidates }));
   let i = 0;
+  let shown = 0; // monotonic display position: `i` is the array cursor and stays
+                 // put after a splice, so it can't drive the [n/total] counter.
   emit({ type: 'start', total });
 
   while (i < entries.length) {
     const e = entries[i];
     const v = e.decision?.verdict || 'park';
+    const pos = shown++;
     const splice = () => { entries = entries.filter((x) => x !== e); rewrite(); };
-    const done = (outcome) => emit({ type: 'entry', phase: 'done', i, total, tag: e.tag, verdict: v, outcome });
-    emit({ type: 'entry', phase: 'begin', i, total, tag: e.tag, verdict: v });
+    const done = (outcome) => emit({ type: 'entry', phase: 'done', i: pos, total, tag: e.tag, verdict: v, outcome });
+    emit({ type: 'entry', phase: 'begin', i: pos, total, tag: e.tag, verdict: v });
 
     if (v === 'refine') { report.refined.push({ tag: e.tag, details: e.decision.details, reply: e.lastRoundReply }); done('refined'); i++; continue; }
     if (v === 'park') { report.parked.push(e.tag); done('parked'); i++; continue; }
@@ -142,7 +145,7 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
         mkdirSync(dirname(abs), { recursive: true });
         writeFileSync(abs, e.draft.replace(/\n+$/, '') + '\n');
         if (e.kind === 'new-rule') ensureOwnerRow(ownershipPath, e.tag, e.role);
-        emit({ type: 'entry', phase: 'gate', i, total, tag: e.tag, verdict: v });
+        emit({ type: 'entry', phase: 'gate', i: pos, total, tag: e.tag, verdict: v });
         runGate(root);
       } catch (err) {
         for (const [p, c] of snap) { if (c === null) rmSync(p, { force: true }); else writeFileSync(p, c); }
