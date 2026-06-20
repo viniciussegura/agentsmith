@@ -56,7 +56,7 @@ It then **accounts for every rubric dimension** (`proposal-format.md`): consolid
 
 ### 5. Reduce output + handoff (main thread)
 
-Present the **dimension scorecard** (a Strong/Good/Weak/Gaps verdict per rubric dimension, with `file`/`#tag` citations) and the **mechanical-nits** list. The scorecard is never omitted **when reduce runs**; the setup gate's *Stop and process* path runs no reduce and so presents no new scorecard -- that is the one sanctioned no-scorecard path.
+Present the **dimension scorecard** (a Strong/Good/Weak/Gaps verdict per rubric dimension, with `file`/`#tag` citations -- each cell is the worst of its per-rule findings, Strong when none) and the **mechanical-nits** list. The scorecard is never omitted **when reduce runs**; the setup gate's *Stop and process* path runs no reduce and so presents no new scorecard -- that is the one sanctioned no-scorecard path.
 
 Then write / refresh the triage worksheet `.agentsmith/instruction-review/triage.json` with the consolidated proposals and **stop**. The round does **not** disposition in-session; the human triages in the worksheet (by hand or in the `npm run triage` UI) and runs `/instruction-apply`. Nothing in `instructions/` or the decisions log changes from a round alone.
 
