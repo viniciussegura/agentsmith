@@ -70,8 +70,10 @@ function currentToken(path) {
 
 /**
  * The previous round's scorecard for trend arrows, read from the sibling
- * `triage.prev.json` archive (written by an "ignore parked" round). Returns null
- * when no archive exists or it carries no scorecard — the UI then shows no arrows.
+ * `triage.prev.json` archive. Each instruction-review round archives the
+ * outgoing scorecard here before overwriting it (and the "ignore parked" gate
+ * archives the whole worksheet to the same path). Returns null when no archive
+ * exists or it carries no scorecard — the UI then shows no arrows.
  */
 function readPrevScorecard(path) {
   const prevPath = join(dirname(path), 'triage.prev.json');

@@ -58,6 +58,8 @@ It then **accounts for every rubric dimension** (`proposal-format.md`): consolid
 
 Present the **dimension scorecard** (a Strong/Good/Weak/Gaps verdict per rubric dimension, with `file`/`#tag` citations -- each cell is the worst of its per-rule findings, Strong when none) and the **mechanical-nits** list. The scorecard is never omitted **when reduce runs**; the setup gate's *Stop and process* path runs no reduce and so presents no new scorecard -- that is the one sanctioned no-scorecard path.
 
+**Archive the prior scorecard for trend arrows.** Before overwriting the worksheet, if the existing `triage.json` carries a `scorecard`, copy that prior worksheet's `{round, scorecard}` to the sibling `.agentsmith/instruction-review/triage.prev.json` (gitignored). The triage UI reads it to render per-cell trend arrows (this round vs the previous). This applies on every reduce path; the setup gate's *Ignore parked* option already archives the whole worksheet to the same path, and *Stop and process* runs no reduce, so it neither overwrites nor re-archives. No prior scorecard (first round / wiped store) simply means no arrows.
+
 Then write / refresh the triage worksheet `.agentsmith/instruction-review/triage.json` with the consolidated proposals and **stop**. The round does **not** disposition in-session; the human triages in the worksheet (by hand or in the `npm run triage` UI) and runs `/instruction-apply`. Nothing in `instructions/` or the decisions log changes from a round alone.
 
 Worksheet format -- a structured JSON file (schema + validator in `devtools/triage-ui/schema.mjs`), written via the canonical serializer (sorted keys, 2-space indent). Shape:

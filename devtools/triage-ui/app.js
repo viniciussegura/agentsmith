@@ -99,7 +99,7 @@ function pickDefaultView() {
 function viewValid() {
   const v = state.view;
   if (!v) return false;
-  if (v.kind === 'scorecard') return !!state.data.scorecard;
+  if (v.kind === 'scorecard' || v.kind === 'nits') return !!state.data.scorecard;
   if (v.kind === 'proposal') return v.idx < state.data.entries.length;
   if (v.kind === 'candidate') return v.idx < sortedCandidates().length;
   if (v.kind === 'empty') return !state.data.scorecard && !state.data.entries.length && !sortedCandidates().length;
@@ -155,14 +155,15 @@ function createCandidateFromFinding(d) {
 // ephemeral round artifacts, so dismissing makes the list a working checklist.
 function dismissNit(i) {
   state.data.scorecard.nits.splice(i, 1);
-  renderScorecardDetail();
+  renderNitsDetail();
+  renderSidebar(); // keep the sidebar "Nits (N)" count in sync
   scheduleSave();
 }
 // "you fix": flag/unflag a nit for the /instruction-apply agent to fix.
 function toggleNitFix(i) {
   const n = state.data.scorecard.nits[i];
   if (n.fix === 'auto') delete n.fix; else n.fix = 'auto';
-  renderScorecardDetail();
+  renderNitsDetail();
   scheduleSave();
 }
 
@@ -195,8 +196,12 @@ function renderSidebar() {
   const kids = [];
 
   if (state.data.scorecard) {
+    const nitCount = state.data.scorecard.nits?.length || 0;
+    kids.push(el('div', { class: 'sechead', text: 'Scorecard' }));
     kids.push(el('div', { class: `scitem ${v.kind === 'scorecard' ? 'active' : ''}`, onclick: () => select('scorecard', 0) },
       [el('span', { text: '▤ Scorecard' })]));
+    kids.push(el('div', { class: `scitem ${v.kind === 'nits' ? 'active' : ''}`, onclick: () => select('nits', 0) },
+      [el('span', { text: `🤖 Nits (${nitCount})` })]));
   }
 
   kids.push(el('div', { class: 'sechead', text: `Proposals (${entries.length})` }));
@@ -234,6 +239,7 @@ function navbar(idx, total, go) {
 function renderDetail() {
   const v = state.view;
   if (v.kind === 'scorecard') return renderScorecardDetail();
+  if (v.kind === 'nits') return renderNitsDetail();
   if (v.kind === 'candidate') return renderCandidateDetail();
   if (v.kind === 'proposal') return renderProposalDetail();
   $('#detail').replaceChildren(el('div', { class: 'empty', text: 'No proposals or candidates. Run /instruction-review.' }));
@@ -336,18 +342,33 @@ function renderScorecardDetail() {
         el('div', { class: 'finding-note' }, richText(d.note || '')),
       ]))));
   }
-  if (sc.nits?.length) {
-    kids.push(el('label', { class: 'field', text: 'mechanical nits' }));
-    kids.push(el('div', { class: 'scnits' }, sc.nits.map((n, i) => {
-      const auto = n.fix === 'auto';
-      return el('div', { class: `scn ${auto ? 'auto' : ''}` }, [
-        el('span', { class: 'scn-bullet', text: auto ? '🤖' : '•' }),
-        el('span', { class: 'scn-text' }, richText(n.text || '')),
-        el('button', { class: `nit-fix ${auto ? 'on' : ''}`, title: auto ? 'Flagged for the agent to fix on /instruction-apply (click to unflag)' : 'Flag for the agent to fix (you fix)', text: 'you fix', onclick: () => toggleNitFix(i) }),
-        el('button', { class: 'nit-done', title: 'I fixed it — remove', text: '✓ I fix', onclick: () => dismissNit(i) }),
-      ]);
-    })));
+  $('#detail').replaceChildren(...kids);
+}
+
+// --- nits focused view (main area): mechanical nits as a working checklist ---
+// Split out of the scorecard view so the sidebar's "Nits" item owns it.
+function renderNitsDetail() {
+  const sc = state.data.scorecard;
+  if (!sc) { $('#detail').replaceChildren(el('div', { class: 'empty', text: 'No scorecard.' })); return; }
+  const kids = [el('h2', { text: 'Mechanical nits' })];
+  kids.push(el('div', { class: 'sclegend' }, [
+    el('span', { class: 'sclegend-item' }, [el('span', { text: '🤖 ' }), el('span', { text: 'you fix = the /instruction-apply agent fixes it' })]),
+    el('span', { class: 'sclegend-note', text: 'a nit is an ephemeral round artifact; "✓ I fix" removes it once handled' }),
+  ]));
+  if (!sc.nits?.length) {
+    kids.push(el('div', { class: 'empty', text: 'No nits this round.' }));
+    $('#detail').replaceChildren(...kids);
+    return;
   }
+  kids.push(el('div', { class: 'scnits' }, sc.nits.map((n, i) => {
+    const auto = n.fix === 'auto';
+    return el('div', { class: `scn ${auto ? 'auto' : ''}` }, [
+      el('span', { class: 'scn-bullet', text: auto ? '🤖' : '•' }),
+      el('span', { class: 'scn-text' }, richText(n.text || '')),
+      el('button', { class: `nit-fix ${auto ? 'on' : ''}`, title: auto ? 'Flagged for the agent to fix on /instruction-apply (click to unflag)' : 'Flag for the agent to fix (you fix)', text: 'you fix', onclick: () => toggleNitFix(i) }),
+      el('button', { class: 'nit-done', title: 'I fixed it — remove', text: '✓ I fix', onclick: () => dismissNit(i) }),
+    ]);
+  })));
   $('#detail').replaceChildren(...kids);
 }
 

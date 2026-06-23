@@ -121,6 +121,8 @@ Required-per-kind: `new-rule` and `strengthen` require `targetFile` (`new-rule` 
 
 Persistence: the open queue, drafts, scorecard, and candidates are ephemeral in `.agentsmith/instruction-review/triage.json` (gitignored, per-machine); the single committed output is the decisions log `docs/instruction-rules-decisions.md`. Applying decisions to `instructions/` sources is the separate, human-gated `/instruction-apply` step -- a round alone never edits instruction sources.
 
+Each round archives the prior worksheet's scorecard to a sibling `.agentsmith/instruction-review/triage.prev.json` (also gitignored) before overwriting `scorecard`; the triage UI reads this archive to render per-cell trend arrows (this round's verdict vs the previous round's). The "ignore parked" setup gate archives the whole worksheet to the same path. No archive (first round, or wiped store) means no arrows.
+
 ### Worksheet entities (`triage.json`)
 
 The worksheet carries three siblings -- the `scorecard`, the `candidates` (undrafted proposals awaiting triage), and the `entries` (drafted proposals) -- validated by `devtools/triage-ui/schema.mjs`.
