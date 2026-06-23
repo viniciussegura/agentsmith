@@ -67,6 +67,8 @@ owners:
   ui-canonical-states: frontend
   ui-design-tokens: frontend
   ui-framework-idioms: frontend
+  ui-component-reuse: frontend
+  ui-inline-style: frontend
 
   # ux -- the end-user experience and flow
   front-nielsen-heuristics: ux
@@ -77,6 +79,7 @@ owners:
   ui-empty-state-guidance: ux
   ui-destructive-confirm: ux
   ui-overlay-focus-flow: ux
+  ui-perceived-performance: ux
 
   # ai -- meta lens: agent behavior, planning, memory, the review engine (instruction-review only)
   ai-conversational: ai
