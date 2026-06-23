@@ -253,6 +253,15 @@ function renderScorecardDetail() {
   const sc = state.data.scorecard;
   if (!sc) { $('#detail').replaceChildren(el('div', { class: 'empty', text: 'No scorecard.' })); return; }
   const kids = [el('h2', { text: 'Scorecard' })];
+  // Legend: what the matrix icons mean + how a cell is derived. Built from ICON
+  // so it never drifts from the verdicts the cells actually render.
+  kids.push(el('div', { class: 'sclegend' }, [
+    ...['strong', 'good', 'weak', 'gaps'].map((v) =>
+      el('span', { class: 'sclegend-item', title: v }, [
+        el('span', { text: `${ICON[v]} ` }), el('span', { text: v }),
+      ])),
+    el('span', { class: 'sclegend-note', text: 'cell = worst of its findings; click a non-strong cell to drill down' }),
+  ]));
   if (sc.lenses?.length && sc.perLens?.length) {
     const cols = `grid-template-columns:1.4fr repeat(${sc.lenses.length},1fr)`;
     const head = el('div', { class: 'scrow head', style: cols }, [
