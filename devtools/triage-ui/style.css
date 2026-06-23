@@ -118,6 +118,9 @@ textarea.details { min-height: 60px; }
 .sclegend { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 6px 0 2px; font-size: 11px; color: var(--muted); }
 .sclegend-item { white-space: nowrap; }
 .sclegend-note { font-style: italic; }
+.sctrend { font-size: 10px; font-weight: 700; vertical-align: super; }
+.sctrend.up { color: #2e7d32; }
+.sctrend.down { color: #c62828; }
 .scmatrix { margin: 10px 0; display: grid; gap: 1px; max-width: 760px; }
 .scrow { display: grid; grid-template-columns: 1.4fr repeat(9, 1fr); gap: 1px; }
 .sccell { padding: 3px 4px; text-align: center; }

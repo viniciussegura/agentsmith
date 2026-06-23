@@ -8,12 +8,13 @@ const DETAIL_LABEL = {
 };
 const NO_DETAILS_VERDICTS = new Set(['adopt', 'park']);
 const ICON = { strong: '🟢', good: '🔵', weak: '🟡', gaps: '🔴' };
+const SC_RANK = { strong: 0, good: 1, weak: 2, gaps: 3 }; // lower = better; for trend arrows
 const PRI_RANK = { high: 0, medium: 1, low: 2 };
 const CAND_NOTE_LABEL = { park: 'Note (optional)', wanted: 'Drafting note (optional)', reject: 'Reason (optional)' };
 
 // view selects what the main pane shows: the scorecard, one proposal (entry), or
 // one candidate. idx indexes entries[] (proposal) or sortedCandidates() (candidate).
-const state = { data: { round: '', entries: [], candidates: [], scorecard: null }, version: null, tags: [], view: { kind: 'empty', idx: 0 }, scFilter: null };
+const state = { data: { round: '', entries: [], candidates: [], scorecard: null }, prevScorecard: null, version: null, tags: [], view: { kind: 'empty', idx: 0 }, scFilter: null };
 let saveTimer = null;
 
 const $ = (sel) => document.querySelector(sel);
@@ -39,6 +40,7 @@ async function load() {
     state.data = t.data || { round: '', entries: [], candidates: [], scorecard: null };
     state.data.candidates = state.data.candidates ?? [];
     state.data.scorecard = state.data.scorecard ?? null;
+    state.prevScorecard = t.prevScorecard ?? null;
     state.version = t.version;
     state.tags = (await (await fetch('/api/tags')).json()).tags || [];
     render();
@@ -262,6 +264,22 @@ function renderScorecardDetail() {
       ])),
     el('span', { class: 'sclegend-note', text: 'cell = worst of its findings; click a non-strong cell to drill down' }),
   ]));
+  // Trend vs the previous round (triage.prev.json archive, if any): ↑ improved
+  // (verdict got better), ↓ worse. No arrow when there is no prior or no change.
+  const prev = state.prevScorecard;
+  const prevVerdict = (dim, lens) => {
+    if (!prev) return null;
+    if (lens == null) { const r = (prev.global || []).find((g) => g && g.dimension === dim); return r ? r.verdict : null; }
+    const row = (prev.perLens || []).find((r) => r && r.dimension === dim);
+    const cell = row && Array.isArray(row.cells) ? row.cells.find((c) => c && c.lens === lens) : null;
+    return cell ? cell.verdict : null;
+  };
+  const trend = (dim, lens, cur) => {
+    const p = prevVerdict(dim, lens);
+    if (p == null || !(cur in SC_RANK) || !(p in SC_RANK) || p === cur) return null;
+    const up = SC_RANK[cur] < SC_RANK[p]; // lower rank = better
+    return el('span', { class: `sctrend ${up ? 'up' : 'down'}`, title: `${p} → ${cur} vs previous run`, text: up ? ' ↑' : ' ↓' });
+  };
   if (sc.lenses?.length && sc.perLens?.length) {
     const cols = `grid-template-columns:1.4fr repeat(${sc.lenses.length},1fr)`;
     const head = el('div', { class: 'scrow head', style: cols }, [
@@ -276,9 +294,8 @@ function renderScorecardDetail() {
         return el('div', {
           class: `sccell ${clickable ? 'clickable' : ''} ${sel ? 'selected' : ''}`,
           title: `${c.lens}: ${c.verdict}`,
-          text: ICON[c.verdict] || '?',
           ...(clickable ? { onclick: () => toggleScFilter(row.dimension, c.lens) } : {}),
-        });
+        }, [el('span', { text: ICON[c.verdict] || '?' }), trend(row.dimension, c.lens, c.verdict)].filter(Boolean));
       }),
     ]));
     kids.push(el('div', { class: 'scmatrix' }, [head, ...rows]));
@@ -292,7 +309,7 @@ function renderScorecardDetail() {
         class: `scg ${clickable ? 'clickable' : ''} ${sel ? 'selected' : ''}`,
         title: g.verdict,
         ...(clickable ? { onclick: () => toggleScFilter(g.dimension, null) } : {}),
-      }, [el('span', { text: `${ICON[g.verdict] || '?'} ` }), el('span', { text: g.dimension })]);
+      }, [el('span', { text: `${ICON[g.verdict] || '?'} ` }), el('span', { text: g.dimension }), trend(g.dimension, null, g.verdict)].filter(Boolean));
     })));
   }
   // strong findings carry no signal and are never shown; orphans (no declared

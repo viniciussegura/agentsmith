@@ -116,6 +116,29 @@ test('static assets are served with Cache-Control: no-store', async () => {
   });
 });
 
+test('GET /api/triage exposes prevScorecard from a triage.prev.json sibling (null when absent)', async () => {
+  const triagePath = tmpTriage();
+  // No archive yet -> prevScorecard is null.
+  await withServer({ triagePath }, async (base) => {
+    const a = await (await fetch(`${base}/api/triage`)).json();
+    assert.equal(a.prevScorecard, null);
+  });
+  // Write a sibling archive with a scorecard -> it surfaces (migrated).
+  const prevPath = triagePath.replace(/triage\.json$/, 'triage.prev.json');
+  const prevSc = {
+    lenses: ['swe'],
+    perLens: [{ dimension: 'coverage', cells: [{ lens: 'swe', verdict: 'weak' }] }],
+    global: [],
+    details: [{ dimension: 'coverage', lens: 'swe', file: 'f', tag: 't', verdict: 'weak', note: 'n' }],
+    nits: [],
+  };
+  writeFileSync(prevPath, canonicalJSON({ round: 'r0', scorecard: prevSc, candidates: [], entries: [] }), 'utf8');
+  await withServer({ triagePath }, async (base) => {
+    const b = await (await fetch(`${base}/api/triage`)).json();
+    assert.equal(b.prevScorecard.perLens[0].cells[0].verdict, 'weak');
+  });
+});
+
 test('GET /api/tags returns injected tags', async () => {
   await withServer({ triagePath: tmpTriage() }, async (base) => {
     const body = await (await fetch(`${base}/api/tags`)).json();

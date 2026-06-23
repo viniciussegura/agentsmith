@@ -68,6 +68,19 @@ function currentToken(path) {
   return versionToken(canonicalJSON(loaded.data));
 }
 
+/**
+ * The previous round's scorecard for trend arrows, read from the sibling
+ * `triage.prev.json` archive (written by an "ignore parked" round). Returns null
+ * when no archive exists or it carries no scorecard — the UI then shows no arrows.
+ */
+function readPrevScorecard(path) {
+  const prevPath = join(dirname(path), 'triage.prev.json');
+  if (!existsSync(prevPath)) return null;
+  let parsed;
+  try { parsed = JSON.parse(readFileSync(prevPath, 'utf8')); } catch { return null; }
+  return migrateWorksheet(parsed).scorecard ?? null;
+}
+
 function atomicWrite(path, text) {
   const tmp = `${path}.tmp`;
   writeFileSync(tmp, text, 'utf8');
@@ -138,7 +151,7 @@ export function createServer({
 
     // --- API ---
     if (path === '/api/triage' && req.method === 'GET') {
-      return send(res, 200, readTriage(triagePath));
+      return send(res, 200, { ...readTriage(triagePath), prevScorecard: readPrevScorecard(triagePath) });
     }
     if (path === '/api/tags' && req.method === 'GET') {
       return send(res, 200, { tags: tagsProvider() });
