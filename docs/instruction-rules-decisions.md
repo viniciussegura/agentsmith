@@ -29,3 +29,4 @@ A deferred entry carries a placement hint `(-> <targetFile>, <role>)` so a futur
 - `#swe-reference-spec` -- rejected (reowner -> `docs`): it is the system-of-record (architecture / entity-model home), not a docs-sync artifact; stays owned by `swe`.
 - `#front-nielsen-heuristics` -- rejected: Enumerating Nielsen's heuristics is general knowledge the agent already holds; conflicts with #ai-conversational terseness. Keep the live pointer + trade-off obligation.
 - `#front-cdn` -- rejected: Enumerating the cognitive dimensions is general knowledge the agent already holds; conflicts with #ai-conversational terseness. Keep the live pointer + trade-off obligation.
+- `#ui-design-tokens` -- rejected (rehome -> core): kept frontend-bundle-only to avoid core bloat for backend-only consumers; `#code-style` names the *Design tokens* rule in prose, not a core->bundle tag link.

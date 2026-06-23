@@ -15,6 +15,7 @@ The process rules for how the agent communicates, plans, remembers, and reviews:
 - `#ai-conversational` -- terseness and token discipline; every subagent dispatch states an explicit model.
 - `#ai-candid` -- critical-thinking stance; no reflexive agreement.
 - `#ai-plan` -- the spec/plan lifecycle and the append-only-once-`Approved` rule.
+- `#ai-plan-deviation` -- when and how the agent may diverge from an approved plan.
 - `#ai-spec-review` -- the adversarial spec auto-review loop, cycles, and convergence guard.
 - `#ai-preflight` -- the execution-shape / interaction-shape questions before a plan runs.
 - `#ai-memory` -- memory-persistence opt-in, the advisory-reminder guard, suppressed-interaction modes.
