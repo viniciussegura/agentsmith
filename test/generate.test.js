@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generate } from '../src/generate.js';
+import { generate, demoteHeadings } from '../src/generate.js';
 
 test('concatenates preamble then modules in order', () => {
   const out = generate({
@@ -98,4 +98,37 @@ test('does not demote headings inside fenced code blocks', () => {
 
   assert.match(out, /^## Title$/m, 'real heading demoted');
   assert.match(out, /^# Not a heading$/m, 'fenced content untouched');
+});
+
+test('demoteHeadings shifts by N levels and clamps at h6', () => {
+  assert.equal(demoteHeadings('# A', 2), '### A');
+  assert.equal(demoteHeadings('## B', 2), '#### B');
+  assert.equal(demoteHeadings('##### E', 2), '###### E'); // clamp 5+2 -> 6
+  assert.equal(demoteHeadings('###### F', 2), '###### F'); // already h6
+  assert.equal(demoteHeadings('# A', 1), '## A');
+});
+
+test('demoteHeadings leaves fenced headings untouched at by=2', () => {
+  const out = demoteHeadings('# T\n\n```md\n# X\n```', 2);
+  assert.match(out, /^### T$/m);
+  assert.match(out, /^# X$/m);
+});
+
+test('generate accepts {text, demote} module items', () => {
+  const out = generate({
+    preamble: '# Root',
+    modules: [
+      { text: '# Group\n\nprose', demote: 1 },
+      { text: '# #tag Title\n\nbody', demote: 2 },
+    ],
+    source: 's',
+  });
+  assert.match(out, /^# Root$/m);
+  assert.match(out, /^## Group$/m);      // _intro: h1 -> h2
+  assert.match(out, /^### #tag Title$/m); // tag: h1 -> h3
+});
+
+test('generate still accepts plain-string modules (demote 1)', () => {
+  const out = generate({ preamble: '# R', modules: ['# G\n\nx'], source: 's' });
+  assert.match(out, /^## G$/m);
 });

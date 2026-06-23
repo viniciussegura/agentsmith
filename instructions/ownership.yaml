@@ -1,0 +1,103 @@
+# Role -> rule ownership map.
+#
+# Every instruction #tag has EXACTLY ONE owner: the role accountable for raising
+# findings/proposals about it. This is the one-to-one "single home" relation, distinct
+# from composition (the many-to-many "what a reviewer reads"). A role routinely reads
+# tags it does not own.
+#
+# Owner values: a domain role (security, db, frontend, ux, qa, docs), the base lens (swe),
+# or a meta lens (ai, git) for the agent-behavior / VCS-workflow process rules. Ownership
+# follows DOMAIN, not tag prefix: an `ai-`/`swe-` prefixed rule whose subject is security
+# (e.g. ai-untrusted-content, swe-security) is owned by `security`, not by prefix.
+#
+# Tag-keyed by BARE name (no leading '#', which YAML would read as a comment). Adding a
+# rule forces exactly one new row here; the coverage lint (src/bundles.js) fails CI on any
+# orphan (unowned tag), duplicate key (double-ownership), or owner that resolves to no
+# declared role/marker. Role metadata lives in roles.yaml; a role's owned-tag set is
+# DERIVED from this file, never hand-listed there.
+#
+# Repo config, like manifest.json. NEVER exported: it appears in neither the generated
+# AGENTS.md nor the tools/claude plugin.
+
+owners:
+  # swe -- base lens, cross-cutting code and process quality
+  code-markdown: swe
+  code-style: swe
+  swe-naming: swe
+  swe-reuse: swe
+  swe-terminology: swe
+  swe-errors: swe
+  swe-observability: swe
+  swe-display-messages: swe
+  swe-deps: swe
+  swe-agile: swe
+  swe-future-work: swe
+  swe-technical-debts: swe
+  swe-dated-todos: swe
+  swe-dead-code: swe
+  swe-reference-spec: swe
+  swe-async: swe
+  swe-decomposition: swe
+
+  # security
+  swe-security: security
+  swe-environment: security
+  ai-untrusted-content: security
+  ai-tool-safety: security
+
+  # db -- data modeling and the data-facing API contract
+  swe-entity: db
+  be-api-first: db
+  be-api-versioning: db
+  be-schema-migration: db
+  be-api-error-envelope: db
+
+  # docs
+  swe-docs-drift: docs
+  swe-public-surface-docs: docs
+
+  # qa
+  swe-done: qa
+  swe-testing: qa
+  swe-test-quality: qa
+
+  # frontend -- how the component is built
+  front-display-labels: frontend
+  front-a11y: frontend
+  ui-canonical-states: frontend
+  ui-design-tokens: frontend
+  ui-framework-idioms: frontend
+  ui-component-reuse: frontend
+  ui-inline-style: frontend
+
+  # ux -- the end-user experience and flow
+  front-nielsen-heuristics: ux
+  front-cdn: ux
+  ui-header-visibility: ux
+  ui-tabs: ux
+  ui-validation: ux
+  ui-empty-state-guidance: ux
+  ui-destructive-confirm: ux
+  ui-overlay-focus-flow: ux
+  ui-perceived-performance: ux
+
+  # ai -- meta lens: agent behavior, planning, memory, the review engine (instruction-review only)
+  ai-conversational: ai
+  ai-candid: ai
+  ai-plan: ai
+  ai-spec-review: ai
+  ai-preflight: ai
+  ai-memory: ai
+  ai-review-engine: ai
+  ai-review-board: ai
+  ai-instruction-review: ai
+  ai-plan-deviation: ai
+
+  # git -- meta lens: VCS workflow, commits, branches, PRs (instruction-review only)
+  git-title: git
+  git-pr-body: git
+  git-usage: git
+  git-branch-workflow: git
+  git-secret-history: git
+  git-merge-conflict: git
+  git-tooling: git

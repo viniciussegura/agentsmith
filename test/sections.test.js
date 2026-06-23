@@ -3,72 +3,60 @@ import assert from 'node:assert/strict';
 import { resolveSections } from '../src/sections.js';
 
 test('splits no-when sections into core and when sections into bundles', () => {
-  const listFiles = (name) =>
+  const listModules = (name) =>
     ({
-      core: ['core/ai.md', 'core/code.md'],
-      frontend: ['frontend/front.md', 'frontend/ui-guidelines.md'],
+      core: [{ path: 'core/swe/_intro.md', demote: 1 }, { path: 'core/swe/swe-x.md', demote: 2 }],
+      frontend: [{ path: 'frontend/front/_intro.md', demote: 1 }],
     })[name] || [];
 
-  const { coreModulePaths, bundles } = resolveSections({
+  const { coreModules, bundles } = resolveSections({
     sections: [
       { name: 'core' },
       { name: 'frontend', title: 'Front-end instructions', when: 'Front-end or UI work' },
     ],
-    listFiles,
+    listModules,
   });
 
-  assert.deepEqual(coreModulePaths, ['core/ai.md', 'core/code.md']);
+  assert.deepEqual(coreModules, [
+    { path: 'core/swe/_intro.md', demote: 1 },
+    { path: 'core/swe/swe-x.md', demote: 2 },
+  ]);
   assert.equal(bundles.length, 1);
   assert.deepEqual(bundles[0], {
     name: 'frontend',
     title: 'Front-end instructions',
     when: 'Front-end or UI work',
-    modulePaths: ['frontend/front.md', 'frontend/ui-guidelines.md'],
+    modules: [{ path: 'frontend/front/_intro.md', demote: 1 }],
   });
 });
 
-test('an explicit modules list overrides listFiles verbatim', () => {
+test('an explicit modules list overrides listModules, demote from basename', () => {
   let called = false;
-  const listFiles = () => {
-    called = true;
-    return ['SHOULD-NOT-BE-USED'];
-  };
-
-  const { coreModulePaths } = resolveSections({
-    sections: [{ name: 'core', modules: ['core/swe.md', 'core/ai.md'] }],
-    listFiles,
+  const listModules = () => { called = true; return [{ path: 'X', demote: 9 }]; };
+  const { coreModules } = resolveSections({
+    sections: [{ name: 'core', modules: ['core/swe/_intro.md', 'core/swe/swe-a.md'] }],
+    listModules,
   });
-
-  assert.deepEqual(coreModulePaths, ['core/swe.md', 'core/ai.md'], 'override used as given');
-  assert.equal(called, false, 'listFiles is not consulted when modules is provided');
+  assert.deepEqual(coreModules, [
+    { path: 'core/swe/_intro.md', demote: 1 },
+    { path: 'core/swe/swe-a.md', demote: 2 },
+  ]);
+  assert.equal(called, false);
 });
 
 test('multiple no-when sections concatenate in section order', () => {
-  const listFiles = (name) => ({ a: ['a1.md'], b: ['b1.md', 'b2.md'] })[name];
-
-  const { coreModulePaths, bundles } = resolveSections({
-    sections: [{ name: 'a' }, { name: 'b' }],
-    listFiles,
-  });
-
-  assert.deepEqual(coreModulePaths, ['a1.md', 'b1.md', 'b2.md']);
+  const listModules = (name) => ({ a: [{ path: 'a1.md', demote: 2 }], b: [{ path: 'b1.md', demote: 2 }, { path: 'b2.md', demote: 2 }] })[name];
+  const { coreModules, bundles } = resolveSections({ sections: [{ name: 'a' }, { name: 'b' }], listModules });
+  assert.deepEqual(coreModules, [{ path: 'a1.md', demote: 2 }, { path: 'b1.md', demote: 2 }, { path: 'b2.md', demote: 2 }]);
   assert.deepEqual(bundles, []);
 });
 
 test('bundle order is preserved and title is optional', () => {
-  const listFiles = (name) => [`${name}/x.md`];
-
+  const listModules = (name) => [{ path: `${name}/x.md`, demote: 2 }];
   const { bundles } = resolveSections({
-    sections: [
-      { name: 'frontend', when: 'FE work' },
-      { name: 'backend', when: 'BE work' },
-    ],
-    listFiles,
+    sections: [{ name: 'frontend', when: 'FE work' }, { name: 'backend', when: 'BE work' }],
+    listModules,
   });
-
-  assert.deepEqual(
-    bundles.map((b) => b.name),
-    ['frontend', 'backend'],
-  );
-  assert.equal(bundles[0].title, undefined, 'title omitted; buildOutputs falls back to name');
+  assert.deepEqual(bundles.map((b) => b.name), ['frontend', 'backend']);
+  assert.equal(bundles[0].title, undefined);
 });

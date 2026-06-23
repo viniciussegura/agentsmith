@@ -35,6 +35,10 @@ test('folder sections inline the core and emit a file per bundle', () => {
     assert.ok(existsSync(join(dir, '.agentsmith/agents/backend.md')), 'backend bundle written');
     const backend = readFileSync(join(dir, '.agentsmith/agents/backend.md'), 'utf8');
     assert.match(backend, /#be-api-first/, 'a bundle-section rule lands in its bundle file');
+    // #ai-instruction-review is an authoring-only on-demand bundle, not in the consumer core
+    assert.doesNotMatch(core, /## #ai-instruction-review/, 'instruction-review rule is not defined in the lean core');
+    const authoring = readFileSync(join(dir, '.agentsmith/agents/authoring.md'), 'utf8');
+    assert.match(authoring, /## #ai-instruction-review/, 'instruction-review rule is defined in the authoring bundle');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -59,6 +63,18 @@ test('default run installs the claude adapter into .claude', () => {
     assert.ok(existsSync(join(dir, '.claude/agents/spec-specialist.md')), 'subagent installed');
     assert.ok(existsSync(join(dir, '.claude/skills/spec-review/SKILL.md')), 'skill installed');
     assert.ok(existsSync(join(dir, '.claude/commands/spec-review.md')), 'command installed');
+    // the review-board adapter (reviewer personas, skill, commands)
+    assert.ok(existsSync(join(dir, '.claude/agents/review-correctness.md')), 'a reviewer persona installed');
+    assert.ok(existsSync(join(dir, '.claude/agents/review-pm.md')), 'pm reduce persona installed');
+    assert.ok(existsSync(join(dir, '.claude/skills/review-board/SKILL.md')), 'review-board skill installed');
+    assert.ok(existsSync(join(dir, '.claude/skills/review-board/lint.mjs')), 'review-board store linter installed');
+    assert.ok(existsSync(join(dir, '.claude/skills/review-board/reviewer-common.md')), 'shared reviewer protocol installed');
+    assert.ok(existsSync(join(dir, '.claude/commands/review-board.md')), 'review-board command installed');
+    assert.ok(existsSync(join(dir, '.claude/commands/review-promote.md')), 'review-promote command installed');
+    // the instruction-review adapter
+    assert.ok(existsSync(join(dir, '.claude/agents/instruction-editor.md')), 'instruction-editor persona installed');
+    assert.ok(existsSync(join(dir, '.claude/skills/instruction-review/SKILL.md')), 'instruction-review skill installed');
+    assert.ok(existsSync(join(dir, '.claude/commands/instruction-review.md')), 'instruction-review command installed');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -70,6 +86,7 @@ test('--no-tools skips the adapter install', () => {
     run(dir, ['--no-tools']);
     assert.ok(existsSync(join(dir, '.agentsmith/AGENTS.md')), 'core still written');
     assert.ok(!existsSync(join(dir, '.claude/skills/spec-review/SKILL.md')), 'adapter not installed');
+    assert.ok(!existsSync(join(dir, '.claude/skills/review-board/SKILL.md')), 'review-board adapter not installed');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

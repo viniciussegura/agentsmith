@@ -1,0 +1,6 @@
+# #ai-plan-deviation Mid-execution plan deviation
+
+When executing an approved plan, if a step proves invalid, an assumption turns out false, or the scope must widen beyond the plan, stop and surface it -- do not silently adapt.
+State the deviation (what changed, which step), propose the minimal correction, and wait for confirmation before continuing.
+A scope widening is new work: it needs its own spec or plan approval (#ai-plan), even when discovered mid-execution.
+A narrowing -- a step proves unnecessary -- may proceed, but is reported at the next natural pause.

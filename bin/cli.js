@@ -5,9 +5,10 @@ import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
-import { resolveSections } from '../src/sections.js';
+import { resolveSections, demoteForBasename } from '../src/sections.js';
 import { planToolInstall } from '../src/tools.js';
 import { userImport } from '../src/userimport.js';
+import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -56,21 +57,43 @@ if (outIdx !== -1 && (out === undefined || out.startsWith('--'))) {
   process.exit(1);
 }
 
-// A section's files are every *.md in instructions/<name>/, sorted for
-// deterministic output, unless the section pins an explicit `modules` order.
-const listFiles = (name) =>
-  readdirSync(join(pkgRoot, 'instructions', name))
-    .filter((f) => f.endsWith('.md'))
-    .sort()
-    .map((f) => `instructions/${name}/${f}`);
+// Recursive module lister: ordered { path, demote } for a section's subtree.
+// A branch dir (only subdirs) recurses alphabetically; a leaf dir emits
+// _intro.md first then tag files alphabetically. demote: _intro -> 1, tag -> 2.
+export function makeListModules(root) {
+  return function listModules(name) {
+    const out = [];
+    const walk = (absDir, relDir) => {
+      const entries = readdirSync(absDir, { withFileTypes: true });
+      const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+      const files = entries.filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name);
+      if (dirs.length && files.length) {
+        // The tree is two-level by construction: a dir is EITHER a branch (only
+        // subdirs) OR a leaf group (_intro.md + tag files). A mix would silently
+        // drop the files, so fail loud rather than miscompile the output.
+        throw new Error(`agentsmith: mixed branch/leaf dir (subdirs + .md files): ${relDir}`);
+      }
+      if (dirs.length) {
+        for (const d of dirs) walk(join(absDir, d), `${relDir}/${d}`);
+        return;
+      }
+      const ordered = files.filter((f) => f === '_intro.md')
+        .concat(files.filter((f) => f !== '_intro.md').sort());
+      for (const f of ordered) out.push({ path: `${relDir}/${f}`, demote: demoteForBasename(f) });
+    };
+    walk(join(root, 'instructions', name), `instructions/${name}`);
+    return out;
+  };
+}
 
-const { coreModulePaths, bundles } = resolveSections({
+const listModules = makeListModules(pkgRoot);
+const { coreModules, bundles } = resolveSections({
   sections: manifest.sections || [],
-  listFiles,
+  listModules,
 });
 
 for (const b of bundles) {
-  if (!b.modulePaths.length) {
+  if (!b.modules.length) {
     process.stderr.write(`agentsmith: warning -- section "${b.name}" has no .md files\n`);
   }
 }
@@ -78,12 +101,12 @@ for (const b of bundles) {
 const { commit, date } = sourceRevision();
 const built = buildOutputs({
   preamble: read(manifest.preamble),
-  modules: coreModulePaths.map(read),
+  modules: coreModules.map(({ path, demote }) => ({ text: read(path), demote })),
   bundles: bundles.map((b) => ({
     name: b.name,
     title: b.title,
     when: b.when,
-    modules: b.modulePaths.map(read),
+    modules: b.modules.map(({ path, demote }) => ({ text: read(path), demote })),
   })),
   source: manifest.source,
   commit,
@@ -101,8 +124,11 @@ if (built.dangling.length) {
 }
 
 if (built.crossBoundary.length) {
+  const list = built.crossBoundary
+    .map((c) => `#${c.from || '(core preamble)'} -> bundle-only #${c.tag}`)
+    .join(', ');
   process.stderr.write(
-    `agentsmith: warning -- core references bundle-only #tag(s): ${built.crossBoundary.join(', ')}\n`,
+    `agentsmith: warning -- core rule references a bundle-only #tag: ${list}\n`,
   );
 }
 
@@ -112,14 +138,36 @@ const writeAbs = (dest, content) => {
   process.stderr.write(`agentsmith: wrote ${dest}\n`);
 };
 
+// Merge agentsmith's owned hooks into <base>/.claude/settings.json without clobbering
+// the consumer's own settings. Project installs use a project-relative command (hooks
+// run from the project root); user installs need the absolute home path (a user hook's
+// cwd is the active project, not home). Idempotent across reinstalls.
+const installSettings = (base, { absolute }) => {
+  const dest = resolve(base, '.claude/settings.json');
+  let existing = null;
+  if (existsSync(dest)) {
+    try {
+      existing = JSON.parse(readFileSync(dest, 'utf8'));
+    } catch {
+      process.stderr.write(`agentsmith: warning -- ${dest} is not valid JSON; left untouched\n`);
+      return;
+    }
+  }
+  const commandPath = absolute ? resolve(base, HOOK_REL) : HOOK_REL;
+  const next = mergeSettings(existing, agentsmithHooks(commandPath));
+  writeAbs(dest, `${JSON.stringify(next, null, 2)}\n`);
+};
+
 // Install tool adapters (tools/<ai>/** -> <base>/.<ai>/**). Namespaced and
 // non-destructive: only the adapter's own files are written.
-const installAdapters = (base) => {
+const installAdapters = (base, { absolute }) => {
   if (!installTools) return;
   const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
   for (const { src, dest } of planToolInstall(sources)) {
     writeAbs(resolve(base, dest), readFileSync(join(pkgRoot, src)));
   }
+  // Wire settings after the hook script is on disk, so it never references a missing file.
+  installSettings(base, { absolute });
 };
 
 if (has('--stdout')) {
@@ -140,7 +188,7 @@ if (has('--stdout')) {
   if (next !== null) writeAbs(claudeMd, next);
   else process.stderr.write(`agentsmith: kept existing import in ${claudeMd}\n`);
 
-  installAdapters(base);
+  installAdapters(base, { absolute: true });
 } else {
   const cwd = process.cwd();
   writeAbs(resolve(cwd, built.corePath), built.coreContent);
@@ -155,5 +203,5 @@ if (has('--stdout')) {
     }
   }
 
-  installAdapters(cwd);
+  installAdapters(cwd, { absolute: false });
 }

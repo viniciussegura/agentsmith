@@ -1,5 +1,6 @@
 node_modules/
 .claude/
+tmp/
 
 # Build artifact: the forged AGENTS.md is generated, never committed here.
 /AGENTS.md
@@ -9,3 +10,6 @@ node_modules/
 
 # caveman /compress backups
 *.original.md
+
+# Brainstorming visual-companion mockups
+.superpowers/

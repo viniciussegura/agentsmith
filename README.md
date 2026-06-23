@@ -39,6 +39,14 @@ The adapter install is namespaced and non-destructive: it writes only the adapte
 
 Whether the generated `AGENTS.md` is committed in the consumer repo is the consumer's call -- agentsmith only produces the file.
 
+## Bundled Claude Code tools
+
+Beyond the portable instructions, the Claude adapter ships skills, commands, and subagents that realize the instruction protocols with real sub-agent delegation:
+
+- **Spec auto-review** (`/spec-review`) -- adversarial review rounds that harden a spec before it becomes a plan (`#ai-spec-review`).
+- **Code-review board** (`/review-board`, `/review-promote`) -- a role-based review engine (`#ai-review-engine`, `#ai-review-board`): role-specialized reviewer subagents fan out over a diff or the whole repo, findings are verified adversarially, and a PM reduce groups them into epics and writes a prioritized triage report (`triage.md` -- a triage report, deliberately not an `#ai-plan` execution `plan.md`). It maintains a per-machine issue store under `.agentsmith/review-board/` (gitignored, never committed; closed and promoted issues are partitioned, never deleted); per-run reasoning stays ephemeral under `.agentsmith/tmp/`. The board is a triage layer on top of the team's tracker -- `/review-promote` records a human escalating an issue into the real backlog. A zero-dependency, read-only store linter ships alongside (`node .claude/skills/review-board/lint.mjs`) and enforces the store's structural invariants -- ids, status/placement coupling, and `relatedIssues` integrity -- as a CI-ready gate. Non-Claude tools run the same protocol in a degraded mode via `AGENTS.md`.
+- **Instruction review** (`/instruction-review`) -- the same engine and role registry turned on an instruction set itself (`#ai-instruction-review`): each role audits `instructions/` + the generated `AGENTS.md` through its lens, proposing missing or weak rules. It opens on the ownership coverage lint, verifies each proposal is a real not-already-covered gap, and writes an editable triage worksheet (`.agentsmith/instruction-review/triage.json`, gitignored); the human triages it (by hand or in `npm run triage`) and the separate `/instruction-apply` writes the one committed output -- the decisions log `docs/instruction-rules-decisions.md` -- and adopts accepted rules into `instructions/`. The round proposes only; it never edits instruction sources.
+
 ## Structure
 
 ```
@@ -47,13 +55,15 @@ instructions/      rule sections (the portable source of truth)
   core/            ai.md code.md git.md swe.md   always-loaded modules
   frontend/        front.md ui-guidelines.md     on-demand bundle
   backend/         backend.md                    on-demand bundle
+  ownership.yaml   #tag -> owner map             repo config; NEVER exported
+  roles.yaml       review-role metadata          repo config; NEVER exported
 tools/             tool-specific adapters, installed into .<ai>/
   claude/          agents/ skills/ commands/     Claude Code adapter (-> .claude/)
 manifest.json      preamble, ordered sections (folder + optional when/title), source label
 src/generate.js    pure: (preamble, modules, source) -> AGENTS.md text
 src/build.js       pure: assembles the lean core, bundle files, and root stub
 src/sections.js    pure: splits manifest sections into core vs on-demand bundles
-src/bundles.js     on-demand index + #tag reference-integrity checks
+src/bundles.js     on-demand index + #tag reference-integrity + ownership coverage lint
 src/tools.js       pure: maps tools/<ai>/** to .<ai>/** install paths
 bin/cli.js         reads sources, writes the files
 test/              tests for the generator
@@ -64,6 +74,7 @@ test/              tests for the generator
 - Each rule has a `#tag` (e.g. `#swe-reuse`) usable as a handle in conversation.
 - Rules follow their own `#code-markdown` convention: one sentence per line.
 - To add a rule, drop a `.md` into a section folder under `instructions/` (e.g. `core/` or `backend/`); it is picked up automatically.
+- Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the `process` non-review marker) in `instructions/ownership.yaml`; adding a rule means adding its one owner row, or `npm test`'s coverage lint fails on the orphan. Role metadata lives in `instructions/roles.yaml`; both are repo config and are never exported.
 - To add a section, create a folder under `instructions/` and add an entry to `manifest.json` `sections`: a `name` (the folder) plus, for an on-demand bundle, a `title` and a `when`; a section with no `when` is always-loaded and inlined into the core.
 - Files in a section load alphabetically; set a section's `modules` to an explicit file list to override that order.
 - Section order in the output follows `manifest.json`.
