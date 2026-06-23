@@ -71,10 +71,8 @@ test('default run installs the claude adapter into .claude', () => {
     assert.ok(existsSync(join(dir, '.claude/skills/review-board/reviewer-common.md')), 'shared reviewer protocol installed');
     assert.ok(existsSync(join(dir, '.claude/commands/review-board.md')), 'review-board command installed');
     assert.ok(existsSync(join(dir, '.claude/commands/review-promote.md')), 'review-promote command installed');
-    // the instruction-review adapter
-    assert.ok(existsSync(join(dir, '.claude/agents/instruction-editor.md')), 'instruction-editor persona installed');
-    assert.ok(existsSync(join(dir, '.claude/skills/instruction-review/SKILL.md')), 'instruction-review skill installed');
-    assert.ok(existsSync(join(dir, '.claude/commands/instruction-review.md')), 'instruction-review command installed');
+    // the instruction-review adapter is authoring-only (--dev); see the dedicated
+    // default-excludes / --dev-includes tests below.
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
