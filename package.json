@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node --test",
     "build": "node bin/cli.js",
+    "build:plugin": "node bin/build-plugin.js",
     "triage": "node devtools/triage-ui/server.mjs"
   },
   "files": [
