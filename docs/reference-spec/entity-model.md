@@ -120,3 +120,33 @@ interface InstructionProposal {
 Required-per-kind: `new-rule` and `strengthen` require `targetFile` (`new-rule` also `draft` once concrete); `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must resolve to a declared role, the `swe` base lens, or a known non-review marker.
 
 Persistence: the open queue, drafts, scorecard, and candidates are ephemeral in `.agentsmith/instruction-review/triage.json` (gitignored, per-machine); the single committed output is the decisions log `docs/instruction-rules-decisions.md`. Applying decisions to `instructions/` sources is the separate, human-gated `/instruction-apply` step -- a round alone never edits instruction sources.
+
+### Worksheet entities (`triage.json`)
+
+The worksheet carries three siblings -- the `scorecard`, the `candidates` (undrafted proposals awaiting triage), and the `entries` (drafted proposals) -- validated by `devtools/triage-ui/schema.mjs`.
+
+```typescript
+type Verdict  = 'strong' | 'good' | 'weak' | 'gaps';
+type Priority = 'high' | 'medium' | 'low';
+
+interface Scorecard {
+  lenses: string[];        // matrix columns (participating role ids)
+  perLens: PerLensRow[];   // one row per per-lens dimension (coverage, clarity, ...)
+  global: GlobalRow[];     // one row per global/structural dimension (cohesiveness, ...)
+  details: Finding[];      // the per-rule findings; cells/global roll up from these
+  nits: (string | { text: string; fix?: 'auto' })[]; // mechanical nits; fix:'auto' = agent fixes on apply
+}
+interface PerLensRow { dimension: string; cells: Cell[]; }    // cells positionally aligned to lenses
+interface Cell       { lens: string; verdict: Verdict; }      // = worst of its matching findings, else strong
+interface GlobalRow  { dimension: string; verdict: Verdict; } // = worst of its lens-absent findings, else strong
+interface Finding    { dimension: string; lens?: string; file: string; tag: string; verdict: Verdict; note: string; }
+                     // lens absent => a global finding; a cell/global verdict is DERIVED as the worst of its findings
+
+interface Candidate {  // a verified-but-undrafted proposal awaiting triage (no draft)
+  tag: string; kind: ProposalKind; role: string; targetFile: string; gap: string;
+  priority: Priority;
+  decision: { verdict: 'park' | 'wanted' | 'reject'; details?: string };
+}
+```
+
+`scorecard` is a per-round artifact (each reduce overwrites it; `null` when the setup gate's stop-and-process path runs). A cell or global verdict is never asserted on its own -- it is the worst-score roll-up of its `details` findings (`strong` when none), and the validator enforces that equality. An `Entry` is the drafted form a `wanted` candidate is promoted into (it adds `draft`, `status`, `decision` with the full `Verdict` set, and an `applyLog`); see the worksheet schema for its per-kind fields.

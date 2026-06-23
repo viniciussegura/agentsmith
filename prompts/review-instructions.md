@@ -5,7 +5,7 @@ Run it whenever instructions change, or on a cadence, to keep the rule set clear
 
 > **Preferred path: the instruction-review application** (`#ai-instruction-review`, the `/instruction-review` skill) fans this audit out **per role** for sharper, less-diluted coverage.
 > This prompt is the **single-agent degraded fallback** of that application (`#ai-review-engine` degradation): one agent applies the dimensions below across all lenses sequentially.
-> Either way there is **one backlog and one rubric** -- the nine dimensions here are the shared rubric the per-role fan-out also applies, and both roll the same `docs/future-work/proposed-instruction-rules.md`. No duplication (`#swe-reuse`).
+> Either way there is **one rubric and one committed output** -- the nine dimensions here are the shared rubric the per-role fan-out also applies, and the only committed artifact is the decisions log `docs/instruction-rules-decisions.md` (open proposals are ephemeral: the per-role path writes a structured triage worksheet, this fallback presents them inline). No duplication (`#swe-reuse`).
 
 ## Usage
 
@@ -41,20 +41,17 @@ The modules merge into a single `AGENTS.md`, so file names disappear from the ou
 - Cross-reference rules by `#tag`, never by file name.
 - Emit order matters: related domains should be adjacent in `manifest.json`.
 
-## Maintain the proposal backlog
+## Surface proposals; record only decisions
 
-The proposal backlog is a single rolling file: `docs/future-work/proposed-instruction-rules.md`.
-It is the only file this review writes to -- instruction sources are never edited here.
+This fallback **writes no instruction sources and keeps no backlog file** -- open proposals are ephemeral. The only committed artifact is the decisions log `docs/instruction-rules-decisions.md` (closed judgments: rejected / folded / deferred, one line per `#tag`).
 
-Each run, update it in place:
+Each run:
 
-1. Read the backlog file first.
-2. Drop any proposal already adopted into `instructions/` (check the live `#tag`s in the generated output).
-3. Re-check every remaining proposal: does it still close a real gap? Rewrite stale wording; demote or remove ideas overtaken by recent edits.
-4. Add a proposal for each new gap found this run. For each give: tag, target file, the gap it closes, a one-line rationale, any blocker or condition, and a drop-in house-style block once the rule is concrete enough to draft.
-5. Rebuild the summary table at the top: rank, tag, target, gap, status (ready / blocked on #tag / conditional). List what was adopted-and-removed since the last roll.
+1. Read the decisions log and the live `#tag`s in the generated output first, so you neither re-raise an adopted rule nor re-litigate a closed judgment.
+2. For each new gap, present a proposal inline in your reply: tag, target file, the gap it closes, a one-line rationale, any blocker or condition, and a drop-in house-style block once the rule is concrete enough to draft.
+3. The human dispositions them; adoption happens through the per-role application's `/instruction-apply`, never here.
 
-In your review reply, summarize what moved, what closed, and recommend the top few to draft next.
+In your review reply, summarize the gaps found and recommend the top few to draft next.
 
 ## Output format
 
@@ -64,4 +61,4 @@ In your review reply, summarize what moved, what closed, and recommend the top f
 - End with a recommended next action.
 
 Do not edit instruction sources as part of the review -- propose only.
-The single file this review writes is the rolling backlog `docs/future-work/proposed-instruction-rules.md`.
+This review writes no files; closed judgments persist in the decisions log `docs/instruction-rules-decisions.md` via the per-role application's `/instruction-apply`.
