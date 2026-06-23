@@ -90,6 +90,33 @@ test('--no-tools skips the adapter install', () => {
   }
 });
 
+const IR = '.claude/skills/instruction-review/SKILL.md';
+const SHIPPED = '.claude/commands/review-board.md';
+const TRIAGE = '.triage-ui'; // a devtools/triage-ui leak would create this; must never appear
+
+test('default install ships review-board but NOT the authoring tools', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir);
+    assert.ok(existsSync(join(dir, SHIPPED)), 'shipped tool present');
+    assert.ok(!existsSync(join(dir, IR)), 'authoring tool absent by default');
+    assert.ok(!existsSync(join(dir, '.claude/commands/instruction-apply.md')), 'instruction-apply absent');
+    assert.ok(!existsSync(join(dir, '.claude/agents/review-ai.md')), 'review-ai absent');
+    assert.ok(!existsSync(join(dir, TRIAGE)), 'triage-ui never installed');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('--dev install adds the authoring tools alongside the shipped set', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir, ['--dev']);
+    assert.ok(existsSync(join(dir, SHIPPED)), 'shipped tool still present');
+    assert.ok(existsSync(join(dir, IR)), 'authoring skill present under --dev');
+    assert.ok(existsSync(join(dir, '.claude/agents/instruction-editor.md')), 'instruction-editor present under --dev');
+    assert.ok(!existsSync(join(dir, TRIAGE)), 'triage-ui still not installed');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 // Run the CLI with HOME/USERPROFILE pointed at a throwaway home dir.
 function runUser(cwd, home, args = []) {
   execFileSync('node', [cli, '--user', ...args], {

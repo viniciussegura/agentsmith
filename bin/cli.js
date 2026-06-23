@@ -37,6 +37,7 @@ const layout = has('--full') || has('--inline') ? 'full' : 'lean';
 const placement = has('--root') ? 'root' : 'nested';
 const installTools = !has('--no-tools');
 const userScope = has('--user');
+const dev = has('--dev');
 
 // Every *.md (and any file) under tools/, relative to pkgRoot, recursively.
 function listToolSources(absDir, relBase) {
@@ -162,7 +163,11 @@ const installSettings = (base, { absolute }) => {
 // non-destructive: only the adapter's own files are written.
 const installAdapters = (base, { absolute }) => {
   if (!installTools) return;
+  // tools/<ai> ships always; devtools/claude (authoring-only) installs only under
+  // --dev. The dev root is listed at devtools/claude exactly (never devtools/),
+  // so dev-only runtime scripts (triage-ui, restructure) are never installed.
   const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
+  if (dev) sources.push(...listToolSources(join(pkgRoot, 'devtools', 'claude'), 'devtools/claude'));
   for (const { src, dest } of planToolInstall(sources)) {
     writeAbs(resolve(base, dest), readFileSync(join(pkgRoot, src)));
   }
