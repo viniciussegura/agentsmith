@@ -36,6 +36,19 @@ test('curated spec_review membership matches the spec', () => {
   for (const r of wantFalse) assert.equal(roles[r], false, `${r} should NOT participate (folded into generalist or meta-lens)`);
 });
 
+// --- reviewer-common third arm (Task 4) ---
+
+test('reviewer-common.md Subject clause names a spec (third subject arm)', () => {
+  const t = read('tools/claude/skills/review-board/reviewer-common.md');
+  assert.match(t, /spec review/i, 'Subject/Schema must mention spec review');
+});
+
+test('reviewer-common.md Schema clause names Finding -> spec-review/finding-format.md', () => {
+  const t = read('tools/claude/skills/review-board/reviewer-common.md');
+  assert.match(t, /Finding/, 'names the Finding schema arm');
+  assert.match(t, /spec-review\/finding-format\.md/, 'points at the spec-review finding format');
+});
+
 test('no review-<role> persona contains spec-specific text (artifact-neutral, no fork)', () => {
   const dir = join(root, 'tools/claude/agents');
   const personas = readdirSync(dir).filter((f) => /^review-.+\.md$/.test(f));
