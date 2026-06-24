@@ -151,8 +151,50 @@ export function persistApply({ store, roundId, scratchDir }) {
   return { written, errors, warnings };
 }
 
-// Stubs replaced in later tasks.
-function applyReconcile() {}
+const CLOSING = new Set(['fixed', 'deprecated', 'superseded']);
+
+// Apply reconcile transitions to existing issue files; move files to match the
+// new status placement. `written` accumulates touched paths for reporting.
+function applyReconcile({ store, round, findings, written }) {
+  const index = indexStore(store);
+  for (const f of findings) {
+    for (const rc of f.reconcile || []) {
+      const rec = index.get(rc.id);
+      if (!rec) continue; // unknown id: nothing to reconcile (lint will not see a phantom).
+      const issue = rec.obj;
+
+      if (CLOSING.has(rc.transition)) {
+        issue.status = rc.transition;
+        issue.closingComments = rc.closingComments || `${rc.transition} in round ${round.id}`;
+        issue.closedInRound = round.id;
+        if (rc.relatedIssues) issue.relatedIssues = rc.relatedIssues;
+        moveIssue(rec, store, rec.roleDir, 'closed', issue, written);
+      } else if (rc.transition === 'reopen') {
+        issue.status = 'open';
+        delete issue.closingComments;
+        delete issue.closedInRound;
+        moveIssue(rec, store, rec.roleDir, 'open', issue, written);
+      } else if (rc.transition === 'still-open') {
+        issue.status = 'open';
+        if (rc.locations) issue.locations = rc.locations;
+        issue.lastConfirmedCommit = round.baselineCommit;
+        moveIssue(rec, store, rec.roleDir, 'open', issue, written);
+      }
+    }
+  }
+}
+
+// Write the issue at its new placement and remove the old file if the path changed.
+function moveIssue(rec, store, roleDir, placement, issue, written) {
+  const target = issuePath(store, roleDir, placement, issue);
+  writeJson(target, issue);
+  written.push(target);
+  if (resolve(rec.absPath) !== resolve(target) && existsSync(rec.absPath)) {
+    rmSync(rec.absPath);
+  }
+}
+
+// Stub replaced in later task.
 function applyEpics() {}
 
 // ---------- summary (Task 7) ----------
