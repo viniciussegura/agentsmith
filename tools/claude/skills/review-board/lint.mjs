@@ -169,7 +169,7 @@ export function lintStore({ root }) {
         errors.push(`${where}: status \`${o.status}\` requires placement \`${expectedPlacement}/\` but file is in \`${r.placement}\``);
       }
       if (CLOSING_STATUS.has(o.status)) {
-        if (!o.closingComments || String(o.closingComments).trim() === '') {
+        if (typeof o.closingComments !== 'string' || o.closingComments.trim() === '') {
           errors.push(`${where}: closing status \`${o.status}\` requires non-empty \`closingComments\``);
         }
         if (!o.closedInRound) {

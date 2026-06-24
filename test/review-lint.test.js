@@ -156,6 +156,7 @@ test('no tracker configured: a promoted issue without promotedTo is allowed', ()
   try {
     const { errors } = lintStore({ root });
     assert.ok(!errors.some((e) => /requires `promotedTo`/.test(e)), 'promotedTo not required without a tracker');
+    assert.deepEqual(errors, []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
