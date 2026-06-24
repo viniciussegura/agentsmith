@@ -176,3 +176,29 @@ test('summary projects carried-forward open issues and accepted new findings', (
   // Summaries are lean: no description/locations.
   assert.equal(out.new[0].description, undefined);
 });
+
+test('epic child that the PM rejected is dropped, store stays lint-clean', () => {
+  const { store, scratchDir, roundId } = scaffold('r7');
+  writeJson(join(scratchDir, 'findings', 'swe.json'), {
+    role: 'swe',
+    new: [newFinding('r7#swe-1'), newFinding('r7#swe-2', { title: 'Rejected child' })],
+    reconcile: [],
+  });
+  for (const id of ['r7--swe-1', 'r7--swe-2']) {
+    writeJson(join(scratchDir, 'verdicts', `${id}.json`), { id: id.replace('--', '#'), verdict: 'accept', rationale: 'ok' });
+  }
+  // PM rejects swe-2 but ALSO lists it as an epic child -> must not dangle.
+  writeJson(join(scratchDir, 'pm-directive.json'), {
+    epics: [{ id: 'r7#epic-1', title: 'Theme', priority: 'high', priorityRationale: 'rollup', children: ['r7#swe-1', 'r7#swe-2'] }],
+    rejections: [{ id: 'r7#swe-2', reason: 'not worth tracking' }],
+  });
+
+  const res = persistApply({ store, scratchDir, roundId });
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+
+  // swe-2 was not written (rejected); the epic links only swe-1.
+  assert.equal(existsSync(join(store, 'issues', 'swe')) && readdirSync(join(store, 'issues', 'swe')).some((f) => f.startsWith('r7--swe-2')), false);
+  const epicFile = readdirSync(join(store, 'epics')).find((f) => f.startsWith('r7--epic-1'));
+  const epic = JSON.parse(readFileSync(join(store, 'epics', epicFile), 'utf8'));
+  assert.deepEqual(epic.relatedIssues.map((r) => r.issueId), ['r7#swe-1']);
+});

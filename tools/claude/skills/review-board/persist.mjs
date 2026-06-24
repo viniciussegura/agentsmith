@@ -195,9 +195,13 @@ function moveIssue(rec, store, roleDir, placement, issue, written) {
 }
 
 // Write canonical epic files from the PM directive. An epic links its children
-// via relatedIssues; the children already exist (written above), so lint's
-// referential check resolves.
+// via relatedIssues; only children that actually exist in the store are linked
+// (a child the PM rejected, a verifier dropped, or mistyped would otherwise
+// dangle and fail lint). Runs after issues are written + reconciled, so walking
+// issues/ yields every id that will exist.
 function applyEpics({ store, round, directive, written }) {
+  const known = new Set();
+  walk(join(store, 'issues'), (abs) => known.add(readJson(abs).id));
   for (const e of directive.epics || []) {
     const epic = {
       id: e.id,
@@ -208,7 +212,9 @@ function applyEpics({ store, round, directive, written }) {
       priorityRationale: e.priorityRationale || 'rollup',
       status: 'open',
       lastConfirmedCommit: round.baselineCommit,
-      relatedIssues: (e.children || []).map((issueId) => ({ issueId, description: 'parent-of' })),
+      relatedIssues: (e.children || [])
+        .filter((issueId) => known.has(issueId))
+        .map((issueId) => ({ issueId, description: 'parent-of' })),
     };
     const p = join(store, 'epics', `${idToSafe(epic.id)}-${slugify(epic.title)}.json`);
     writeJson(p, epic);
