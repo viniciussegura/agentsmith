@@ -10,5 +10,8 @@ A change is done only when all of these hold:
 3. Unused dependencies are pruned (#swe-deps).
 4. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
 5. The change has been self-reviewed against these instructions; self-review is the floor, and a non-trivial diff escalates to a deliberate, independent review pass (#ai-review-board) before it squash-merges to `main`.
+6. Temporary artifacts the session created but the change does not ship -- scratch files, throwaway worktrees, ad-hoc output or log directories -- are removed.
+   Outputs that are deliberately persisted are not temporary and stay: anything the change is meant to produce, plus durable stores a workflow writes by design (e.g. the review-board issue store).
+   When it is unclear whether an artifact is throwaway or wanted, ask the user before deleting rather than guessing.
 
 Do not open or update a PR before all items hold.

@@ -3,6 +3,8 @@
 We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutorials/comparing-workflows/feature-branch-workflow), with one adjustment: a branch maps to a **logical unit of work**, not strictly a single feature.
 
 - All work happens on branches off `main`.
+  A new unit of work branches from an up-to-date `main` (fetch first), not from whatever branch the session is currently on -- a prior session branch may be stale or already squash-merged.
+  When new work starts while the session is on a non-`main` branch, confirm the intended base with the user before branching.
   Changes land on `main` via squash-merge.
   **Never** commit directly to `main` or the default branch; when a commit is warranted there, stop and ask to create a branch first.
 - A branch's scope is its logical unit, which may be wider than one feature.
