@@ -26,10 +26,9 @@ test('plugin.json mirrors package.json name/version/description and omits compon
   assert.ok(plugin.hooks?.PreToolUse, 'declares the PreToolUse hook');
 });
 
-test('marketplace.json has owner + a git-subdir plugin source at tools/claude', () => {
+test('marketplace.json has owner + a relative plugin source at tools/claude', () => {
   const m = JSON.parse(read('.claude-plugin/marketplace.json'));
   assert.ok(m.owner?.name, 'owner.name required');
   const entry = m.plugins.find((p) => p.name === 'agentsmith');
-  assert.equal(entry.source.source, 'git-subdir');
-  assert.equal(entry.source.path, 'tools/claude');
+  assert.equal(entry.source, './tools/claude');
 });

@@ -11,7 +11,6 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const REPO = 'https://github.com/viniciussegura/agentsmith.git'; // git-subdir url (A3)
 
 const plugin = {
   name: 'agentsmith',
@@ -33,8 +32,12 @@ const marketplace = {
   owner: { name: 'Vinicius Segura', email: 'viniciussegura@gmail.com' },
   plugins: [
     {
+      // Relative source: resolves to <repo-root>/tools/claude for both the git-slug
+      // install (/plugin marketplace add viniciussegura/agentsmith) and a local-path
+      // add of a branch checkout (pre-merge testing). Only a raw-URL marketplace add
+      // would need a git-subdir object instead — not the documented flow.
       name: 'agentsmith',
-      source: { source: 'git-subdir', url: REPO, path: 'tools/claude' },
+      source: './tools/claude',
       description: pkg.description,
     },
   ],
