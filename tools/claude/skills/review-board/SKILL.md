@@ -6,7 +6,7 @@ description: Run a role-based code-review round over the current repo state or a
 # Code-review board
 
 Run one review round of the code-review application of agentsmith's review engine (`#ai-review-engine`, `#ai-review-board`).
-A round is a single pass -- **setup -> reconcile+review -> verify -> persist -> reduce -> present** -- not an inner convergence loop.
+A round is a single pass -- **setup -> reconcile+review -> verify -> persist(summary) -> reduce -> persist(apply) -> present** -- not an inner convergence loop.
 Schema, status lifecycle, ids, and the store layout are in `issue-format.md`; read it before persisting.
 
 ## When to run
