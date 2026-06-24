@@ -33,6 +33,7 @@ Flags:
 - `--out <path>` -- write the core to a specific path.
 - `--no-tools` -- skip installing the tool adapters (`tools/<ai>/` into `.<ai>/`).
 - `--user` -- set up agentsmith for all projects: write the instructions to `~/.agentsmith/AGENTS.md`, install the tool adapters into `~/.<ai>/` (e.g. `~/.claude/`), and add an `@`-import of the home instructions to `~/.claude/CLAUDE.md` (appended only if absent; your other content is left untouched). If you previously imported a local checkout's `AGENTS.md`, remove that stale line.
+- `--dev` -- **maintainer-only.** Additionally install the authoring tools from `devtools/claude/` (the instruction-review/apply engine + its meta-agents) into `.claude/`. These audit and edit *this repo's* instruction source and cannot run in a consumer project, so they are never shipped by a normal install; this repo's own dogfood install is `node bin/cli.js --dev`. Composes with `--user`; a no-op under `--stdout`.
 - `--stdout` -- print the core to stdout instead of writing files (also skips the adapter install).
 
 The adapter install is namespaced and non-destructive: it writes only the adapter's own files (e.g. `.claude/skills/spec-review/`) and never touches the rest of a consumer's `.claude/`.
@@ -43,9 +44,26 @@ Whether the generated `AGENTS.md` is committed in the consumer repo is the consu
 
 Beyond the portable instructions, the Claude adapter ships skills, commands, and subagents that realize the instruction protocols with real sub-agent delegation:
 
+- **Instruction check** (`/instruction-check`) -- the light tier of review: a single-agent, ephemeral pass that grades the current diff against the project's own generated `AGENTS.md` and reports where it violates a rule (every finding cites a real `#tag`). Fast pre-squash-merge gate; sits above `#swe-done` self-review and below the review board. Unlike the board it measures *conformance to the written rules* only, not general correctness/security/design -- reach for `/review-board` when the change is large or high-stakes.
 - **Spec auto-review** (`/spec-review`) -- adversarial review rounds that harden a spec before it becomes a plan (`#ai-spec-review`).
 - **Code-review board** (`/review-board`, `/review-promote`) -- a role-based review engine (`#ai-review-engine`, `#ai-review-board`): role-specialized reviewer subagents fan out over a diff or the whole repo, findings are verified adversarially, and a PM reduce groups them into epics and writes a prioritized triage report (`triage.md` -- a triage report, deliberately not an `#ai-plan` execution `plan.md`). It maintains a per-machine issue store under `.agentsmith/review-board/` (gitignored, never committed; closed and promoted issues are partitioned, never deleted); per-run reasoning stays ephemeral under `.agentsmith/tmp/`. The board is a triage layer on top of the team's tracker -- `/review-promote` records a human escalating an issue into the real backlog. A zero-dependency, read-only store linter ships alongside (`node .claude/skills/review-board/lint.mjs`) and enforces the store's structural invariants -- ids, status/placement coupling, and `relatedIssues` integrity -- as a CI-ready gate. Non-Claude tools run the same protocol in a degraded mode via `AGENTS.md`.
-- **Instruction review** (`/instruction-review`) -- the same engine and role registry turned on an instruction set itself (`#ai-instruction-review`): each role audits `instructions/` + the generated `AGENTS.md` through its lens, proposing missing or weak rules. It opens on the ownership coverage lint, verifies each proposal is a real not-already-covered gap, and writes an editable triage worksheet (`.agentsmith/instruction-review/triage.json`, gitignored); the human triages it (by hand or in `npm run triage`) and the separate `/instruction-apply` writes the one committed output -- the decisions log `docs/instruction-rules-decisions.md` -- and adopts accepted rules into `instructions/`. The round proposes only; it never edits instruction sources.
+- **Instruction review** (`/instruction-review`, `/instruction-apply`) -- **authoring-only; not shipped to consumers** (lives under `devtools/claude/`, installed only with `--dev`). The same engine and role registry turned on an instruction set itself (`#ai-instruction-review`): each role audits `instructions/` + the generated `AGENTS.md` through its lens, proposing missing or weak rules. It opens on the ownership coverage lint, verifies each proposal is a real not-already-covered gap, and writes an editable triage worksheet (`.agentsmith/instruction-review/triage.json`, gitignored); the human triages it (by hand or in `npm run triage`) and the separate `/instruction-apply` writes the one committed output -- the decisions log `docs/instruction-rules-decisions.md` -- and adopts accepted rules into `instructions/`. The round proposes only; it never edits instruction sources. These tools operate on the authoring repo's own instruction source, so they are excluded from a consumer install.
+
+## Install as a Claude Code plugin
+
+The shippable Claude tools are also packaged as a Claude Code **plugin**, which gives them an `agentsmith:` namespace, enable/disable/uninstall, and a version-aware update channel -- an alternative to the raw `npx` adapter install:
+
+```
+/plugin marketplace add viniciussegura/agentsmith
+/plugin install agentsmith
+```
+
+Commands then surface namespaced -- `/agentsmith:review-board`, `/agentsmith:spec-review`, `/agentsmith:agentsmith-init`. Updates: bump `version` in `package.json`, run `npm run build:plugin`, commit; users run `/plugin marketplace update`.
+
+The plugin `source` is a relative path (`./tools/claude`), so you can test an unmerged branch by adding a **local checkout** as the marketplace -- `/plugin marketplace add /path/to/this/repo` -- no push or merge required; it resolves the files on the checked-out branch.
+
+- **Instructions** are not part of the plugin (they are AI-neutral and project-tailored, not Claude-only static text). A plugin user lays them down by running `/agentsmith:agentsmith-init`, which invokes the generator -- so that command requires Node + `npx` (or a local checkout).
+- **Pick one path for tooling.** Installing the tools via *both* `npx` and the plugin double-wires the `Agent` model-enforcement hook (once via `settings.json`, once via the plugin) -- harmless (the hook is idempotent) but redundant. Use the plugin **or** the `npx` adapter install, not both.
 
 ## Structure
 
@@ -57,15 +75,21 @@ instructions/      rule sections (the portable source of truth)
   backend/         backend.md                    on-demand bundle
   ownership.yaml   #tag -> owner map             repo config; NEVER exported
   roles.yaml       review-role metadata          repo config; NEVER exported
-tools/             tool-specific adapters, installed into .<ai>/
-  claude/          agents/ skills/ commands/     Claude Code adapter (-> .claude/)
+tools/             tool-specific adapters, installed into .<ai>/ (shipped to consumers)
+  claude/          agents/ skills/ commands/ hooks/   Claude Code adapter (-> .claude/)
+    .claude-plugin/plugin.json                        generated plugin manifest
+devtools/          maintainer-only dev tooling, never shipped to consumers
+  claude/          authoring adapters (instruction-review/apply) installed only with --dev
+  triage-ui/       the instruction-review triage server + apply engine
+.claude-plugin/marketplace.json   generated single-plugin marketplace (git-subdir -> tools/claude)
 manifest.json      preamble, ordered sections (folder + optional when/title), source label
 src/generate.js    pure: (preamble, modules, source) -> AGENTS.md text
 src/build.js       pure: assembles the lean core, bundle files, and root stub
 src/sections.js    pure: splits manifest sections into core vs on-demand bundles
 src/bundles.js     on-demand index + #tag reference-integrity + ownership coverage lint
-src/tools.js       pure: maps tools/<ai>/** to .<ai>/** install paths
+src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** install paths
 bin/cli.js         reads sources, writes the files
+bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
 test/              tests for the generator
 ```
 
@@ -84,6 +108,8 @@ Set `manifest.json` `source` to your actual repo URL; it appears in the generate
 ## Development
 
 ```bash
-npm test     # node --test
+npm test               # node --test
 npm run build -- --stdout   # preview the forged AGENTS.md
+npm run build:plugin   # regenerate the plugin.json + marketplace.json manifests
+node bin/cli.js --dev  # dogfood install, including the authoring tools
 ```

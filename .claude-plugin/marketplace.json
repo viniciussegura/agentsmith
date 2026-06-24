@@ -1,0 +1,14 @@
+{
+  "name": "agentsmith",
+  "owner": {
+    "name": "Vinicius Segura",
+    "email": "viniciussegura@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "agentsmith",
+      "source": "./tools/claude",
+      "description": "Canonical agent instructions and a generator that forges AGENTS.md for any project."
+    }
+  ]
+}
