@@ -194,8 +194,27 @@ function moveIssue(rec, store, roleDir, placement, issue, written) {
   }
 }
 
-// Stub replaced in later task.
-function applyEpics() {}
+// Write canonical epic files from the PM directive. An epic links its children
+// via relatedIssues; the children already exist (written above), so lint's
+// referential check resolves.
+function applyEpics({ store, round, directive, written }) {
+  for (const e of directive.epics || []) {
+    const epic = {
+      id: e.id,
+      kind: 'epic',
+      title: e.title,
+      description: e.description || e.title,
+      priority: e.priority || 'medium',
+      priorityRationale: e.priorityRationale || 'rollup',
+      status: 'open',
+      lastConfirmedCommit: round.baselineCommit,
+      relatedIssues: (e.children || []).map((issueId) => ({ issueId, description: 'parent-of' })),
+    };
+    const p = join(store, 'epics', `${idToSafe(epic.id)}-${slugify(epic.title)}.json`);
+    writeJson(p, epic);
+    written.push(p);
+  }
+}
 
 // ---------- summary (Task 7) ----------
 

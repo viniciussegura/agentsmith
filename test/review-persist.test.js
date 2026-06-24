@@ -93,6 +93,8 @@ test('reconcile closes, reopens, and refreshes still-open issues', () => {
   assert.ok(reopened, 'reopened file should be directly under role dir');
   const ro = JSON.parse(readFileSync(join(store, 'issues', 'swe', reopened), 'utf8'));
   assert.equal(ro.status, 'open');
+  assert.equal(ro.closingComments, undefined);
+  assert.equal(ro.closedInRound, undefined);
 });
 
 test('reconcile still-open refreshes locations and baseline', () => {
@@ -110,4 +112,36 @@ test('reconcile still-open refreshes locations and baseline', () => {
   const o = JSON.parse(readFileSync(join(store, 'issues', 'swe', f), 'utf8'));
   assert.equal(o.lastConfirmedCommit, 'cafe1234');
   assert.deepEqual(o.locations[0].lines, [5, 9]);
+});
+
+test('pm directive writes epics, applies overrides and duplicates', () => {
+  const { store, scratchDir, roundId } = scaffold('r4');
+  writeJson(join(scratchDir, 'findings', 'swe.json'), {
+    role: 'swe',
+    new: [newFinding('r4#swe-1'), newFinding('r4#swe-2', { title: 'Dup of one' })],
+    reconcile: [],
+  });
+  for (const id of ['r4--swe-1', 'r4--swe-2']) {
+    writeJson(join(scratchDir, 'verdicts', `${id}.json`), { id: id.replace('--', '#'), verdict: 'accept', rationale: 'ok' });
+  }
+  writeJson(join(scratchDir, 'pm-directive.json'), {
+    epics: [{ id: 'r4#epic-1', title: 'A theme', priority: 'high', priorityRationale: 'rollup', children: ['r4#swe-1'] }],
+    priorityOverrides: [{ id: 'r4#swe-1', priority: 'high', rationale: 'user-facing' }],
+    duplicates: [{ id: 'r4#swe-2', canonical: 'r4#swe-1', comment: 'same root cause' }],
+  });
+
+  const res = persistApply({ store, scratchDir, roundId });
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+
+  const epicFile = readdirSync(join(store, 'epics')).find((f) => f.startsWith('r4--epic-1'));
+  const epic = JSON.parse(readFileSync(join(store, 'epics', epicFile), 'utf8'));
+  assert.equal(epic.kind, 'epic');
+  assert.equal(epic.relatedIssues[0].issueId, 'r4#swe-1');
+
+  const one = JSON.parse(readFileSync(join(store, 'issues', 'swe', readdirSync(join(store, 'issues', 'swe')).find((f) => f.startsWith('r4--swe-1'))), 'utf8'));
+  assert.equal(one.priority, 'high');
+
+  const dup = JSON.parse(readFileSync(join(store, 'issues', 'swe', 'closed', readdirSync(join(store, 'issues', 'swe', 'closed')).find((f) => f.startsWith('r4--swe-2'))), 'utf8'));
+  assert.equal(dup.status, 'duplicated');
+  assert.equal(dup.relatedIssues.at(-1).issueId, 'r4#swe-1');
 });
