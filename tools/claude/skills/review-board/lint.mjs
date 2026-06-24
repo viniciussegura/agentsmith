@@ -6,110 +6,26 @@
 // structurally invalid. The store is local (gitignored, not committed), so this
 // is a local integrity check the review round runs -- not a CI/pre-commit gate.
 //
-// Zero-dependency on purpose -- it ships into a consumer's `.claude/` and must
-// run on bare `node`, so it does NOT parse arbitrary YAML. It extracts the
-// handful of fields the invariants need with line-anchored scans (the same
-// minimal-parse stance as src/bundles.js), and is tolerant of block scalars and
-// decoration it does not read.
+// Store machine files are JSON (issues, epics, rounds), parsed with the built-in
+// JSON.parse -- zero dependency, so it runs on bare `node` in a consumer's
+// `.claude/`. The hand-maintained `config.yaml` stays YAML; only its single
+// `tracker:` scalar is read, with one regex.
 //
 // Usage:
 //   node .claude/skills/review-board/lint.mjs [store-dir] [--strict]
 //   (default dir: ./.agentsmith/review-board; --strict promotes warnings to a non-zero exit)
 
-import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, relative, sep, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argv, stdout, stderr, exit, cwd } from 'node:process';
 
-const VALID_STATUS = new Set([
-  'open',
-  'promoted',
-  'fixed',
-  'deprecated',
-  'superseded',
-  'duplicated',
-]);
+const VALID_STATUS = new Set(['open', 'promoted', 'fixed', 'deprecated', 'superseded', 'duplicated']);
 const CLOSING_STATUS = new Set(['fixed', 'deprecated', 'superseded', 'duplicated']);
 const VALID_KIND = new Set(['issue', 'epic']);
 
-// ---------- minimal field extraction ----------
-
-// A top-level `key: value` scalar. Returns undefined when the key is absent,
-// '' when present but empty or a block scalar (`|`/`>`), else the trimmed,
-// unquoted value. Anchored at column 0, so indented block-scalar bodies never
-// masquerade as top-level keys.
-function topScalar(text, key) {
-  const m = text.match(new RegExp(`^${key}:[ \\t]*(.*)$`, 'm'));
-  if (!m) return undefined;
-  const v = m[1].trim();
-  if (v === '' || /^[|>][+-]?$/.test(v)) return '';
-  return v.replace(/^["']/, '').replace(/["']$/, '');
-}
-
-// True when a key is present with non-empty content -- an inline value or, for a
-// block scalar, at least one non-empty indented line beneath it.
-function keyPresentNonEmpty(text, key) {
-  const inline = topScalar(text, key);
-  if (inline === undefined) return false;
-  if (inline !== '') return true;
-  const lines = text.split('\n');
-  const idx = lines.findIndex((l) => new RegExp(`^${key}:`).test(l));
-  if (idx === -1) return false;
-  for (let i = idx + 1; i < lines.length; i++) {
-    if (/^\S/.test(lines[i])) break;
-    if (lines[i].trim() !== '') return true;
-  }
-  return false;
-}
-
-// The indented lines belonging to a top-level key's block (until the next
-// column-0 key). Used to sub-scan sequences of maps.
-function blockLines(text, key) {
-  const lines = text.split('\n');
-  const idx = lines.findIndex((l) => new RegExp(`^${key}:`).test(l));
-  if (idx === -1) return [];
-  const out = [];
-  for (let i = idx + 1; i < lines.length; i++) {
-    if (/^\S/.test(lines[i])) break;
-    out.push(lines[i]);
-  }
-  return out;
-}
-
-// Every `<subkey>: value` within a block (sequence items or nested maps).
-function subValues(lines, subkey) {
-  const out = [];
-  const re = new RegExp(`^\\s+-?\\s*${subkey}:[ \\t]*(.+)$`);
-  for (const l of lines) {
-    const m = l.match(re);
-    if (m) out.push(m[1].trim().replace(/^["']/, '').replace(/["']$/, ''));
-  }
-  return out;
-}
-
 /**
- * Extract the validated subset of an Issue/Epic YAML file.
- * @param {string} text
- */
-export function parseIssue(text) {
-  return {
-    id: topScalar(text, 'id'),
-    kind: topScalar(text, 'kind'),
-    title: topScalar(text, 'title'),
-    status: topScalar(text, 'status'),
-    priority: topScalar(text, 'priority'),
-    lastConfirmedCommit: topScalar(text, 'lastConfirmedCommit'),
-    closedInRound: topScalar(text, 'closedInRound'),
-    promotedTo: topScalar(text, 'promotedTo'),
-    hasClosingComments: keyPresentNonEmpty(text, 'closingComments'),
-    relatedIssueIds: subValues(blockLines(text, 'relatedIssues'), 'issueId'),
-    locationFilenames: subValues(blockLines(text, 'locations'), 'filename'),
-  };
-}
-
-/**
- * Split a compositional id `<roundId>#<role>-<n>` into its parts, or null when
- * malformed. The role segment is `epic` for epics, else a reviewer role id.
+ * Split a compositional id `<roundId>#<role>-<n>` into parts, or null when malformed.
  * @param {string} id
  */
 export function parseId(id) {
@@ -122,35 +38,42 @@ export function parseId(id) {
   return { roundId, role: m[1].toLowerCase(), n: Number(m[2]) };
 }
 
-const idToSafe = (id) => id.replace(/#/g, '--');
+export const idToSafe = (id) => id.replace(/#/g, '--');
 
-// ---------- filesystem walk ----------
+// The single `tracker:` scalar from the YAML config (kept human-editable).
+function trackerConfigured(root) {
+  const p = join(root, 'config.yaml');
+  if (!existsSync(p)) return false;
+  try {
+    const m = readFileSync(p, 'utf8').match(/^tracker:[ \t]*(.*)$/m);
+    if (!m) return false;
+    const v = m[1].trim().replace(/^["']/, '').replace(/["']$/, '');
+    return v !== '' && !/^[|>]/.test(v);
+  } catch {
+    return false;
+  }
+}
 
-function walkYaml(dir) {
+function walkJson(dir) {
   if (!existsSync(dir)) return [];
   const out = [];
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const abs = join(dir, e.name);
-    if (e.isDirectory()) out.push(...walkYaml(abs));
-    else if (e.name.endsWith('.yaml')) out.push(abs);
+    if (e.isDirectory()) out.push(...walkJson(abs));
+    else if (e.name.endsWith('.json')) out.push(abs);
   }
   return out;
 }
 
-// Placement is derived from the path: a `closed/` or `promoted/` segment under
-// the role/epics directory, else `open`.
 function placementOf(relParts) {
   if (relParts.includes('closed')) return 'closed';
   if (relParts.includes('promoted')) return 'promoted';
   return 'open';
 }
 
-// ---------- the lint ----------
-
 /**
- * Validate a local `.agentsmith/review-board/` issue store. Returns human-readable errors and warnings;
- * never throws on store content and never mutates the store.
- * @param {{ root: string }} input  `root` is the store directory (`.agentsmith/review-board/`).
+ * Validate a local `.agentsmith/review-board/` JSON issue store.
+ * @param {{ root: string }} input  `root` is the store directory.
  * @returns {{ errors: string[], warnings: string[] }}
  */
 export function lintStore({ root }) {
@@ -158,30 +81,17 @@ export function lintStore({ root }) {
   const warnings = [];
   if (!existsSync(root)) return { errors, warnings };
 
-  // `promotedTo` is required on a promoted issue only when a tracker is
-  // configured (a non-empty top-level `tracker:` key in the local config.yaml);
-  // a no-tracker repo uses the local store as the working record (spec N1).
-  let trackerConfigured = false;
-  const configPath = join(root, 'config.yaml');
-  if (existsSync(configPath)) {
-    try {
-      const t = topScalar(readFileSync(configPath, 'utf8'), 'tracker');
-      trackerConfigured = typeof t === 'string' && t !== '';
-    } catch {
-      /* unreadable config -> treat as no tracker */
-    }
-  }
-
+  const tracker = trackerConfigured(root);
   const rel = (abs) => relative(root, abs).split(sep).join('/');
   const records = [];
 
   const collect = (subdir, expectedKind) => {
-    for (const abs of walkYaml(join(root, subdir))) {
-      let text;
+    for (const abs of walkJson(join(root, subdir))) {
+      let obj;
       try {
-        text = readFileSync(abs, 'utf8');
+        obj = JSON.parse(readFileSync(abs, 'utf8'));
       } catch (err) {
-        errors.push(`${rel(abs)}: cannot read file (${err.code || err.message})`);
+        errors.push(`${rel(abs)}: invalid JSON (${err.message})`);
         continue;
       }
       const relParts = relative(root, abs).split(sep);
@@ -192,50 +102,46 @@ export function lintStore({ root }) {
         expectedKind,
         roleDir: subdir === 'issues' ? relParts[1] : null,
         placement: placementOf(relParts.slice(1, -1)),
-        parsed: parseIssue(text),
+        obj,
       });
     }
   };
   collect('issues', 'issue');
   collect('epics', 'epic');
 
-  // Round ids declared by round files (used for the soft prefix check).
   const roundIds = new Set();
   const roundsDir = join(root, 'rounds');
   if (existsSync(roundsDir)) {
     for (const e of readdirSync(roundsDir)) {
-      if (e.endsWith('.yaml')) roundIds.add(basename(e, '.yaml'));
+      if (e.endsWith('.json')) roundIds.add(basename(e, '.json'));
     }
   }
 
   // Pass 1: per-record validation + global id index.
   const idToRecord = new Map();
   for (const r of records) {
-    const { parsed: p, rel: where } = r;
+    const { obj: o, rel: where } = r;
+    const id = o.id;
 
-    if (!p.id) {
+    if (!id || typeof id !== 'string') {
       errors.push(`${where}: missing required field \`id\``);
       continue;
     }
-    if (idToRecord.has(p.id)) {
-      errors.push(`${where}: duplicate id \`${p.id}\` (also at ${idToRecord.get(p.id).rel})`);
+    if (idToRecord.has(id)) {
+      errors.push(`${where}: duplicate id \`${id}\` (also at ${idToRecord.get(id).rel})`);
     } else {
-      idToRecord.set(p.id, r);
+      idToRecord.set(id, r);
     }
 
-    const idParts = parseId(p.id);
-    if (!idParts) {
-      errors.push(`${where}: malformed id \`${p.id}\` (expected \`<roundId>#<role>-<n>\`)`);
+    const idParts = parseId(id);
+    if (!idParts) errors.push(`${where}: malformed id \`${id}\` (expected \`<roundId>#<role>-<n>\`)`);
+
+    if (!VALID_KIND.has(o.kind)) {
+      errors.push(`${where}: invalid kind \`${o.kind ?? '(missing)'}\` (expected issue or epic)`);
+    } else if (o.kind !== r.expectedKind) {
+      errors.push(`${where}: kind \`${o.kind}\` but file is under ${r.relParts[0]}/ (expected kind ${r.expectedKind})`);
     }
 
-    // kind present and consistent with the directory it lives in.
-    if (!VALID_KIND.has(p.kind)) {
-      errors.push(`${where}: invalid kind \`${p.kind ?? '(missing)'}\` (expected issue or epic)`);
-    } else if (p.kind !== r.expectedKind) {
-      errors.push(`${where}: kind \`${p.kind}\` but file is under ${r.relParts[0]}/ (expected kind ${r.expectedKind})`);
-    }
-
-    // id role segment vs location.
     if (idParts) {
       if (r.expectedKind === 'epic' && idParts.role !== 'epic') {
         errors.push(`${where}: epic id role segment \`${idParts.role}\` must be \`epic\``);
@@ -249,85 +155,77 @@ export function lintStore({ root }) {
       }
     }
 
-    // filename encodes the id (slug is decoration; identity keys off the id).
-    const stem = basename(where, '.yaml');
-    if (!stem.startsWith(idToSafe(p.id))) {
-      warnings.push(`${where}: filename does not start with the id rendered safe (\`${idToSafe(p.id)}\`)`);
+    const stem = basename(where, '.json');
+    if (!stem.startsWith(idToSafe(id))) {
+      warnings.push(`${where}: filename does not start with the id rendered safe (\`${idToSafe(id)}\`)`);
     }
 
-    // status validity + placement coupling.
-    if (!VALID_STATUS.has(p.status)) {
-      errors.push(`${where}: invalid status \`${p.status ?? '(missing)'}\``);
+    if (!VALID_STATUS.has(o.status)) {
+      errors.push(`${where}: invalid status \`${o.status ?? '(missing)'}\``);
     } else {
       const expectedPlacement =
-        p.status === 'promoted' ? 'promoted' : CLOSING_STATUS.has(p.status) ? 'closed' : 'open';
+        o.status === 'promoted' ? 'promoted' : CLOSING_STATUS.has(o.status) ? 'closed' : 'open';
       if (r.placement !== expectedPlacement) {
-        errors.push(
-          `${where}: status \`${p.status}\` requires placement \`${expectedPlacement}/\` but file is in \`${r.placement}\``,
-        );
+        errors.push(`${where}: status \`${o.status}\` requires placement \`${expectedPlacement}/\` but file is in \`${r.placement}\``);
       }
-      if (CLOSING_STATUS.has(p.status)) {
-        if (!p.hasClosingComments) {
-          errors.push(`${where}: closing status \`${p.status}\` requires non-empty \`closingComments\``);
+      if (CLOSING_STATUS.has(o.status)) {
+        if (typeof o.closingComments !== 'string' || o.closingComments.trim() === '') {
+          errors.push(`${where}: closing status \`${o.status}\` requires non-empty \`closingComments\``);
         }
-        if (!p.closedInRound) {
-          errors.push(`${where}: closing status \`${p.status}\` requires \`closedInRound\``);
+        if (!o.closedInRound) {
+          errors.push(`${where}: closing status \`${o.status}\` requires \`closedInRound\``);
         }
       }
-      if (p.status === 'promoted' && trackerConfigured && !p.promotedTo) {
+      if (o.status === 'promoted' && tracker && !o.promotedTo) {
         errors.push(`${where}: status \`promoted\` requires \`promotedTo\` (a tracker is configured in config.yaml)`);
       }
     }
 
-    if (!p.lastConfirmedCommit) {
+    if (!o.lastConfirmedCommit) {
       warnings.push(`${where}: missing \`lastConfirmedCommit\` (every issue is anchored to a baseline SHA)`);
     }
-
-    // Soft check: the id's round prefix should name a known round file.
     if (idParts && roundIds.size > 0 && !roundIds.has(idParts.roundId)) {
-      warnings.push(`${where}: id round prefix \`${idParts.roundId}\` has no rounds/${idParts.roundId}.yaml`);
+      warnings.push(`${where}: id round prefix \`${idParts.roundId}\` has no rounds/${idParts.roundId}.json`);
     }
   }
 
   // Pass 2: relatedIssues referential integrity.
   for (const r of records) {
-    const { parsed: p, rel: where } = r;
-    for (const ref of p.relatedIssueIds) {
-      if (ref === p.id) {
-        warnings.push(`${where}: relatedIssues references itself (\`${ref}\`)`);
+    const { obj: o, rel: where } = r;
+    const refs = Array.isArray(o.relatedIssues) ? o.relatedIssues : [];
+    for (const ref of refs) {
+      const refId = ref && ref.issueId;
+      if (!refId) continue;
+      if (refId === o.id) {
+        warnings.push(`${where}: relatedIssues references itself (\`${refId}\`)`);
         continue;
       }
-      if (!idToRecord.has(ref)) {
-        errors.push(`${where}: relatedIssues references unknown id \`${ref}\``);
+      if (!idToRecord.has(refId)) {
+        errors.push(`${where}: relatedIssues references unknown id \`${refId}\``);
       }
     }
   }
 
   // Round files: the baseline invariant + self-consistency.
   for (const abs of existsSync(roundsDir)
-    ? readdirSync(roundsDir).filter((e) => e.endsWith('.yaml')).map((e) => join(roundsDir, e))
+    ? readdirSync(roundsDir).filter((e) => e.endsWith('.json')).map((e) => join(roundsDir, e))
     : []) {
-    let text;
+    let o;
     try {
-      text = readFileSync(abs, 'utf8');
+      o = JSON.parse(readFileSync(abs, 'utf8'));
     } catch (err) {
-      errors.push(`${rel(abs)}: cannot read file (${err.code || err.message})`);
+      errors.push(`${rel(abs)}: invalid JSON (${err.message})`);
       continue;
     }
     const where = rel(abs);
-    const id = topScalar(text, 'id');
-    const baselineCommit = topScalar(text, 'baselineCommit');
-    const commit = topScalar(text, 'commit');
-    const previousRound = topScalar(text, 'previousRound');
-    const stem = basename(where, '.yaml');
-
-    if (!id) errors.push(`${where}: round is missing \`id\``);
-    else if (id !== stem) errors.push(`${where}: round id \`${id}\` != filename stem \`${stem}\``);
-    if (!baselineCommit)
+    const stem = basename(where, '.json');
+    if (!o.id) errors.push(`${where}: round is missing \`id\``);
+    else if (o.id !== stem) errors.push(`${where}: round id \`${o.id}\` != filename stem \`${stem}\``);
+    if (!o.baselineCommit)
       errors.push(`${where}: \`baselineCommit\` is missing -- it must always be a live default-branch SHA`);
-    if (!commit) errors.push(`${where}: round is missing \`commit\``);
-    if (previousRound && !roundIds.has(previousRound))
-      warnings.push(`${where}: previousRound \`${previousRound}\` has no rounds/${previousRound}.yaml`);
+    if (!o.commit) errors.push(`${where}: round is missing \`commit\``);
+    if (o.previousRound && !roundIds.has(o.previousRound))
+      warnings.push(`${where}: previousRound \`${o.previousRound}\` has no rounds/${o.previousRound}.json`);
   }
 
   return { errors, warnings };

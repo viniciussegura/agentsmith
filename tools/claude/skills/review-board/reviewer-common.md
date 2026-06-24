@@ -22,8 +22,11 @@ Stay in your lens -- other roles own theirs; overlap is fine, and duplicate-by-d
 
 ## Output
 
-Your entire response IS the structured result: a list of schema objects, no preamble, no praise.
-Nothing in your lens -> return an empty list and say so in one line.
+Do **not** return findings inline. Write your findings as one fenced JSON block conforming to the schema the spawn prompt names, to the scratch file the prompt gives you (`findings/<role>.json` for a reviewer, `verdicts/<finding-id>.json` for a verifier). Write nothing outside that JSON.
+
+Your **entire response** back to the orchestrator is then the scratch file's path and a one-line count -- e.g. `wrote findings/swe.json: 3 new, 1 reconcile`. No preamble, no deliberation, no praise. Nothing in your lens -> write an empty `new`/`reconcile` and say so in the one line.
+
+The orchestrator never ingests your findings; `persist.mjs` reads the scratch file and `lint.mjs` validates it, so a malformed block fails closed. Your reasoning stays internal -- this only stops you narrating it back.
 
 ## Conformance and critique
 

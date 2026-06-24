@@ -83,12 +83,12 @@ Local, per-machine, gitignored, living (not committed, not per-round folders):
 ```
 .agentsmith/review-board/
   config.yaml                            active roles + gating table (+ instruction-review.participants)
-  issues/<role-id>/<id>-<slug>.yaml       open issues, mutated in place across rounds
-  issues/<role-id>/closed/<...>.yaml      issues with a CLOSING status
-  issues/<role-id>/promoted/<...>.yaml    issues escalated to the external tracker (status 'promoted')
-  epics/<epic-id>.yaml                    canonical epics, mutated in place
+  issues/<role-id>/<id>-<slug>.json       open issues, mutated in place across rounds
+  issues/<role-id>/closed/<...>.json      issues with a CLOSING status
+  issues/<role-id>/promoted/<...>.json    issues escalated to the external tracker (status 'promoted')
+  epics/<epic-id>.json                    canonical epics, mutated in place
   epics/closed/, epics/promoted/          rolled-up epics
-  rounds/<round-id>.yaml                  one ReviewRoundInfo per round
+  rounds/<round-id>.json                  one ReviewRoundInfo per round
   rounds/<round-id>.triage.md             the PM triage report (per-round, kept for history)
 ```
 
@@ -99,6 +99,7 @@ The store is **local-lifetime**: within a machine's store no agent deletes files
 ## Validation
 
 The store is machine-validated by `lint.mjs` (installed alongside this file at `.claude/skills/review-board/lint.mjs`): `node .claude/skills/review-board/lint.mjs .agentsmith/review-board`.
+Store machine files (`issues/`, `epics/`, `rounds/`) are **JSON**, written by `persist.mjs` and validated by `lint.mjs` with built-in `JSON.parse` (zero dependency). `config.yaml` (hand-edited) stays YAML and `triage.md` stays markdown. The store **directory layout** is unchanged.
 It is **read-only** -- it reports and exits non-zero, never mutating the store. The store is local (not committed), so this is a **local integrity check the round runs**, not a CI/pre-commit gate.
 Run it at the end of every round (SKILL step 4).
 
@@ -109,8 +110,36 @@ It enforces, as **errors** (non-zero exit):
 - Filesystem placement matches status: a closing status (`fixed`/`deprecated`/`superseded`/`duplicated`) lives under `closed/`, `promoted` under `promoted/`, everything else directly under its role directory.
 - A closing status carries `closingComments` and `closedInRound`; a `promoted` status carries `promotedTo` **when a tracker is configured** in `.agentsmith/review-board/config.yaml` (no tracker configured: a missing `promotedTo` is valid, and `promoted` is discouraged in favor of a closing status).
 - Every `relatedIssues[].issueId` resolves to an id that exists in the store.
-- Every `rounds/<id>.yaml` has a `baselineCommit` (never undefined) and a `commit`, and its `id` matches its filename.
+- Every `rounds/<id>.json` has a `baselineCommit` (never undefined) and a `commit`, and its `id` matches its filename.
 
 And as **warnings** (non-zero only under `--strict`): a missing `lastConfirmedCommit`, a filename that does not encode its id, a `relatedIssues` self-reference, and an id or `previousRound` whose round prefix has no matching `rounds/` file.
 
 It does **not** check supersession-chain acyclicity: our relations live in free-text `relatedIssues[].description`, not a typed field, so a reliable graph cannot be built without false positives. A typed relation kind is deferred work.
+
+## Scratch contract and persistence
+
+Per-run scratch under `.agentsmith/tmp/review-board/<round-id>/` (gitignored). Machine files are JSON; `persist.mjs` consumes them and writes the store.
+
+- `round.json` -- the `ReviewRoundInfo` for the round (written by Setup).
+- `findings/<role>.json` -- `{ role, new: Issue[], reconcile: Reconcile[] }`. `new` are this round's findings under pre-minted ids; `reconcile` are transitions on the role's dirty prior issues.
+- `verdicts/<finding-id>.json` -- `{ id, verdict: "accept" | "reject", rationale }`, one per new finding.
+- `pm-directive.json` -- the PM's structured directive (below); absent means no consolidation.
+- `pm-input.json` -- written by `persist.mjs summary`, read by the PM reduce.
+
+`Reconcile = { id, transition: "fixed" | "deprecated" | "superseded" | "reopen" | "still-open", closingComments?, locations?, relatedIssues? }`.
+
+### `pm-directive.json`
+
+```json
+{
+  "epics": [
+    { "id": "<roundId>#epic-1", "title": "...", "priority": "high",
+      "priorityRationale": "...", "children": ["<id>", "<id>"] }
+  ],
+  "priorityOverrides": [ { "id": "<id>", "priority": "medium", "rationale": "..." } ],
+  "duplicates": [ { "id": "<id>", "canonical": "<id>", "comment": "..." } ],
+  "rejections": [ { "id": "<id>", "reason": "..." } ]
+}
+```
+
+`persist.mjs apply` reads `findings/` + `verdicts/` + `pm-directive.json` and writes the store: verified-new issues under their ids, reconcile transitions, epics, and the round file, then runs `lint.mjs` and exits non-zero on any violation. The `Issue` schema, ids, status lifecycle, and directory layout are unchanged.
