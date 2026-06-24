@@ -218,8 +218,38 @@ function applyEpics({ store, round, directive, written }) {
 
 // ---------- summary (Task 7) ----------
 
-export function persistSummary() {
-  throw new Error('not implemented');
+const summarize = (o, role) => ({ id: o.id, title: o.title, priority: o.priority, role, status: o.status || 'open', kind: o.kind || 'issue' });
+
+/**
+ * Project the PM's input: carried-forward OPEN issues (from the store) plus this
+ * round's accepted new findings (scratch minus rejects). Writes pm-input.json.
+ * @param {{ store: string, roundId: string, scratchDir?: string }} input
+ * @returns {{ roundId: string, carried: object[], new: object[] }}
+ */
+export function persistSummary({ store, roundId, scratchDir }) {
+  const scratch = scratchDir || defaultScratchDir(store, roundId);
+  const findings = readDirJson(join(scratch, 'findings'));
+  const verdicts = readDirJson(join(scratch, 'verdicts'));
+  const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
+
+  const carried = [];
+  walk(join(store, 'issues'), (abs) => {
+    const relParts = abs.slice(join(store, 'issues').length + 1).split(/[\\/]/);
+    if (relParts.includes('closed') || relParts.includes('promoted')) return; // open only
+    const o = readJson(abs);
+    if (o.status === 'open') carried.push(summarize(o, relParts[0]));
+  });
+
+  const fresh = [];
+  for (const f of findings) {
+    for (const n of f.new || []) {
+      if (accepted.has(n.id)) fresh.push(summarize(n, f.role));
+    }
+  }
+
+  const out = { roundId, carried, new: fresh };
+  writeJson(join(scratch, 'pm-input.json'), out);
+  return out;
 }
 
 // ---------- CLI ----------

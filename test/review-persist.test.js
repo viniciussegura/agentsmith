@@ -154,3 +154,25 @@ test('malformed findings JSON fails closed before writing the store', () => {
   assert.equal(existsSync(join(store, 'rounds', 'r5.json')), false);
   assert.equal(existsSync(join(store, 'issues')), false);
 });
+
+test('summary projects carried-forward open issues and accepted new findings', () => {
+  const { store, scratchDir, roundId } = scaffold('r6');
+  // A carried-forward open issue already in the store.
+  writeJson(join(store, 'issues', 'swe', 'r1--swe-1-carried.json'), {
+    ...newFinding('r1#swe-1', { title: 'Carried' }),
+  });
+  // A new finding this round, accepted.
+  writeJson(join(scratchDir, 'findings', 'swe.json'), { role: 'swe', new: [newFinding('r6#swe-1', { title: 'Fresh' })], reconcile: [] });
+  writeJson(join(scratchDir, 'verdicts', 'r6--swe-1.json'), { id: 'r6#swe-1', verdict: 'accept', rationale: 'ok' });
+
+  const out = persistSummary({ store, scratchDir, roundId });
+
+  const onDisk = JSON.parse(readFileSync(join(scratchDir, 'pm-input.json'), 'utf8'));
+  assert.deepEqual(onDisk, out);
+  assert.equal(out.carried.length, 1);
+  assert.equal(out.carried[0].id, 'r1#swe-1');
+  assert.equal(out.new.length, 1);
+  assert.equal(out.new[0].id, 'r6#swe-1');
+  // Summaries are lean: no description/locations.
+  assert.equal(out.new[0].description, undefined);
+});
