@@ -49,26 +49,29 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 - For each dirty issue the role re-checks validity against the current code (real re-read, not file-membership) and transitions it: open -> `fixed`/`deprecated`/`superseded` or still `open`; recently-closed -> `open` on regression (a reopen, same id). On confirming still-open it updates `locations` to current text and sets `lastConfirmedCommit = baselineCommit`.
 - In the same pass the role raises **new** findings, numbering them per the compositional id.
 - A non-dirty open issue carries forward unchanged, no re-read. A `full-sweep` re-checks every prior open issue and advances `lastConfirmedCommit = baselineCommit` for each re-confirmed.
+- Each reviewer **writes its findings to `.agentsmith/tmp/review-board/<round-id>/findings/<role>.json`** (`new` + `reconcile` arrays, per `issue-format.md`) and returns only that path plus a one-line count -- it does not return findings inline (`reviewer-common.md` output contract).
 
 ### 3. Verify (adversarial, parallel, per new finding, cheap model)
 
 - One-time-at-entry: verify runs only on findings new this round; spawn one `review-verifier` per finding, biased to reject.
 - Drop rejected findings before persistence (they live only in scratch).
 - Carried-forward issues are not re-verified -- retiring a stale carried issue is reconcile's job (step 2).
+- Each verifier **writes its verdict to `verdicts/<finding-id>.json`** (`{ id, verdict, rationale }`) and returns only the path + verdict; rejected ids are dropped by `persist.mjs`, their rationale retained in scratch.
 
 ### 4. Persist (main thread)
 
-- Write verified new issues under their already-minted compositional ids (no allocation step); apply reconciled status transitions; move newly-closing issues to `closed/`.
-- Do **not** set `promoted` here -- that is `/review-promote`.
-- Write/refresh `.agentsmith/review-board/rounds/<round-id>.yaml` (the `ReviewRoundInfo`).
-- Validate the store before reducing (a local integrity check, not a CI gate): run `node .claude/skills/review-board/lint.mjs .agentsmith/review-board`.
-  A non-zero exit means the write left the store structurally invalid -- an id/role/placement mismatch, a dangling `relatedIssues` reference, a closing status missing its `closingComments`/`closedInRound`, or a round with no `baselineCommit`.
-  Fix the offending files and rerun until it exits clean; the linter is read-only and never edits the store for you.
+- The driver writes the round's `ReviewRoundInfo` to `.agentsmith/tmp/review-board/<round-id>/round.json` (Setup already computed every field).
+- **Build the PM input:** run `node .claude/skills/review-board/persist.mjs summary .agentsmith/review-board <round-id>`; it writes `pm-input.json` (carried-forward open issues + accepted new findings, as lean summaries) for the reduce.
+- Persistence proper happens **after** the reduce (step 5b), in one deterministic `persist.mjs apply` call -- the driver no longer hand-authors issue/epic/round files.
 
 ### 5. Reduce (PM role, strong model)
 
-- Spawn `review-pm` with **summaries** of all open issues (verified-new + carried-forward); it consolidates priority, groups issues into canonical epics, marks duplicates `duplicated`, may down-rank/reject (with a recorded reason), and writes `.agentsmith/review-board/rounds/<round-id>.triage.md`.
-- Apply the PM's status mutations and epic updates to the store.
+- Spawn `review-pm` with `pm-input.json`; it consolidates priority, groups issues into canonical epics, marks duplicates, may down-rank/reject (with a recorded reason), and writes **both** `.agentsmith/review-board/rounds/<round-id>.triage.md` (the human report) and `.agentsmith/tmp/review-board/<round-id>/pm-directive.json` (the structured directive `persist.mjs` applies).
+
+### 5b. Persist apply (main thread)
+
+- Run `node .claude/skills/review-board/persist.mjs apply .agentsmith/review-board <round-id>`. It reads the findings + verdicts + `pm-directive.json`, drops rejected findings, writes verified-new issues under their minted ids, applies reconcile and PM transitions, moves closing issues to `closed/`, writes `rounds/<round-id>.json`, updates epics, and runs `lint.mjs` as its final step.
+- A non-zero exit means the scratch was malformed or the write left the store invalid. Read the reported errors, fix the offending scratch/directive, and rerun -- `persist.mjs` is deterministic, so a clean rerun reproduces a clean store.
 
 ### 6. Present (main thread)
 
@@ -102,3 +105,5 @@ Per `#ai-review-engine`: real sub-agents when available; else one agent role-pla
 ## Token discipline
 
 Parallel fan-out; cheap model for review/verify, strong only for the PM reduce; each reviewer gets only the diff + its touched files + its profile tags (never the whole repo); the diff is computed once and passed by reference; non-dirty issues carry forward without re-read; the PM groups on summaries and pulls full descriptions only for issues it merges.
+
+The orchestration span is now mechanical -- dispatch agents, collect scratch paths, run `persist.mjs` -- because reviewers/verifiers write JSON scratch the driver never ingests and persistence is a deterministic script. So run the **driver on a cheap model** where the host lets the operator pick the session model; the strong model stays reserved for the `review-pm` reduce (its own dispatch). This is guidance, not an enforced mechanism: a skill cannot set its own session model.
