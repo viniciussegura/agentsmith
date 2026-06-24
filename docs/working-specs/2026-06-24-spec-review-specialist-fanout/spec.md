@@ -1,7 +1,7 @@
 # Spec: Spec-review specialist fan-out (engine application #3)
 
 Date: 2026-06-24
-Status: Approved
+Status: Implemented
 Review: spec-review converged at round 3 (`b`-trajectory 5 -> 3 -> 0, progress every round, no stall). All blockers + nits resolved; no open blockers.
 
 ## Motivation

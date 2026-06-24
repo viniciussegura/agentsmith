@@ -1,6 +1,8 @@
 # Spec-review specialist fan-out — Implementation Plan
 
-Status: Draft
+Status: Implemented
+
+Tasks 1–8 built and committed; `node --test` green (208). Residual: the live multi-agent dogfood acceptance (Task 8 Step 3) requires the installed subagents in a fresh Claude session — `guard.mjs` was verified end-to-end via its CLI here.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
