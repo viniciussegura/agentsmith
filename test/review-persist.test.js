@@ -145,3 +145,12 @@ test('pm directive writes epics, applies overrides and duplicates', () => {
   assert.equal(dup.status, 'duplicated');
   assert.equal(dup.relatedIssues.at(-1).issueId, 'r4#swe-1');
 });
+
+test('malformed findings JSON fails closed before writing the store', () => {
+  const { store, scratchDir, roundId } = scaffold('r5');
+  writeFileSync(join(scratchDir, 'findings', 'swe.json'), '{ this is not json');
+  assert.throws(() => persistApply({ store, scratchDir, roundId }), /JSON/i);
+  // No partial store written.
+  assert.equal(existsSync(join(store, 'rounds', 'r5.json')), false);
+  assert.equal(existsSync(join(store, 'issues')), false);
+});
