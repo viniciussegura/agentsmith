@@ -34,16 +34,22 @@ The original draft called a cheap orchestrator (addressing R1) the biggest lever
 
 The real fix is to make the orchestrator **do almost nothing**. Once findings never enter its context (R2) and the store is written by a script (R3), the orchestrator's whole span shrinks to: dispatch agents, collect file paths, run one script. An expensive model doing near-zero work costs near-zero. **R1 stops mattering once R2 and R3 are solved**, so R1 demotes to a one-line note.
 
-R2 and R3 are solved by host-agnostic artifacts (YAML scratch files + a `persist.mjs` script). They carry the entire portable win. A Workflow-based driver is then a strictly-additive Claude-Code-only accelerator over the same artifacts -- consistent with the repo's stated principle: *portability is the default; tool-specific artifacts are additive.*
+R2 and R3 are solved by host-agnostic artifacts (JSON scratch files + a `persist.mjs` script). They carry the entire portable win. A Workflow-based driver is then a strictly-additive Claude-Code-only accelerator over the same artifacts -- consistent with the repo's stated principle: *portability is the default; tool-specific artifacts are additive.*
 
 ## Architecture: one engine, two drivers
 
 ### Shared engine (host-agnostic) -- the contract both drivers obey
 
 - the review-* subagents (unchanged)
-- the `Issue` schema + YAML **scratch files** (S2)
+- the `Issue` schema + **JSON scratch files** (S2)
 - `persist.mjs` (S3)
-- `lint.mjs` and the store layout (unchanged)
+- `lint.mjs` (rewritten as a JSON validator) and the store directory layout (unchanged)
+
+### Interchange format: JSON end-to-end
+
+`persist.mjs` and `lint.mjs` ship into a consumer's `.claude/` and must run on bare `node` with **zero dependencies** (no YAML library). Reading findings back with full fidelity (multiline markdown `description`, nested `locations`) is exactly the arbitrary-YAML parsing `lint.mjs` was written to avoid. So the machine-written artifacts -- scratch findings, and the `issues/`/`epics/`/`rounds/` store files -- are **JSON**, parsed and emitted with built-in `JSON.parse`/`JSON.stringify`. One format, one parser, every host, no dependency.
+
+Human-facing and human-edited files stay as they are: `config.yaml` remains YAML (hand-maintained -- activate a role by adding a row; `lint.mjs` reads only its single `tracker:` scalar), and the PM's `triage.md` stays markdown. Only machine-written store files change format. The store **directory layout** is unchanged.
 
 ### Two drivers over that one contract
 
@@ -60,27 +66,31 @@ Reviewers and verifiers stop returning findings inline. Their **entire response 
 
 Scratch layout under `.agentsmith/tmp/review-board/<round-id>/` (already the scratch home, gitignored):
 
-- `findings/<role>.yaml` -- one file per reviewer, two sections:
-  - `reconcile:` -- status transitions for dirty issues the role owns (open -> `fixed`/`deprecated`/`superseded`, a recently-closed -> `open` reopen, or still-`open` with refreshed `locations`)
-  - `new:` -- new findings this round, each a single `Issue`-shaped object under its pre-minted compositional id
-- `verdicts/<finding-id>.yaml` -- one file per verifier: `verdict: accept|reject` + `rationale`
-- `pm-directive.yaml` -- the PM reduce writes this structured directive (see below)
+- `findings/<role>.json` -- one file per reviewer, two arrays:
+  - `reconcile` -- status transitions for dirty issues the role owns (open -> `fixed`/`deprecated`/`superseded`, a recently-closed -> `open` reopen, or still-`open` with refreshed `locations`)
+  - `new` -- new findings this round, each a single `Issue`-shaped object under its pre-minted compositional id
+- `verdicts/<finding-id>.json` -- one file per verifier: `{ "verdict": "accept"|"reject", "rationale": "..." }`
+- `pm-directive.json` -- the PM reduce writes this structured directive (see below)
 - `triage.md` -- the PM's human-readable report (unchanged)
 
-Output format is a single fenced **YAML** block conforming to the schema, nothing outside it -- one format, one parser, every host (no per-host structured-output branch). `persist.mjs` validates on ingest, so a malformed block fails closed rather than corrupting the store.
+Output is a single fenced **JSON** block conforming to the schema, nothing outside it -- one format, one parser (`JSON.parse`), every host, no dependency. `persist.mjs` validates on ingest, so a malformed block fails closed rather than corrupting the store.
 
-The shared protocol (`reviewer-common.md`) is tightened: the response is the scratch file's path and a count line; no preamble, no praise, no inline YAML.
+The shared protocol (`reviewer-common.md`) is tightened: the response is the scratch file's path and a count line; no preamble, no praise, no inline findings.
 
 ## S3 -- Deterministic persistence script
 
-Add `persist.mjs` alongside the read-only `lint.mjs`. All deterministic string and projection work is pulled out of the model into this script. Two subcommands:
+Add `persist.mjs` alongside `lint.mjs`. All deterministic string and projection work is pulled out of the model into this script. Two subcommands:
 
-- `node persist.mjs summary <store> <round-id>` -- projects (a) carried-forward open issues read from the store and (b) new verified findings (scratch `new:` minus `reject` verdicts) into the PM's input summary file. Runs **before** the PM reduce so the PM groups on summaries, not full bodies.
-- `node persist.mjs apply <store> <round-id>` -- reads `findings/` + `verdicts/` + `pm-directive.yaml`, drops rejected findings, writes verified new issues under their already-minted compositional ids, applies reconcile and PM status transitions, moves newly-closing issues to `closed/`, writes/refreshes `rounds/<round-id>.yaml`, updates epics, then **calls `lint.mjs` as its final step** and exits non-zero on any schema, id/role/placement, dangling-`relatedIssues`, or missing-`closingComments` violation.
+- `node persist.mjs summary <store> <round-id>` -- projects (a) carried-forward open issues read from the store and (b) new verified findings (scratch `new` minus `reject` verdicts) into the PM's input summary file. Runs **before** the PM reduce so the PM groups on summaries, not full bodies.
+- `node persist.mjs apply <store> <round-id>` -- reads `findings/` + `verdicts/` + `pm-directive.json`, drops rejected findings, writes verified new issues (as JSON) under their already-minted compositional ids, applies reconcile and PM status transitions, moves newly-closing issues to `closed/`, writes/refreshes `rounds/<round-id>.json`, updates epics, then **calls `lint.mjs` as its final step** and exits non-zero on any schema, id/role/placement, dangling-`relatedIssues`, or missing-`closingComments` violation.
 
-The orchestrator's persistence step becomes "invoke `persist.mjs`" instead of authoring dozens of files by hand. The script is deterministic, testable, and runs outside the model entirely.
+The orchestrator's persistence step becomes "invoke `persist.mjs`" instead of authoring dozens of files by hand. The script is deterministic, testable, and runs outside the model entirely. Both `persist.mjs` and `lint.mjs` are zero-dependency and read/write JSON via the built-ins.
 
-### `pm-directive.yaml` (the one new schema artifact)
+### `lint.mjs` rewrite (JSON validator)
+
+`lint.mjs` is rewritten to validate JSON store files (`JSON.parse` + field checks) rather than skim YAML with line-anchored regex. All the same invariants hold (id form + uniqueness, kind/tree coupling, status/placement coupling, closing-status required fields, `relatedIssues` integrity, round `baselineCommit`/`commit`). The minimal-parse helpers (`topScalar`, `keyPresentNonEmpty`, `blockLines`, `subValues`, `parseIssue`) are deleted; `parseId`/`placementOf`/`walkYaml`(->`walkJson`) stay. It still reads `config.yaml`'s single `tracker:` scalar (kept as YAML), which one small regex handles. `review-lint.test.js` fixtures flip from YAML to JSON.
+
+### `pm-directive.json` (the one new schema artifact)
 
 A structured list of operations the PM emits for `persist.mjs apply` to execute:
 
@@ -89,7 +99,7 @@ A structured list of operations the PM emits for `persist.mjs apply` to execute:
 - duplicate marks (issue id -> canonical id, status `duplicated`)
 - rejections / down-ranks (issue id + recorded reason)
 
-`Issue` schema, ids, status lifecycle, and store layout are **unchanged**; this directive is a new internal scratch artifact, not a change to the persisted schema. Its shape is documented in `issue-format.md`.
+`Issue` schema, ids, status lifecycle, and the store **directory layout** are unchanged; this directive is a new internal scratch artifact, not a change to the persisted schema. Its shape is documented in `issue-format.md`.
 
 ## S1 -- Cheap-orchestrator note (demoted)
 
@@ -100,10 +110,10 @@ A structured list of operations the PM emits for `persist.mjs apply` to execute:
 Shape unchanged (the same 6 steps; setup and gating logic untouched):
 
 1. **Setup** (driver) -- mode/target/baseline/role-selection/dirtiness scan/confirmation gate, exactly as today.
-2. **Reconcile + review** (parallel reviewers, cheap) -- each writes `findings/<role>.yaml` (`reconcile:` + `new:`), returns path + count.
-3. **Verify** (parallel verifiers, cheap) -- each writes `verdicts/<finding-id>.yaml`, returns path + verdict.
+2. **Reconcile + review** (parallel reviewers, cheap) -- each writes `findings/<role>.json` (`reconcile` + `new`), returns path + count.
+3. **Verify** (parallel verifiers, cheap) -- each writes `verdicts/<finding-id>.json`, returns path + verdict.
 4. **Persist (summary)** -- `node persist.mjs summary <store> <round-id>` builds the PM input.
-5. **Reduce** (PM, strong) -- reads the summary, writes `pm-directive.yaml` + `triage.md`.
+5. **Reduce** (PM, strong) -- reads the summary, writes `pm-directive.json` + `triage.md`.
 6. **Persist (apply)** -- `node persist.mjs apply <store> <round-id>` performs one deterministic write and self-lints.
 7. **Present** (driver) -- unchanged: round summary, verify-reject count, scratch paths, promote offer.
 
@@ -116,15 +126,15 @@ A `tools/claude/skills/review-board/workflow.mjs`, invoked by its own command (e
 Workflow scripts have no filesystem or Node API access, so the script dispatches agents for all IO and reuses the same engine:
 
 - a setup agent returns diff metadata (schema return)
-- `parallel` reviewer agents (agentType `review-correctness`, ...) write their scratch `findings/<role>.yaml` and return the path
-- `pipeline` verifier agents write `verdicts/<id>.yaml`
-- an agent runs `persist.mjs summary`; the `review-pm` agent writes `pm-directive.yaml`; an agent runs `persist.mjs apply`
+- `parallel` reviewer agents (agentType `review-correctness`, ...) write their scratch `findings/<role>.json` and return the path
+- `pipeline` verifier agents write `verdicts/<id>.json`
+- an agent runs `persist.mjs summary`; the `review-pm` agent writes `pm-directive.json`; an agent runs `persist.mjs apply`
 
 Same scratch, same `persist.mjs`, same store -- only the dispatch is deterministic JS with no main-loop model. Marked phase 2 and built after the core; honestly marginal once S2+S3 land, since by then the portable orchestrator already does near-zero work. Value is enforcement (the model is structurally absent from orchestration) rather than a large additional saving.
 
 ## Build order
 
-1. **Core (portable):** S2 scratch contract + tightened `reviewer-common.md`; `persist.mjs` (both subcommands) + `pm-directive.yaml` shape in `issue-format.md`; `SKILL.md` pipeline edits + S1 note. Tests for `persist.mjs`.
+1. **Core (portable):** `lint.mjs` JSON rewrite (+ flip `review-lint.test.js` fixtures) first, since the store format underpins everything; then S2 scratch contract + tightened `reviewer-common.md`; `persist.mjs` (both subcommands) + `pm-directive.json` shape in `issue-format.md`; `SKILL.md` pipeline edits + S1 note. Tests for `persist.mjs`.
 2. **Phase 2 (Claude-only):** `workflow.mjs` + its command, over the now-existing contract.
 
 Phase 2 depends on phase 1 (it reuses the scratch contract and `persist.mjs`); they are parallel in architecture but sequential in build.
@@ -133,13 +143,15 @@ Phase 2 depends on phase 1 (it reuses the scratch contract and `persist.mjs`); t
 
 - **Reviewer reasoning is not lost.** Reviewers still reason internally; S2 only stops them narrating it back. The verifier's reject rationale is still captured (in its scratch verdict), just not as free prose in the driver's context.
 - **A cheap orchestrator may reconcile less astutely.** Reconciliation is largely mechanical (dirty-path scan, status transitions); the genuinely hard judgment stays in the strong PM subagent. If a specific reconcile step needs more reasoning, dispatch it as a small strong-model subagent rather than upgrading the whole loop.
-- **Non-goal:** changing the round pipeline shape, `Issue` schema, status lifecycle, id scheme, or store layout. This is purely about *which model does the mechanical span* and *how findings move from subagent to store*. The only new schema is the internal `pm-directive.yaml` scratch artifact.
+- **Non-goal:** changing the round pipeline shape, `Issue` schema (fields), status lifecycle, id scheme, or store **directory layout**. This is purely about *which model does the mechanical span*, *how findings move from subagent to store*, and the machine-file serialization (YAML -> JSON). The only new schema is the internal `pm-directive.json` scratch artifact.
+- **In scope by consequence of JSON-everywhere:** the store's machine files change format (YAML -> JSON), `lint.mjs` is rewritten as a JSON validator, and any existing per-machine store regenerates via one forced full sweep (gitignored, local-lifetime, atomic-loss -- low stakes). `config.yaml` and `triage.md` are unchanged.
 
 ## Acceptance
 
-- Reviewers/verifiers write scratch and return only a path + count; the orchestrator ingests no reviewer/verifier prose and hand-authors no store files.
-- `persist.mjs` exists with `summary` and `apply` subcommands, writes a lint-clean store from the scratch inputs, and fails closed on malformed input.
+- Reviewers/verifiers write JSON scratch and return only a path + count; the orchestrator ingests no reviewer/verifier prose and hand-authors no store files.
+- `persist.mjs` exists with `summary` and `apply` subcommands, writes a lint-clean JSON store from the scratch inputs, and fails closed on malformed input.
+- `lint.mjs` validates the JSON store with the same invariants; `review-lint.test.js` passes against JSON fixtures.
 - `SKILL.md` states the scratch contract (S2), the split persist steps, and the cheap-orchestrator note (S1).
-- `pm-directive.yaml` shape is documented in `issue-format.md`.
-- Backward compatible: `Issue` schema, ids, status lifecycle, and store layout unchanged.
+- `pm-directive.json` shape is documented in `issue-format.md`.
+- Backward compatible where it counts: `Issue` schema fields, ids, status lifecycle, and store directory layout unchanged; only machine-file serialization changes.
 - Phase 2: `workflow.mjs` + its command drive an identical round with no main-loop model in the orchestration span, producing the same store via the same `persist.mjs`. Built after the core.
