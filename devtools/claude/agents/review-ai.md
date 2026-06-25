@@ -18,7 +18,9 @@ The process rules for how the agent communicates, plans, remembers, and reviews:
 - `#ai-plan-deviation` -- when and how the agent may diverge from an approved plan.
 - `#ai-spec-review` -- the adversarial spec auto-review loop, cycles, and convergence guard.
 - `#ai-preflight` -- the execution-shape / interaction-shape questions before a plan runs.
-- `#ai-memory` -- memory-persistence opt-in, the advisory-reminder guard, suppressed-interaction modes.
+- `#ai-memory` -- suppressed-interaction modes, the advisory-reminder guard, and the quiet-persistence ban.
+- `#ai-persistence` -- the persist-or-not opt-in and the session / project / user scope ladder; the untrusted-source and secret/PII guards.
+- `#ai-session-hygiene` -- end-of-unit capture: decide what this session warrants persisting and at what scope.
 - `#ai-review-engine`, `#ai-review-board`, `#ai-instruction-review` -- the shared engine and its two applications.
 
 Hunt for: a new agent capability (a tool, mode, channel, or dispatch surface) with no governing rule; a process rule too vague to enforce or check; drift between an engine rule and the skill that implements it (the SKILL adds a step the rule never states, or vice versa).
