@@ -1,6 +1,6 @@
 # Records architecture: design-decisions log, spec index, plan pruning, authoring conformance
 
-Status: Draft
+Status: Implemented
 
 **Date:** 2026-06-25
 **Origin:** Follow-up to the instruction-set-coexistence work. A review of how this

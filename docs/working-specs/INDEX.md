@@ -4,7 +4,7 @@
 
 | Date | Unit | Status |
 |---|---|---|
-| 2026-06-25 | [Records architecture: design-decisions log, spec index, plan pruning, authoring conformance](2026-06-25-records-architecture/spec.md) | Draft |
+| 2026-06-25 | [Records architecture: design-decisions log, spec index, plan pruning, authoring conformance](2026-06-25-records-architecture/spec.md) | Implemented |
 | 2026-06-24 | [Spec: Spec-review specialist fan-out (engine application #3)](2026-06-24-spec-review-specialist-fanout/spec.md) | Implemented |
 | 2026-06-23 | [Spec: Authoring-tool split + Claude plugin packaging](2026-06-23-authoring-split-and-plugin-packaging/spec.md) | Reviewed |
 | 2026-06-23 | [Spec: Reduce review-board orchestration cost (one engine, two drivers)](2026-06-23-review-board-token-cost/spec.md) | Implemented |
