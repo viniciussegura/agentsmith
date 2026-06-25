@@ -1,7 +1,8 @@
 # #ai-review-engine Role-based review engine
 
 - A shared, opt-in engine fans out **role-specialized reviewer sub-agents**, each a composition of existing instruction tags (#swe-reuse), not a fresh persona -- so reviewers track the instruction set instead of forking it.
-- One pipeline, two applications -- **code review** (#ai-review-board) and instruction review -- sharing the registry and shape, differing only in subject, schema, persistence, and reconciliation.
+- One pipeline, three applications -- **code review** (#ai-review-board), **instruction review**, and **spec review** (#ai-spec-review) -- sharing the registry and shape, differing only in subject, schema, persistence, and reconciliation.
+  Spec review differs in two further traits: its reduce runs **in-loop** (a generalist converges the fan-out every round, rather than a once-per-round PM), and it selects lenses by the generalist's **semantic routing** over the curated `spec_review` registry column, not by path-glob gating (a spec has no diff).
 - Shape: **setup -> fan-out (parallel) -> verify (per-finding skeptic, biased to reject) -> reduce (editor; consolidates and writes the human output) -> present**.
   Per #ai-conversational, every sub-agent dispatch states an explicit model id: fan-out and verify use the cheapest model whose context window and tool-use capability suffice; reduce uses a stronger model capable of sustained multi-step reconciliation.
 - **Setup mints a round-id first** (date-based `<YYYY-MM-DD>`, suffixed `[a]`, `[b]`, ... for same-day reruns) so the scratch and archive paths are defined before fan-out.

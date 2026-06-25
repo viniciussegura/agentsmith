@@ -8,6 +8,12 @@
 #   always              the role runs on every code-review round regardless of gating
 #   base_lens           the always-on cross-cutting lens that owns the cross-cutting tags
 #   instruction_review  the role participates in the instruction-review application (Phase 3)
+#   spec_review         the role participates in the spec-review application (engine app #3,
+#                       #ai-spec-review). Curated and INDEPENDENT of instruction_review: a role
+#                       may join one, both, or neither. The spec-review generalist subsumes the
+#                       swe + correctness lenses (so both are false here); the meta lenses ai/git
+#                       review process/VCS rules, not a feature spec, so they are false too. The
+#                       generalist's consultable menu is exactly this column filtered to true.
 #
 # correctness owns no tag by design (its subject is the diff's behavior, not a rule), so the
 # coverage lint exempts it from the "every role owns >=1 tag" warning.
@@ -20,16 +26,16 @@
 # Repo config, like manifest.json. NEVER exported to AGENTS.md or the plugin.
 
 roles:
-  correctness: { always: true,  base_lens: false, instruction_review: false }
-  swe:         { always: true,  base_lens: true,  instruction_review: true }
-  security:    { always: false, base_lens: false, instruction_review: true }
-  db:          { always: false, base_lens: false, instruction_review: true }
-  qa:          { always: false, base_lens: false, instruction_review: true }
-  docs:        { always: false, base_lens: false, instruction_review: true }
-  frontend:    { always: false, base_lens: false, instruction_review: true }
-  ux:          { always: false, base_lens: false, instruction_review: true }
-  ai:          { always: false, base_lens: false, instruction_review: true }
-  git:         { always: false, base_lens: false, instruction_review: true }
+  correctness: { always: true,  base_lens: false, instruction_review: false, spec_review: false }
+  swe:         { always: true,  base_lens: true,  instruction_review: true,  spec_review: false }
+  security:    { always: false, base_lens: false, instruction_review: true,  spec_review: true }
+  db:          { always: false, base_lens: false, instruction_review: true,  spec_review: true }
+  qa:          { always: false, base_lens: false, instruction_review: true,  spec_review: true }
+  docs:        { always: false, base_lens: false, instruction_review: true,  spec_review: true }
+  frontend:    { always: false, base_lens: false, instruction_review: true,  spec_review: true }
+  ux:          { always: false, base_lens: false, instruction_review: true,  spec_review: true }
+  ai:          { always: false, base_lens: false, instruction_review: true,  spec_review: false }
+  git:         { always: false, base_lens: false, instruction_review: true,  spec_review: false }
 
 # No non-review markers: every #tag resolves to a reviewing lens above.
 markers: []

@@ -88,6 +88,8 @@ owners:
   ai-spec-review: ai
   ai-preflight: ai
   ai-memory: ai
+  ai-persistence: ai
+  ai-session-hygiene: ai
   ai-review-engine: ai
   ai-review-board: ai
   ai-instruction-review: ai

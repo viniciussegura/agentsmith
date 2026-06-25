@@ -10,9 +10,9 @@ Stay in your lens -- other roles own theirs; overlap is fine, and duplicate-by-d
 
 ## Inputs (from the spawn prompt)
 
-- **Subject** -- a code diff + touched files (code review) or an instruction set (instruction review); read it, do not assume.
-- **Schema** -- `Issue` (code review) or `InstructionProposal` (instruction review); the prompt names which and points at the reference (`issue-format.md` / `proposal-format.md`).
-- **Reconciliation** -- any focus paths or prior-issue context the prompt passes.
+- **Subject** -- a code diff + touched files (code review), an instruction set (instruction review), or a spec (spec review); read it, do not assume. For spec review the spawn prompt also sets the **altitude**: judge whether your lens's concerns are *specified* -- complete, consistent, testable -- at design altitude, not implementation bugs.
+- **Schema** -- `Issue` (code review), `InstructionProposal` (instruction review), or `Finding` (spec review); the prompt names which and points at the reference (`issue-format.md` / `proposal-format.md` / `spec-review/finding-format.md`).
+- **Reconciliation** -- any focus paths, prior-issue/prior-finding context, or (spec review) the diff since your last consult that the prompt passes.
 
 ## Method
 
