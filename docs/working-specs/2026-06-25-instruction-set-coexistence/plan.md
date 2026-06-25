@@ -1,5 +1,7 @@
 # Instruction-set coexistence Implementation Plan
 
+Status: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the generated instruction set state how it coexists with a project-scoped instruction file, close the deep-modules gap, and steer downstream authors away from paraphrase drift.

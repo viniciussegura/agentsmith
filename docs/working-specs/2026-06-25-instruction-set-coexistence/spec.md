@@ -1,7 +1,7 @@
 # Instruction-set coexistence: precedence, gap, and drift
 
 **Date:** 2026-06-25
-**Status:** approved design, pre-implementation
+Status: Implemented
 **Origin:** `tmp/user-rules-feedback.md` — feedback from a downstream project running this
 generated set at user scope beside a Java/Spring project `CLAUDE.md`.
 
