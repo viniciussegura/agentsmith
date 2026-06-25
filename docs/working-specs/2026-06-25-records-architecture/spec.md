@@ -38,6 +38,18 @@ remain:
 - **Authoring conformance**: a new working spec conforms to current present-truth or states
   why it diverges and whether those docs must change.
 
+## Conformance
+
+(Dogfoods the `#ai-plan` conformance clause this spec introduces.) Checked against current
+present-truth:
+
+- **Reference spec** (`docs/reference-spec/entity-model.md`) — unaffected; this change adds no
+  entity and alters no existing one.
+- **Design decisions** — none exist yet (`docs/design-decisions/` is created by this work), so
+  there is nothing to conform to or diverge from.
+- **Divergence:** none. No present-truth document is contradicted; no present-truth update is
+  required by this spec beyond the records it itself creates.
+
 ## Design
 
 ### A. Record taxonomy
@@ -68,6 +80,15 @@ Two families. **Present-truth** = mutable, self-replacing, kept current, never s
    rationale vs the regenerated audit output of the instruction-review application
    (`#ai-instruction-review`). Separate, cross-referenced, not merged.
 
+**Where to look (intent → record):**
+
+- *Why is the system designed this way?* → a `docs/design-decisions/` file (linked from the
+  relevant reference spec / working spec).
+- *What does the system do now, and how?* → the reference spec.
+- *What happened in this unit of work, and why then?* → its frozen working spec (+ git).
+- *What does decision X affect?* → grep its slug across `docs/` (one-way linking is
+  deliberate; no reverse index is maintained — see Boundary 1).
+
 ### B. New rule `#swe-design-decisions`
 
 New file `instructions/core/swe/swe-design-decisions.md`; one ownership row
@@ -83,10 +104,13 @@ New file `instructions/core/swe/swe-design-decisions.md`; one ownership row
 > superseded entries. Scope by reach: unit-local choices stay in the working spec; only
 > cross-cutting or re-litigated choices earn a file. It is the WHY counterpart to the
 > reference spec's WHAT/HOW; the relationship is many-to-many. Present-truth documents and
-> working specs link **out** to a decision by slug; a decision need not enumerate referrers.
-> Distinct from `docs/instruction-rules-decisions.md` (regenerated instruction-review audit
-> output, not hand-authored rationale). Kept current under `#swe-docs-drift`, gated by
-> `#swe-done`.
+> working specs link **out** to a decision by slug; a decision need not enumerate referrers —
+> to find what a decision affects, grep its slug. A decision is always **project scope** (a
+> committed repo file); there is no generated reverse index. Distinct from
+> `docs/instruction-rules-decisions.md` (regenerated instruction-review audit output, not
+> hand-authored rationale). Kept current under `#swe-docs-drift` and gated by `#swe-done`,
+> which checks that **existing** decision files are not left stale — never that a new one
+> must be authored (authoring stays a soft `#ai-session-hygiene` prompt).
 
 Cross-references used (all must resolve): `#swe-reference-spec`, `#ai-plan`,
 `#ai-instruction-review`, `#swe-docs-drift`, `#swe-done`.
@@ -94,20 +118,32 @@ Cross-references used (all must resolve): `#swe-reference-spec`, `#ai-plan`,
 ### C. Wiring into existing rules
 
 - **`#ai-plan`** gains two clauses:
-  1. A new working spec is checked against the current reference spec
-     (`#swe-reference-spec`) and design decisions (`#swe-design-decisions`): it **conforms,
-     or states explicitly where and why it diverges**, and whether those present-truth docs
-     must change. The change itself is applied at `#swe-done`; here it is surfaced and
-     justified.
-  2. A plan reaching `Status: Implemented` **may be pruned** (execution scaffolding; the
-     frozen spec, shipped code, and git carry the result). The spec is never pruned. The set
-     of working specs is indexed at generated `docs/working-specs/INDEX.md`.
-- **`#swe-done`** item 2 gains "…and the design-decisions log when standing rationale
-  changed (`#swe-design-decisions`)"; mechanical upkeep gains "the working-specs index is
-  regenerated."
+  1. **Conformance.** A new working spec carries a short **Conformance** section stating it
+     conforms to the current reference spec (`#swe-reference-spec`) and design decisions
+     (`#swe-design-decisions`), or naming where and why it diverges and whether those
+     present-truth docs must change. The statement's home is that named section, so author
+     and reviewer both know where to look; it is **enforced by the adversarial spec review**
+     (`#ai-spec-review`) — a spec that silently contradicts present-truth without
+     justification is a blocking finding (no automated lint). Any divergence's doc updates
+     are applied later at `#swe-done`.
+  2. **Plan pruning.** A plan reaching `Status: Implemented` **may be pruned** — an explicit
+     exception to the append-only rule for plans (deletion, not in-place mutation),
+     justified because a plan is execution scaffolding with no residual present-truth; the
+     frozen spec, shipped code, and git carry the result. The spec is **never** pruned. The
+     set of working specs is indexed at generated `docs/working-specs/INDEX.md`.
+- **`#swe-done`** item 2 (docs-currency) gains a clause parallel to the reference-spec one it
+  already carries: **when this change altered an existing decision's rationale, that
+  `docs/design-decisions/` file is brought current** (`#swe-design-decisions`). This is a
+  currency check on **existing** files, **not** a requirement to author a new decision —
+  authoring stays soft (`#ai-session-hygiene`), so Section B's "never a merge gate" holds.
+  Mechanical upkeep also gains "the working-specs index is regenerated" — regenerated
+  whenever a spec is added or its `Status:` changes; the drift test is the backstop, not the
+  trigger.
 - **`#ai-session-hygiene`** extends its persist menu: a reusable work standard, a memory,
-  **or a cross-cutting design decision (`#swe-design-decisions`)** — scoped by the same
-  reach test.
+  **or a cross-cutting design decision (`#swe-design-decisions`)**. A design decision is
+  always **project scope** (a committed `docs/design-decisions/` file); the reach test
+  decides only *whether* it warrants a file, independent of the session/project/user tier
+  that scopes standards and memories.
 - **`#swe-reference-spec`** gains one cross-reference line naming the design-decisions log
   as its WHY counterpart.
 
@@ -116,16 +152,23 @@ Cross-references used (all must resolve): `#swe-reference-spec`, `#ai-plan`,
 A small Node ESM generator scans `docs/working-specs/*/spec.md`, reads the H1 title and the
 `Status:` token, and writes `docs/working-specs/INDEX.md`: a table sorted by date
 descending, with a "generated — do not hand-edit" banner. `INDEX.md` is **committed** (it is
-human-browsable on the forge, unlike the gitignored `AGENTS.md`). A test regenerates the
-index into memory and diffs it against the committed file, failing when stale. CLI wiring
-(a `bin/cli.js` subcommand vs a dedicated entry) is decided in the plan; it follows the
-existing generator's conventions.
+human-browsable on the forge, unlike the gitignored `AGENTS.md`). CLI wiring (a `bin/cli.js`
+subcommand vs a dedicated entry) is decided in the plan; it follows the existing generator's
+conventions.
+
+**Drift test.** `test/working-specs-index.test.mjs` runs under `node --test`: it invokes the
+generator to produce the index as a string and `assert.equal`s it against the committed
+`docs/working-specs/INDEX.md`, failing when the committed file is stale. The test is the
+**backstop**; the **trigger** is mechanical upkeep under `#swe-done` (regenerate whenever a
+spec is added or its `Status:` advances), so a forgotten regen surfaces as a red test, not a
+silently wrong index.
 
 ### E. Scope
 
 One working spec. Implementation tasks (sequenced in the plan):
 
-1. New rule `#swe-design-decisions` + ownership row; integrity gate green.
+1. New rule `#swe-design-decisions` + ownership row; the instruction-integrity gates pass
+   (dangling-tag resolution + ownership coverage, per `test/instruction-integrity.test.mjs`).
 2. Wire the four existing rules (Section C).
 3. Index generator + `INDEX.md` + drift test.
 4. Seed `docs/design-decisions/` with the already-warranted decisions this work and its
@@ -143,12 +186,14 @@ One working spec. Implementation tasks (sequenced in the plan):
 - Backfilling rationale files for all historical decisions.
 
 **Note:** frozen specs are append-only, so existing specs will not receive out-links
-retroactively; their decisions stay discoverable via `INDEX.md` and grep.
+retroactively; the decisions they introduced stay discoverable by grepping the decision slug
+(the spec `INDEX.md` indexes specs, not decisions).
 
 ## Verification
 
 - Generator runs clean; `AGENTS.md` regenerated with the new rule and the four amended
   rules; all referenced `#tag`s resolve (dangling-tag gate).
 - Ownership coverage lint green (exactly one new row, no orphan/duplicate).
-- Index drift test passes; `INDEX.md` matches the generator output.
+- Index drift test (`test/working-specs-index.test.mjs`) passes; committed
+  `docs/working-specs/INDEX.md` matches generator output.
 - Full `node --test` suite green.
