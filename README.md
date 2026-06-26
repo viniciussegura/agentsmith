@@ -102,4 +102,5 @@ Commands then surface as `/agentsmith:code-review-board`,
 Working on the rules or the generator? See [CONTRIBUTING.md](CONTRIBUTING.md) for
 the repository layout, how to author rules, and the dev workflow. How this repo
 organizes its specs, decisions, and history is in
-[docs/documentation-model.md](docs/documentation-model.md).
+[docs/documentation-model.md](docs/documentation-model.md); the review-board round
+protocol is in [docs/reference-spec/review-board-protocol.md](docs/reference-spec/review-board-protocol.md).
