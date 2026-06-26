@@ -1,6 +1,6 @@
 # Board unification: one round choreography, two drivers, three boards
 
-Status: Draft
+Status: Approved
 
 ## Problem
 

@@ -1,6 +1,6 @@
 # Installer prune: remove orphaned generated files
 
-Status: Draft
+Status: Approved
 
 ## Problem
 
