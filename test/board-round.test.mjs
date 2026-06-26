@@ -34,6 +34,8 @@ test('code round runs Review -> Verify -> Reduce -> Persist, every dispatch carr
   assert.ok(h.calls.some((c) => c.opts.label === 'reduce:pre'), 'code runs a reduce:pre dispatch');
   const reduce = h.calls.find((c) => c.opts.label === 'reduce');
   assert.match(reduce.prompt, /pm-directive\.json/);
+  // Task 2: reduce must still route to review-pm (rename to project-manager is Task 4, per §J)
+  assert.equal(reduce.opts.agentType, 'review-pm', 'code reduce dispatches to review-pm agent');
 });
 
 test('spec round skips Verify (verify=false)', async () => {
