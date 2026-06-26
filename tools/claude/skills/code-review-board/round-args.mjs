@@ -75,6 +75,7 @@ export function instructionArgs(ctx) {
     ...base(ctx),
     board: 'instruction',
     maintainer: 'ai-engineer',
+    plan: { routingSchema: ROUTING_SCHEMA },
     verify: true,
     // instruction's reduce writes triage.json directly via the maintainer agent;
     // persist is a no-op CLI marker (the worksheet is the reduce output).

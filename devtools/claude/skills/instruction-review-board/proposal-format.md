@@ -28,7 +28,7 @@ interface InstructionProposal {
 }
 ```
 
-**Required per kind** (the reduce step rejects a proposal missing its kind's field): `new-rule` and `strengthen` require `targetFile`; `new-rule` also requires `draft` once concrete; `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must be a **resolvable owner** (a declared role, the `swe` base lens, or a known non-review marker -- else the editor rejects/normalizes it).
+**Required per kind** (the reduce step rejects a proposal missing its kind's field): `new-rule` and `strengthen` require `targetFile`; `new-rule` also requires `draft` once concrete; `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must be a **resolvable owner** (a declared role, the `swe` base lens, or a known non-review marker -- else the `ai-engineer` reduce rejects/normalizes it).
 
 A `draft` is written **verbatim** into a `.md` by `/instruction-apply`, so author it in house markdown style -- `#code-markdown`: one sentence per line, hard-wrap only at sentence boundaries (never by column), lists/tables/fenced blocks left intact. (`#code-markdown`'s own trigger is "editing a `.md`"; a draft is the `.md`'s future content, so the style applies at authoring time.)
 
@@ -36,7 +36,7 @@ The triage worksheet is the structured **`triage.json`** (`{ round, scorecard, c
 
 ### Persisted worksheet (scorecard + candidates)
 
-The worksheet carries two siblings to `entries` that the editor (reduce step) writes each round:
+The worksheet carries two siblings to `entries` that the `ai-engineer` (reduce step) writes each round:
 
 ```typescript
 type Verdict  = 'strong' | 'good' | 'weak' | 'gaps';
@@ -96,22 +96,22 @@ The rubric is the nine dimensions of the single-agent fallback `prompts/review-i
 
 These six per-lens dimensions are scored separately (clarity, terseness, efficiency, and enforceability are not merged): they co-vary but a split lets "terse but unclear" or "clear but unenforceable" surface at a glance.
 
-**Global / structural** -- **not** per-lens; the editor runs these once in reduce, and **no role duplicates them**:
+**Global / structural** -- **not** per-lens; the `ai-engineer` runs these once in reduce, and **no role duplicates them**:
 
 - **Cohesiveness** -- no rule contradicts another or the house style.
 - **Self-reference integrity** -- every `#tag` resolves, every section has a unique tag.
 - **Lean-split integrity** -- no core rule references a bundle-only tag.
 - **Normative voice** -- consistent **MUST** / **Never** / `should`.
 
-**Mechanical nits** -- a separate editor sweep for typos, grammar, stray whitespace, broken links, invalid markup.
+**Mechanical nits** -- a separate `ai-engineer` sweep for typos, grammar, stray whitespace, broken links, invalid markup.
 
 ## Dimension scorecard (presented each round, never committed)
 
 The reduce step does not just write proposals -- it **accounts for every rubric dimension** and the round's present step surfaces the result, so a dimension is never silently skipped (the failure this scorecard exists to prevent).
 
-For **each** rubric dimension (the six per-lens -- coverage, clarity, terseness, efficiency, enforceability, ownership & placement -- consolidated across roles, plus the four global/structural), the editor emits one `Finding` per rule that scores below **Strong**, each citing `file`, `#tag`, and its own `verdict` -- **Strong / Good / Weak / Gaps**. The cell (and global) verdict is then the **worst** of those findings, and **Strong** when there are none. A `Weak`/`Gaps` finding ties to the proposal(s) it produced. The mechanical nits are listed separately as a short actionable list.
+For **each** rubric dimension (the six per-lens -- coverage, clarity, terseness, efficiency, enforceability, ownership & placement -- consolidated across roles, plus the four global/structural), the `ai-engineer` emits one `Finding` per rule that scores below **Strong**, each citing `file`, `#tag`, and its own `verdict` -- **Strong / Good / Weak / Gaps**. The cell (and global) verdict is then the **worst** of those findings, and **Strong** when there are none. A `Weak`/`Gaps` finding ties to the proposal(s) it produced. The mechanical nits are listed separately as a short actionable list.
 
-The per-rule findings come from the fan-out reviewers; the editor only consolidates and rolls them up -- it never asserts a cell verdict independently of its findings. A clean rule produces no finding (and so contributes **Strong**).
+The per-rule findings come from the fan-out reviewers; the `ai-engineer` only consolidates and rolls them up -- it never asserts a cell verdict independently of its findings. A clean rule produces no finding (and so contributes **Strong**).
 
 This mirrors the fallback prompt's output format. The scorecard and nits are **presented to the user, not committed** -- the only committed file is the decisions log.
 

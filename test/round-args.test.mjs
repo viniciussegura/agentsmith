@@ -39,6 +39,8 @@ test('instructionArgs sets board=instruction, verify=true, ai-engineer', () => {
   assert.equal(a.board, 'instruction');
   assert.equal(a.verify, true);
   assert.equal(a.maintainer, 'ai-engineer');
+  assert.ok(a.plan, 'instruction enables the plan phase');
+  assert.equal(a.plan.routingSchema, ROUTING_SCHEMA);
 });
 
 test('DATA sentinels name the source and are distinct', () => {

@@ -1,6 +1,6 @@
 ---
 name: instruction-review-board
-description: Run a per-role audit of an instruction set (instructions/ + the generated AGENTS.md), proposing missing or weak rules through each role's lens. Use when the user runs /instruction-review-board, or asks to audit/review the instruction rules. Opens on the ownership coverage lint, fans out per role, verifies each proposal, an editor reduce consolidates and writes an editable triage worksheet; the separate /instruction-apply command applies the human's decisions. Proposes, then adopts only what the human accepts (#swe-done).
+description: Run a per-role audit of an instruction set (instructions/ + the generated AGENTS.md), proposing missing or weak rules through each role's lens. Use when the user runs /instruction-review-board, or asks to audit/review the instruction rules. Opens on the ownership coverage lint, fans out per role, verifies each proposal, an ai-engineer reduce consolidates and writes an editable triage worksheet; the separate /instruction-apply command applies the human's decisions. Proposes, then adopts only what the human accepts (#swe-done).
 ---
 
 # Instruction review
@@ -16,7 +16,9 @@ Schema, rubric, and the decisions-log format are in `proposal-format.md`; read i
 
 ## Relationship to the shared engine
 
-Same fan-out -> verify -> reduce -> present shape and the same role registry as the code-review board, but: the **subject** is the instruction set (a full audit -- there is no `diff` variant in v1), the **schema** is `InstructionProposal` (not `Issue`), and **persistence is the decisions log** `docs/instruction-rules-decisions.md` (no issue store, no round store, no commit baseline).
+This is the **instruction application** of agentsmith's shared review round (`#ai-review-engine`), whose field-level contract is canonical in `docs/reference-spec/review-board-protocol.md`. The round shape -- `[Plan] -> Review -> [Verify] -> Reduce -> Persist` -- and the role registry are the same as the code-review board; the per-application differences are carried by the `instructionArgs(ctx)` builder in `round-args.mjs` (`board: 'instruction'`, `maintainer: 'ai-engineer'`, `plan` enabled, `verify: true`, the worksheet reduce prompt). The same round runs two ways: this SKILL is the **main-thread driver** (the prose below), and `/instruction-review-board-wf` runs the **Workflow driver** (`board-round.mjs`) deterministically with identical args — parity is by construction (both consume `instructionArgs`).
+
+What differs from code review: the **subject** is the instruction set (a full audit -- there is no `diff` variant in v1), the **schema** is `InstructionProposal` (not `Issue`), the **maintainer** is `ai-engineer` (plan + reduce), and **persistence is the triage worksheet** `.agentsmith/instruction-review/triage.json` then the decisions log `docs/instruction-rules-decisions.md` via `/instruction-apply` (no issue store, no round store, no commit baseline).
 Each reviewer persona is application-neutral; your spawn prompt supplies the instruction set as subject and names `InstructionProposal` as the output schema.
 
 ## Participants
@@ -38,9 +40,13 @@ Not every code lens maps to instruction rules, so role **participation** is per-
 
   If the worksheet is absent or has no entries, no gate; proceed.
 - **Open by running the ownership coverage lint** (`npm test`'s ownership check, or `ownershipCoverage` over `instructions/ownership.yaml` + `roles.yaml`) as the round's **first finding source**: any orphan (unowned) or double-owned `#tag` becomes the round's first proposal(s) -- a `reowner`/`new-rule` to assign or de-conflict an owner, since an unowned rule is one no lens would cover. This is propose-only: record the orphan as a proposal and proceed; the hard CI gate against orphans is the coverage-lint test, not this round.
-- Resolve the participating role set (above).
+- Resolve the participating role set (above) -- this is the round's **candidate** lens set.
 
-### 2. Fan-out (parallel, one sub-agent per participating role, cheap model)
+### 1b. Plan (ai-engineer, strong model)
+
+Spawn `ai-engineer` (the maintainer's **plan** duty) with the candidate lens set and the ownership-coverage-lint output (presented as untrusted DATA): it returns `{lenses, perLens}` -- the subset of lenses to actually consult and a per-lens focus map (e.g. concentrating the owning lens on a lint orphan). It must not merely echo the candidate set. The fan-out below runs the **maintainer-chosen** lenses, not the raw candidate set. (In the `-wf` driver this is the Plan phase of `board-round.mjs`; the lint output is the kickstart's `plannerInputs` DATA.)
+
+### 2. Fan-out (parallel, one sub-agent per planned role, cheap model)
 
 Each role reviews the instruction set through its lens, emitting `InstructionProposal`s for: (a) **coverage** -- a rule its domain expects that is missing or too weak; (b) **per-lens quality** -- clarity, terseness, efficiency, enforceability of rules in its domain; (c) **ownership & placement** -- whether a rule it owns (or believes belongs to its lens) is owned by the right role and in the best file, proposing `rehome`/`reowner` where not.
 The global/structural rubric dimensions are **not** per-lens; they run once in reduce (step 4).
@@ -49,9 +55,9 @@ The global/structural rubric dimensions are **not** per-lens; they run once in r
 
 Spawn one `review-verifier` per proposal, biased to reject: confirm the gap is **real and not already covered** by a live `#tag` (re-read the generated output and grep tags). Drop rejected proposals.
 
-### 4. Reduce (instruction-editor, strong model)
+### 4. Reduce (ai-engineer, strong model)
 
-Spawn `instruction-editor` with the verified proposals: it deduplicates across lenses, reconciles `rehome`/`reowner` to a single owner (confirming the map stays complete and single-owner), rejects proposals missing their required field, and prepares the consolidated proposal set for triage. It does **not** write rule text anywhere, and the round touches no committed file: the decisions log `docs/instruction-rules-decisions.md` is written later by `/instruction-apply`, per the human's worksheet decisions.
+Spawn `ai-engineer` (the maintainer's reduce duty) with the verified proposals: it deduplicates across lenses, reconciles `rehome`/`reowner` to a single owner (confirming the map stays complete and single-owner), rejects proposals missing their required field, and prepares the consolidated proposal set for triage. It does **not** write rule text anywhere, and the round touches no committed file: the decisions log `docs/instruction-rules-decisions.md` is written later by `/instruction-apply`, per the human's worksheet decisions.
 It then **accounts for every rubric dimension** (`proposal-format.md`): consolidate the per-lens verdicts from the role outputs, run the one-time global/structural rubric pass (cohesiveness, self-reference, lean-split, normative voice), and do the mechanical-nits sweep -- producing the **dimension scorecard** and nits list. These are ephemeral (presented, not committed).
 
 ### 5. Reduce output + handoff (main thread)
@@ -68,7 +74,7 @@ Worksheet format -- a structured JSON file (schema + validator in `devtools/tria
 { round: string, scorecard: Scorecard | null, candidates: Candidate[], entries: Entry[] }
 ```
 
-The skill writes all three: `scorecard` from the editor (the dimension matrix), `candidates` with each undrafted proposal carrying an assigned `priority` (high|medium|low) and `decision` defaulting to `{verdict:'park'}` and no `draft`, and `entries` with full drafts.
+The skill writes all three: `scorecard` from the ai-engineer (the dimension matrix), `candidates` with each undrafted proposal carrying an assigned `priority` (high|medium|low) and `decision` defaulting to `{verdict:'park'}` and no `draft`, and `entries` with full drafts.
 
 Each `Entry` carries the common fields `{ tag, role, targetFile, status, gap, decision, applyLog }` plus its per-kind content:
 

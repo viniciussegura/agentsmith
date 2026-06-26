@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runRound } from '../tools/claude/skills/code-review-board/board-round.mjs';
-import { codeArgs, specArgs, ROUTING_SCHEMA } from '../tools/claude/skills/code-review-board/round-args.mjs';
+import { codeArgs, specArgs, instructionArgs, ROUTING_SCHEMA } from '../tools/claude/skills/code-review-board/round-args.mjs';
 
 // Build a recording harness: captures every agent() call + supports parallel/phase/log.
 function harness(routing = { lenses: ['security', 'db'], perLens: {} }) {
@@ -65,6 +65,14 @@ test('spec round: plan, review, NO verify, reduce, guard persist; one round only
   assert.ok(!h.phases.includes('Verify'));
   assert.equal(out.board, 'spec');
   assert.ok(h.calls.some((c) => c.opts.label === 'persist:apply' && /guard\.mjs/.test(c.prompt)));
+});
+
+test('instruction round: plan, review, verify, reduce; ai-engineer maintainer', async () => {
+  const h = harness({ lenses: ['swe', 'security'], perLens: {} });
+  const args = { ...instructionArgs({ roundId: '2026-06-26a', scratch: '/p/x', subjectRef: 'full-audit', candidateLenses: ['swe', 'security', 'git'] }), plan: { routingSchema: ROUTING_SCHEMA } };
+  await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args });
+  assert.ok(h.phases.includes('Verify'), 'instruction keeps verify');
+  assert.ok(h.calls.some((c) => c.opts.label === 'plan' && c.opts.agentType === 'ai-engineer'));
 });
 
 test('a dispatch missing model throws (the in-driver assertion)', async () => {

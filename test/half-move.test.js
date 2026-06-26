@@ -26,7 +26,7 @@ test('no shipped file references a devtools/claude path', () => {
 test('no shipped file spawns a moved agent or invokes a moved command (invocation syntax only)', () => {
   // Invocation syntax: slash-command tokens and explicit agent spawn-target ids.
   // Excludes YAML description: prose and #-commented example lines (inert).
-  const MOVED = ['/instruction-review', '/instruction-apply', 'review-ai', 'review-git', 'instruction-editor'];
+  const MOVED = ['/instruction-review', '/instruction-apply', 'review-ai', 'review-git', 'ai-engineer'];
   const offenders = [];
   for (const { p, t } of texts) {
     for (const line of t.split('\n')) {

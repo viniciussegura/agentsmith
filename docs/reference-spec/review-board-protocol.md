@@ -119,10 +119,11 @@ two dispatches per round.
 |---|---|---|---|---|---|
 | spec | `spec-specialist` | `review-<role>` over `spec_review:true` lenses | `Finding` | no | scratch ledger + `guard.mjs` |
 | code | `project-manager` | `review-<role>` over config-selected roles | `Issue` | yes | issue store via `persist.mjs` |
-| instruction | `ai-engineer` *(was `instruction-editor`)* | `review-<role>` over the participating lenses | `InstructionProposal` | yes | triage worksheet |
+| instruction | `ai-engineer` | `review-<role>` over the participating lenses | `InstructionProposal` | yes | triage worksheet |
 
-`project-manager` and `instruction-editor` are **renamed and extended**, not duplicated:
-each keeps its reduce duty and gains the plan duty. `spec-specialist` is unchanged.
+The code and instruction reducers were **renamed and extended** into `project-manager`
+and `ai-engineer`, not duplicated: each keeps its reduce duty and gains the plan duty.
+`spec-specialist` is unchanged.
 
 ## The two drivers and parity
 

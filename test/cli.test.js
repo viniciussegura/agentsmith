@@ -112,7 +112,7 @@ test('--dev install adds the authoring tools alongside the shipped set', () => {
     run(dir, ['--dev']);
     assert.ok(existsSync(join(dir, SHIPPED)), 'shipped tool still present');
     assert.ok(existsSync(join(dir, IR)), 'authoring skill present under --dev');
-    assert.ok(existsSync(join(dir, '.claude/agents/instruction-editor.md')), 'instruction-editor present under --dev');
+    assert.ok(existsSync(join(dir, '.claude/agents/ai-engineer.md')), 'ai-engineer present under --dev');
     assert.ok(!existsSync(join(dir, TRIAGE)), 'triage-ui still not installed');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
