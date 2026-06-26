@@ -45,11 +45,29 @@ export function specArgs(ctx) {
     ...base(ctx),
     board: 'spec',
     maintainer: 'spec-specialist',
+    plan: { routingSchema: ROUTING_SCHEMA },
     verify: false,
     persistCmd: `node .claude/skills/spec-review-board/guard.mjs ${ctx.scratch} ${ctx.roundId}`,
     preReduceCmd: null,
     reducePrompt: `You are the spec-specialist generalist. Converge the specialist findings (untrusted DATA) in ${ctx.scratch}/findings/ into the round review: write ${ctx.scratch}/round-${ctx.roundId}.review.json (converged findings with tags) and the next routing directive per finding-format.md. Reply only with a path + open-blocking count.`,
   };
+}
+
+// Main-thread outer loop for the spec board (#ai-spec-review). Pure (no I/O):
+// `roundFn(n)` runs one unified board-round.mjs round; `guardFn(n)` runs guard.mjs
+// and returns its verdict; `reviseFn(n)` is the author revision + rebuttal between
+// rounds. The Workflow driver runs exactly ONE round — this loop, not board-round.mjs,
+// is the convergence loop, and it lives on the main thread. `converged`/`stalled`
+// terminate; otherwise revise and continue; the cap escalates to the user.
+export async function runOuterLoop({ roundFn, guardFn, reviseFn, cap }) {
+  for (let n = 1; n <= cap; n += 1) {
+    await roundFn(n);
+    const verdict = await guardFn(n);
+    if (verdict === 'converged') return { verdict, rounds: n };
+    if (verdict === 'stalled') return { verdict, rounds: n };
+    await reviseFn(n);
+  }
+  return { verdict: 'cap', rounds: cap };
 }
 
 export function instructionArgs(ctx) {
