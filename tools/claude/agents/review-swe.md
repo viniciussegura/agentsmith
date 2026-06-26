@@ -27,4 +27,4 @@ Composition is what you **read**; it overlaps other lenses (that is fine). Concr
 
 ## Protocol
 
-Shared reviewer protocol -- stance, inputs, method, output, and the **conformance + critique** layer (this is a generative lens) -- is in `.claude/skills/review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.
+Shared reviewer protocol -- stance, inputs, method, output, and the **conformance + critique** layer (this is a generative lens) -- is in `.claude/skills/code-review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.

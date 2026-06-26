@@ -1,6 +1,6 @@
 ---
-name: spec-review
-description: Run an adversarial auto-review on a spec before it becomes a plan. Use when the user accepts a spec auto-review offer, or asks to review/harden/critique a spec, or runs /spec-review. A generalist routes to and converges a curated fan-out of domain specialists; guard.mjs drives the finding ledger and convergence guard.
+name: spec-review-board
+description: Run an adversarial auto-review on a spec before it becomes a plan. Use when the user accepts a spec auto-review offer, or asks to review/harden/critique a spec, or runs /spec-review-board. A generalist routes to and converges a curated fan-out of domain specialists; guard.mjs drives the finding ledger and convergence guard.
 ---
 
 # Spec auto-review
@@ -11,7 +11,7 @@ Implements the `#ai-spec-review` protocol -- the third application of the role-b
 ## When to run
 
 - The user opts in to the auto-review you offered after proposing a spec, or
-- the user invokes `/spec-review <spec-path>`, or asks to review/harden/critique a spec.
+- the user invokes `/spec-review-board <spec-path>`, or asks to review/harden/critique a spec.
 
 Confirm the target spec path before starting.
 

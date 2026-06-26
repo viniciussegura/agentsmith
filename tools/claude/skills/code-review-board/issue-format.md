@@ -98,7 +98,7 @@ The store is **local-lifetime**: within a machine's store no agent deletes files
 
 ## Validation
 
-The store is machine-validated by `lint.mjs` (installed alongside this file at `.claude/skills/review-board/lint.mjs`): `node .claude/skills/review-board/lint.mjs .agentsmith/review-board`.
+The store is machine-validated by `lint.mjs` (installed alongside this file at `.claude/skills/code-review-board/lint.mjs`): `node .claude/skills/code-review-board/lint.mjs .agentsmith/review-board`.
 Store machine files (`issues/`, `epics/`, `rounds/`) are **JSON**, written by `persist.mjs` and validated by `lint.mjs` with built-in `JSON.parse` (zero dependency). `config.yaml` (hand-edited) stays YAML and `triage.md` stays markdown. The store **directory layout** is unchanged.
 It is **read-only** -- it reports and exits non-zero, never mutating the store. The store is local (not committed), so this is a **local integrity check the round runs**, not a CI/pre-commit gate.
 Run it at the end of every round (SKILL step 4).

@@ -20,4 +20,4 @@ You own how the component is **built**; the end-user *flow and usability* judgme
 
 ## Protocol
 
-Shared reviewer protocol -- stance, inputs, method, output, and the **conformance + critique** layer (this is a generative lens) -- is in `.claude/skills/review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.
+Shared reviewer protocol -- stance, inputs, method, output, and the **conformance + critique** layer (this is a generative lens) -- is in `.claude/skills/code-review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.

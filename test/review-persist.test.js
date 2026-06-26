@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { persistApply, persistSummary } from '../tools/claude/skills/review-board/persist.mjs';
+import { persistApply, persistSummary } from '../tools/claude/skills/code-review-board/persist.mjs';
 
 // Build a round scratch dir + empty store; return { store, scratchDir, roundId }.
 function scaffold(roundId = 'r1') {

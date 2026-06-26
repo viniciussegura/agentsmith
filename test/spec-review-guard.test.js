@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runGuard } from '../tools/claude/skills/spec-review/guard.mjs';
+import { runGuard } from '../tools/claude/skills/spec-review-board/guard.mjs';
 
 function scratch() {
   return mkdtempSync(join(tmpdir(), 'sr-guard-'));

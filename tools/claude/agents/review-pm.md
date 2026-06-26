@@ -1,6 +1,6 @@
 ---
 name: review-pm
-description: Project-manager reduce role for agentsmith's code-review board. Consolidates verified issues across lenses, groups them into epics, applies a product-owner lens, and writes the prioritized triage report. Used by the review-board skill on a strong model.
+description: Project-manager reduce role for agentsmith's code-review board. Consolidates verified issues across lenses, groups them into epics, applies a product-owner lens, and writes the prioritized triage report. Used by the code-review-board skill on a strong model.
 tools: Read, Grep, Glob
 ---
 

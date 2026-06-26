@@ -19,5 +19,5 @@ Compare the doc against the changed code, not your assumptions; cite both the do
 
 ## Protocol
 
-Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.
+Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/code-review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.
 This is a conformance-only lens (no critique layer).

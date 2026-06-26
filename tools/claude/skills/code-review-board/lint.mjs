@@ -12,7 +12,7 @@
 // `tracker:` scalar is read, with one regex.
 //
 // Usage:
-//   node .claude/skills/review-board/lint.mjs [store-dir] [--strict]
+//   node .claude/skills/code-review-board/lint.mjs [store-dir] [--strict]
 //   (default dir: ./.agentsmith/review-board; --strict promotes warnings to a non-zero exit)
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';

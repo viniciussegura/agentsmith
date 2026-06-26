@@ -1,6 +1,6 @@
 ---
-name: instruction-review
-description: Run a per-role audit of an instruction set (instructions/ + the generated AGENTS.md), proposing missing or weak rules through each role's lens. Use when the user runs /instruction-review, or asks to audit/review the instruction rules. Opens on the ownership coverage lint, fans out per role, verifies each proposal, an editor reduce consolidates and writes an editable triage worksheet; the separate /instruction-apply command applies the human's decisions. Proposes, then adopts only what the human accepts (#swe-done).
+name: instruction-review-board
+description: Run a per-role audit of an instruction set (instructions/ + the generated AGENTS.md), proposing missing or weak rules through each role's lens. Use when the user runs /instruction-review-board, or asks to audit/review the instruction rules. Opens on the ownership coverage lint, fans out per role, verifies each proposal, an editor reduce consolidates and writes an editable triage worksheet; the separate /instruction-apply command applies the human's decisions. Proposes, then adopts only what the human accepts (#swe-done).
 ---
 
 # Instruction review
@@ -12,7 +12,7 @@ Schema, rubric, and the decisions-log format are in `proposal-format.md`; read i
 
 ## When to run
 
-- The user invokes `/instruction-review`, or asks to audit/review the instruction rules.
+- The user invokes `/instruction-review-board`, or asks to audit/review the instruction rules.
 
 ## Relationship to the shared engine
 

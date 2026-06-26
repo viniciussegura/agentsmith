@@ -32,7 +32,7 @@ interface InstructionProposal {
 
 A `draft` is written **verbatim** into a `.md` by `/instruction-apply`, so author it in house markdown style -- `#code-markdown`: one sentence per line, hard-wrap only at sentence boundaries (never by column), lists/tables/fenced blocks left intact. (`#code-markdown`'s own trigger is "editing a `.md`"; a draft is the `.md`'s future content, so the style applies at authoring time.)
 
-The triage worksheet is the structured **`triage.json`** (`{ round, scorecard, candidates, entries }`; schema + validator in `devtools/triage-ui/schema.mjs`, full shape in the instruction-review SKILL).
+The triage worksheet is the structured **`triage.json`** (`{ round, scorecard, candidates, entries }`; schema + validator in `devtools/triage-ui/schema.mjs`, full shape in the instruction-review-board SKILL).
 
 ### Persisted worksheet (scorecard + candidates)
 

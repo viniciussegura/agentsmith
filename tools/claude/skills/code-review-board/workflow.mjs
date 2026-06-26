@@ -44,7 +44,7 @@ await parallel(
 
 phase('Reduce');
 await agent(
-  `Run: node ${store}/../../.claude/skills/review-board/persist.mjs summary ${store} ${roundId}. Reply only with the exit line.`,
+  `Run: node ${store}/../../.claude/skills/code-review-board/persist.mjs summary ${store} ${roundId}. Reply only with the exit line.`,
   { label: 'persist:summary', phase: 'Reduce' },
 );
 await agent(
@@ -57,7 +57,7 @@ await agent(
 
 phase('Persist');
 const persist = await agent(
-  `Run: node ${store}/../../.claude/skills/review-board/persist.mjs apply ${store} ${roundId}. ` +
+  `Run: node ${store}/../../.claude/skills/code-review-board/persist.mjs apply ${store} ${roundId}. ` +
     `Report the full stdout/stderr and the exit code.`,
   { label: 'persist:apply', phase: 'Persist' },
 );

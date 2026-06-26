@@ -1,6 +1,6 @@
 ---
 name: review-ai
-description: AI / agent-behavior reviewer for agentsmith's role-based review engine. Reviews the agent-behavior, planning, memory, and review-engine process rules. Instruction-review only. Used by the instruction-review skill; the invoking skill supplies the subject and output schema.
+description: AI / agent-behavior reviewer for agentsmith's role-based review engine. Reviews the agent-behavior, planning, memory, and review-engine process rules. Instruction-review only. Used by the instruction-review-board skill; the invoking skill supplies the subject and output schema.
 tools: Read, Grep, Glob
 ---
 
@@ -28,5 +28,5 @@ Agent-*security* rules (`#ai-untrusted-content`, `#ai-tool-safety`) are owned by
 
 ## Protocol
 
-Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/instruction-review/` via the shared `reviewer-common.md`; the spawn prompt provides it. Read it first.
+Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/instruction-review-board/` via the shared `reviewer-common.md`; the spawn prompt provides it. Read it first.
 Instruction-review only: your subject is always the instruction set, your schema always `InstructionProposal` (`proposal-format.md`); you never review a code diff and never emit an `Issue`.

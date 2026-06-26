@@ -1,6 +1,6 @@
 ---
-name: review-board
-description: Run a role-based code-review round over the current repo state or a branch-vs-default-branch diff. Use when the user runs /review-board, or asks to review a branch/PR/diff with the review board, or to reconcile or sweep the issue store. Fans out role reviewers, verifies findings adversarially, reconciles prior issues, and a PM reduce writes a prioritized triage report.
+name: code-review-board
+description: Run a role-based code-review round over the current repo state or a branch-vs-default-branch diff. Use when the user runs /code-review-board, or asks to review a branch/PR/diff with the review board, or to reconcile or sweep the issue store. Fans out role reviewers, verifies findings adversarially, reconciles prior issues, and a PM reduce writes a prioritized triage report.
 ---
 
 # Code-review board
@@ -11,7 +11,7 @@ Schema, status lifecycle, ids, and the store layout are in `issue-format.md`; re
 
 ## When to run
 
-- The user invokes `/review-board [--full-sweep] [<branch>]`, or asks to review a branch/PR/diff, or to sweep/reconcile the store.
+- The user invokes `/code-review-board [--full-sweep] [<branch>]`, or asks to review a branch/PR/diff, or to sweep/reconcile the store.
 
 ## Roles
 
@@ -61,7 +61,7 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 ### 4. Persist (main thread)
 
 - The driver writes the round's `ReviewRoundInfo` to `.agentsmith/tmp/review-board/<round-id>/round.json` (Setup already computed every field).
-- **Build the PM input:** run `node .claude/skills/review-board/persist.mjs summary .agentsmith/review-board <round-id>`; it writes `pm-input.json` (carried-forward open issues + accepted new findings, as lean summaries) for the reduce.
+- **Build the PM input:** run `node .claude/skills/code-review-board/persist.mjs summary .agentsmith/review-board <round-id>`; it writes `pm-input.json` (carried-forward open issues + accepted new findings, as lean summaries) for the reduce.
 - Persistence proper happens **after** the reduce (step 5b), in one deterministic `persist.mjs apply` call -- the driver no longer hand-authors issue/epic/round files.
 
 ### 5. Reduce (PM role, strong model)
@@ -70,7 +70,7 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 
 ### 5b. Persist apply (main thread)
 
-- Run `node .claude/skills/review-board/persist.mjs apply .agentsmith/review-board <round-id>`. It reads the findings + verdicts + `pm-directive.json`, drops rejected findings, writes verified-new issues under their minted ids, applies reconcile and PM transitions, moves closing issues to `closed/`, writes `rounds/<round-id>.json`, updates epics, and runs `lint.mjs` as its final step.
+- Run `node .claude/skills/code-review-board/persist.mjs apply .agentsmith/review-board <round-id>`. It reads the findings + verdicts + `pm-directive.json`, drops rejected findings, writes verified-new issues under their minted ids, applies reconcile and PM transitions, moves closing issues to `closed/`, writes `rounds/<round-id>.json`, updates epics, and runs `lint.mjs` as its final step.
 - A non-zero exit means the scratch was malformed or the write left the store invalid. Read the reported errors, fix the offending scratch/directive, and rerun -- `persist.mjs` is deterministic, so a clean rerun reproduces a clean store.
 
 ### 6. Present (main thread)

@@ -39,14 +39,14 @@ test('curated spec_review membership matches the spec', () => {
 // --- reviewer-common third arm (Task 4) ---
 
 test('reviewer-common.md Subject clause names a spec (third subject arm)', () => {
-  const t = read('tools/claude/skills/review-board/reviewer-common.md');
+  const t = read('tools/claude/skills/code-review-board/reviewer-common.md');
   assert.match(t, /spec review/i, 'Subject/Schema must mention spec review');
 });
 
 test('reviewer-common.md Schema clause names Finding -> spec-review/finding-format.md', () => {
-  const t = read('tools/claude/skills/review-board/reviewer-common.md');
+  const t = read('tools/claude/skills/code-review-board/reviewer-common.md');
   assert.match(t, /Finding/, 'names the Finding schema arm');
-  assert.match(t, /spec-review\/finding-format\.md/, 'points at the spec-review finding format');
+  assert.match(t, /spec-review-board\/finding-format\.md/, 'points at the spec-review-board finding format');
 });
 
 test('no review-<role> persona contains spec-specific text (artifact-neutral, no fork)', () => {
