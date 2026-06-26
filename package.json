@@ -11,6 +11,7 @@
     "build": "node bin/cli.js",
     "build:plugin": "node bin/build-plugin.js",
     "build:index": "node bin/spec-index.js",
+    "check:index": "node bin/spec-index.js --check",
     "triage": "node devtools/triage-ui/server.mjs"
   },
   "files": [

@@ -1,7 +1,7 @@
 // Generates docs/working-specs/INDEX.md from the working-spec corpus (#ai-plan).
 // Pure functions here; bin/spec-index.js drives them. A drift test
 // (test/spec-index.test.mjs) keeps the committed INDEX.md from going stale.
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const EMDASH = '—';
@@ -51,4 +51,23 @@ export function renderIndex(units) {
     '| Date | Unit | Status |\n|---|---|---|\n';
   const rows = units.map((u) => `| ${u.date} | [${u.title}](${u.dir}/spec.md) | ${u.status} |`);
   return header + rows.join('\n') + '\n';
+}
+
+// Regenerate (default) or validate (check) docs/working-specs/INDEX.md for the
+// project rooted at `cwd` -- the consumer's project under npx, agentsmith's own
+// repo when run from its root. Returns { path, ok, wrote, missing }:
+//   missing -- no docs/working-specs/ (nothing to index; a no-op success)
+//   check   -- ok=false iff the committed INDEX.md differs from a fresh render
+//   default -- wrote=true after rewriting INDEX.md
+export function runSpecIndex({ cwd, check = false } = {}) {
+  const dir = join(cwd, 'docs', 'working-specs');
+  const dest = join(dir, 'INDEX.md');
+  if (!existsSync(dir)) return { path: dest, ok: true, wrote: false, missing: true };
+  const fresh = renderIndex(scanWorkingSpecs(dir));
+  if (check) {
+    const committed = existsSync(dest) ? readFileSync(dest, 'utf8') : '';
+    return { path: dest, ok: committed === fresh, wrote: false, missing: false };
+  }
+  writeFileSync(dest, fresh);
+  return { path: dest, ok: true, wrote: true, missing: false };
 }

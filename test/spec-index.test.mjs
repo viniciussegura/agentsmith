@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSpec, renderIndex, scanWorkingSpecs } from '../src/specindex.js';
+import { parseSpec, renderIndex, scanWorkingSpecs, runSpecIndex } from '../src/specindex.js';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 
@@ -39,5 +40,39 @@ test('docs/working-specs/INDEX.md is not stale', () => {
   const dir = join(ROOT, 'docs', 'working-specs');
   const fresh = renderIndex(scanWorkingSpecs(dir));
   const committed = readFileSync(join(dir, 'INDEX.md'), 'utf8');
-  assert.equal(committed, fresh, 'INDEX.md is stale -- run `node bin/spec-index.js`');
+  assert.equal(committed, fresh, 'INDEX.md is stale -- run `agentsmith spec-index`');
+});
+
+// runSpecIndex drives a CWD-rooted project: regenerate (default) and validate (--check).
+test('runSpecIndex: missing dir is a no-op success', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'agentsmith-si-'));
+  try {
+    const r = runSpecIndex({ cwd, check: true });
+    assert.equal(r.missing, true);
+    assert.equal(r.ok, true);
+    assert.equal(r.wrote, false);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('runSpecIndex: check flags a stale/absent index, then write makes it current', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'agentsmith-si-'));
+  try {
+    const unit = join(cwd, 'docs', 'working-specs', '2026-01-01-foo');
+    mkdirSync(unit, { recursive: true });
+    writeFileSync(join(unit, 'spec.md'), '# Foo\n\nStatus: Draft\n');
+
+    // No INDEX.md yet -> check reports stale.
+    assert.equal(runSpecIndex({ cwd, check: true }).ok, false);
+
+    // Regenerate, then check passes.
+    const w = runSpecIndex({ cwd });
+    assert.equal(w.wrote, true);
+    const index = readFileSync(w.path, 'utf8');
+    assert.match(index, /\| 2026-01-01 \| \[Foo\]\(2026-01-01-foo\/spec\.md\) \| Draft \|/);
+    assert.equal(runSpecIndex({ cwd, check: true }).ok, true);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
