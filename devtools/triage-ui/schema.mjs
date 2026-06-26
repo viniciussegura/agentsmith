@@ -357,7 +357,10 @@ export function migrateWorksheet(file) {
   const entriesIn = Array.isArray(file.entries) ? file.entries : [];
   const entries = entriesIn.map((e) => {
     if (!isObj(e)) return e;
-    const { current, ...rest } = e;
+    // Drop `current` (review-surface, read live from disk) and `_live` (a
+    // client-only cache the triage UI hangs on the object) so neither is
+    // persisted into the worksheet.
+    const { current, _live, ...rest } = e;
     const d = rest.decision;
     if (isObj(d) && ['adopt', 'park'].includes(d.verdict) && 'details' in d) {
       const { details, ...dr } = d;
@@ -365,11 +368,17 @@ export function migrateWorksheet(file) {
     }
     return rest;
   });
+  const candidatesIn = Array.isArray(file.candidates) ? file.candidates : [];
+  const candidates = candidatesIn.map((c) => {
+    if (!isObj(c)) return c;
+    const { _live, current, ...rest } = c; // same client-only transients
+    return rest;
+  });
   const scorecard = isObj(file.scorecard) ? migrateScorecard(file.scorecard) : (file.scorecard ?? null);
   return {
     ...file,
     scorecard,
-    candidates: Array.isArray(file.candidates) ? file.candidates : [],
+    candidates,
     entries,
   };
 }
