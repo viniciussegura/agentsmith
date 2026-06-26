@@ -2,6 +2,7 @@
 
 - A unit of work lives in one directory, `docs/working-specs/<YYYY-MM-DD>-<slug>/`, holding `spec.md` and/or `plan.md`.
   The directory may hold only `spec.md` (no plan yet) or only `plan.md` (trivial work that skipped a spec).
+- A working-spec directory is created on an approved feature branch (#git-branch-workflow); if not yet on one, confirm the branch first.
 - Each file carries a `Status:` line that is exactly one bare token: `Draft`, `Approved`, or `Implemented`.
 - A spec or plan is append-only once `Approved` -- its body is frozen, though the `Status:` line may still advance to `Implemented`; corrections to the live system go to the reference spec (#swe-reference-spec), **never** back into the artifact that predates them.
 - Work is **non-trivial** -- requiring a user-approved spec before a plan is written or executed -- when it meets any of: touches more than one file with distinct purposes; introduces or removes public surface (#swe-public-surface-docs); or cannot be stated in a single sentence. 
