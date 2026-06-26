@@ -45,6 +45,8 @@ The adapter install is non-destructive: it writes only the adapter's own files
 (e.g. `.claude/skills/spec-review-board/`) and never touches the rest of your
 `.claude/`.
 
+**Coexisting with a project instruction file.** A project may ship its own instruction file alongside the generated set; on conflict the project file wins (except the safety baseline). When a project file restates a rule the generated set already owns, reference its `#tag` rather than paraphrasing it -- a paraphrase silently goes stale when the canonical rule is edited.
+
 ## Bundled Claude Code tools
 
 Beyond the portable instructions, the Claude adapter ships skills and commands
