@@ -11,6 +11,12 @@ const ICON = { strong: '🟢', good: '🔵', weak: '🟡', gaps: '🔴' };
 const SC_RANK = { strong: 0, good: 1, weak: 2, gaps: 3 }; // lower = better; for trend arrows
 const PRI_RANK = { high: 0, medium: 1, low: 2 };
 const CAND_NOTE_LABEL = { park: 'Note (optional)', wanted: 'Drafting note (optional)', reject: 'Reason (optional)' };
+const KIND_LABEL = { 'new-rule': 'new rule', strengthen: 'strengthen', rehome: 'rehome', reowner: 'reowner' };
+const kindLabel = (k) => KIND_LABEL[k] || k || '';
+// rehome/reowner change metadata (a file path / an owner), not rule text, so a
+// content diff would render the live text as an all-deletions "erase". These
+// kinds show a path/owner before→after instead.
+const META_KINDS = new Set(['rehome', 'reowner']);
 
 // view selects what the main pane shows: the scorecard, one proposal (entry), or
 // one candidate. idx indexes entries[] (proposal) or sortedCandidates() (candidate).
@@ -208,9 +214,11 @@ function renderSidebar() {
   entries.forEach((e, i) => {
     const ver = e.decision?.verdict || 'park';
     kids.push(el('div', { class: `row ${v.kind === 'proposal' && v.idx === i ? 'active' : ''}`, onclick: () => select('proposal', i) }, [
-      el('span', { class: 'tag', text: `#${e.tag}` }),
-      el('span', { class: 'kind', text: e.kind }),
-      el('span', { class: `badge ${ver}`, text: ver }),
+      el('div', { class: 'row-main' }, [
+        el('span', { class: 'tag', text: `#${e.tag}` }),
+        el('span', { class: `badge ${ver}`, text: ver }),
+      ]),
+      el('div', { class: 'row-sub' }, [el('span', { class: 'kind', text: kindLabel(e.kind) })]),
     ]));
   });
 
@@ -219,9 +227,12 @@ function renderSidebar() {
   cs.forEach((c, i) => {
     const ver = c.decision?.verdict || 'park';
     kids.push(el('div', { class: `row ${v.kind === 'candidate' && v.idx === i ? 'active' : ''}`, onclick: () => select('candidate', i) }, [
-      el('span', { class: `cpri ${c.priority}`, text: c.priority }),
-      el('span', { class: 'tag', text: `#${c.tag}` }),
-      el('span', { class: `badge ${ver}`, text: ver }),
+      el('div', { class: 'row-main' }, [
+        el('span', { class: `cpri ${c.priority}`, text: c.priority }),
+        el('span', { class: 'tag', text: `#${c.tag}` }),
+        el('span', { class: `badge ${ver}`, text: ver }),
+      ]),
+      el('div', { class: 'row-sub' }, [el('span', { class: 'kind', text: kindLabel(c.kind) })]),
     ]));
   });
 
@@ -372,12 +383,47 @@ function renderNitsDetail() {
   $('#detail').replaceChildren(...kids);
 }
 
+// Path/owner before→after for a rehome/reowner, shown in place of a content diff
+// so a metadata-only change does not look like the live text is being erased.
+function metaChangeNodes(item) {
+  if (item.kind === 'rehome') {
+    return [
+      el('label', { class: 'field', text: 'relocation' }),
+      el('div', { class: 'movepath' }, [
+        el('code', { class: 'mv-from', text: item.targetFile || '(unset)' }),
+        el('span', { class: 'mv-arrow', text: '→' }),
+        el('code', { class: 'mv-to', text: item.proposedFile || '(proposedFile unset)' }),
+      ]),
+    ];
+  }
+  return [ // reowner
+    el('label', { class: 'field', text: 'reowner' }),
+    el('div', { class: 'movepath' }, [
+      el('span', { class: 'mv-arrow', text: 'owner →' }),
+      el('code', { class: 'mv-to', text: item.proposedOwner || '(proposedOwner unset)' }),
+    ]),
+  ];
+}
+
 // --- candidate focused view (main area): tag + verdict selector + nav ---
 let candidateRefs = null;
-function renderCandidateDetail() {
+async function renderCandidateDetail() {
   const cs = sortedCandidates();
-  const c = cs[state.view.idx];
+  const idx = state.view.idx;
+  const c = cs[idx];
   if (!c) return;
+
+  // Show the live rule the candidate would touch even though a candidate has no
+  // draft (1b). Guard a fast-nav race: abandon a stale render if the view moved
+  // while the fetch was in flight.
+  const curText = await liveCurrent(c);
+  if (state.view.kind !== 'candidate' || state.view.idx !== idx) return;
+  const currentNodes = META_KINDS.has(c.kind)
+    ? metaChangeNodes(c)
+    : [
+        el('label', { class: 'field', text: 'current rule' }),
+        el('pre', { class: 'current-ro', text: curText || '— new rule · no existing text —' }),
+      ];
 
   const noteLabel = el('label', { class: 'field', text: CAND_NOTE_LABEL[c.decision?.verdict || 'park'] });
   const noteBox = el('textarea', { class: 'details', placeholder: 'Free-text note — guidance for drafting a wanted rule, a reject reason, or a reminder', oninput: () => { applyCandidate(c); scheduleSave(); } });
@@ -391,12 +437,13 @@ function renderCandidateDetail() {
 
   candidateRefs = { c, noteBox, noteLabel };
 
-  const nav = navbar(state.view.idx, cs.length, (i) => select('candidate', i));
+  const nav = navbar(idx, cs.length, (i) => select('candidate', i));
 
   $('#detail').replaceChildren(
     el('div', { class: 'meta', text: `candidate · ${c.kind} · ${c.role} · ${c.targetFile} · priority: ${c.priority}` }),
     el('h2', { text: `#${c.tag}` }),
     el('div', { class: 'gap', text: c.gap || '' }),
+    ...currentNodes,
     el('label', { class: 'field', text: 'Verdict' }),
     radios,
     noteLabel,
@@ -479,16 +526,27 @@ async function renderProposalDetail() {
 
   const nav = navbar(idx, state.data.entries.length, (i) => select('proposal', i));
 
+  // rehome/reowner change metadata, not text, so a content diff would render the
+  // live rule as an all-deletions "erase" (1c). Show the path/owner before→after
+  // instead; include the content diff only when the kind carries text (new-rule /
+  // strengthen) or a metadata-kind also supplies a draft.
+  const hasText = !!(e.draft && e.draft.trim());
+  const changeSection = META_KINDS.has(e.kind)
+    ? [
+        ...metaChangeNodes(e),
+        ...(hasText
+          ? [el('label', { class: 'field', text: 'content change' }), currentDiff, editToggle, draftWrap]
+          : [el('div', { class: 'move-note', text: 'Contents unchanged — metadata-only change.' })]),
+      ]
+    : [el('label', { class: 'field', text: 'current → draft' }), currentDiff, editToggle, draftWrap];
+
   // filter(Boolean): refineReply is null for non-refine entries, and
   // replaceChildren() would coerce a null arg into a literal "null" text node.
   $('#detail').replaceChildren(...[
     el('div', { class: 'meta', text: `${e.kind} · ${e.role} · ${e.targetFile} · status: ${e.status?.state}` }),
     el('h2', { text: `#${e.tag}` }),
     el('div', { class: 'gap', text: e.gap || '' }),
-    el('label', { class: 'field', text: 'current → draft' }),
-    currentDiff,
-    editToggle,
-    draftWrap,
+    ...changeSection,
     verdicts,
     detailsLabel,
     detailsBox,

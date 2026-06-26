@@ -21,13 +21,15 @@ main { flex: 1; display: flex; min-height: 0; }
 
 #sidebar { background: var(--panel); }
 .row {
-  display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+  display: flex; flex-direction: column; gap: 3px; padding: 7px 12px;
   cursor: pointer; border-bottom: 1px solid var(--border);
 }
 .row:hover { background: #2d2d30; }
 .row.active { background: #094771; }
+.row-main { display: flex; align-items: center; gap: 8px; }
+.row-sub { display: flex; }
 .row .tag { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .kind { color: var(--muted); font-size: 11px; }
+.row .kind { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .03em; }
 .badge {
   font-size: 10px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--border);
   text-transform: uppercase; letter-spacing: .04em;
@@ -41,6 +43,20 @@ main { flex: 1; display: flex; min-height: 0; }
 #detail .meta { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 #detail h2 { font-size: 16px; margin: 0 0 8px; }
 #detail .gap { background: var(--panel); border-left: 3px solid var(--accent); padding: 8px 12px; margin: 10px 0; }
+
+/* read-only "current rule" block (candidate detail) + rehome/reowner path-move */
+#detail .current-ro {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 12px; margin: 4px 0 12px; white-space: pre-wrap; word-break: break-word;
+  font: 12px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+  max-height: 320px; overflow-y: auto;
+}
+#detail .movepath { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 12px; }
+#detail .movepath code { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; }
+#detail .movepath .mv-from { color: var(--del-fg); }
+#detail .movepath .mv-to { color: var(--add-fg); }
+#detail .movepath .mv-arrow { color: var(--muted); }
+#detail .move-note { color: var(--muted); font-style: italic; margin: 4px 0 12px; }
 
 .diff { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin: 12px 0; }
 .drow { display: grid; grid-template-columns: 1fr 1fr; }

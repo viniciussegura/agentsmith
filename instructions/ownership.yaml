@@ -38,6 +38,7 @@ owners:
   swe-reference-spec: swe
   swe-async: swe
   swe-decomposition: swe
+  swe-design-decisions: swe
   swe-deep-modules: swe
 
   # security

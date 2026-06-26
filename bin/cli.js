@@ -9,6 +9,7 @@ import { resolveSections, demoteForBasename } from '../src/sections.js';
 import { planToolInstall } from '../src/tools.js';
 import { userImport } from '../src/userimport.js';
 import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
+import { runSpecIndex } from '../src/specindex.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -33,6 +34,28 @@ function sourceRevision() {
 
 const args = process.argv.slice(2);
 const has = (flag) => args.includes(flag);
+
+// Subcommand: `agentsmith spec-index [--check]` regenerates (or validates) the
+// working-specs index for the project in CWD (#ai-plan). Delegated here so npx
+// consumers reach it through the one `agentsmith` bin -- no second entrypoint.
+if (args[0] === 'spec-index') {
+  const r = runSpecIndex({ cwd: process.cwd(), check: has('--check') });
+  if (r.missing) {
+    process.stderr.write(`agentsmith: no docs/working-specs/ in ${process.cwd()} -- nothing to index\n`);
+    process.exit(0);
+  }
+  if (has('--check')) {
+    process.stderr.write(
+      r.ok
+        ? `agentsmith: ${r.path} is current\n`
+        : `agentsmith: ${r.path} is STALE -- run \`agentsmith spec-index\` to regenerate\n`,
+    );
+    process.exit(r.ok ? 0 : 1);
+  }
+  process.stderr.write(`agentsmith: wrote ${r.path}\n`);
+  process.exit(0);
+}
+
 const layout = has('--full') || has('--inline') ? 'full' : 'lean';
 const placement = has('--root') ? 'root' : 'nested';
 const installTools = !has('--no-tools');

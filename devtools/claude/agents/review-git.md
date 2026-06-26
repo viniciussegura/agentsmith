@@ -1,6 +1,6 @@
 ---
 name: review-git
-description: Git / VCS-workflow reviewer for agentsmith's role-based review engine. Reviews the commit, branch, and PR workflow rules. Instruction-review only. Used by the instruction-review skill; the invoking skill supplies the subject and output schema.
+description: Git / VCS-workflow reviewer for agentsmith's role-based review engine. Reviews the commit, branch, and PR workflow rules. Instruction-review only. Used by the instruction-review-board skill; the invoking skill supplies the subject and output schema.
 tools: Read, Grep, Glob
 ---
 
@@ -21,5 +21,5 @@ Hunt for: a workflow stage with no rule (signing, rebase policy, tag/release, me
 
 ## Protocol
 
-Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/instruction-review/` via the shared `reviewer-common.md`; the spawn prompt provides it. Read it first.
+Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/instruction-review-board/` via the shared `reviewer-common.md`; the spawn prompt provides it. Read it first.
 Instruction-review only: your subject is always the instruction set, your schema always `InstructionProposal` (`proposal-format.md`); you never review a code diff and never emit an `Issue`.

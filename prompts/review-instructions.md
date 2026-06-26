@@ -3,7 +3,7 @@
 Standardized prompt for auditing the `instructions/` rule set and its generated `AGENTS.md`.
 Run it whenever instructions change, or on a cadence, to keep the rule set clear, terse, and coherent.
 
-> **Preferred path: the instruction-review application** (`#ai-instruction-review`, the `/instruction-review` skill) fans this audit out **per role** for sharper, less-diluted coverage.
+> **Preferred path: the instruction-review application** (`#ai-instruction-review`, the `/instruction-review-board` skill) fans this audit out **per role** for sharper, less-diluted coverage.
 > This prompt is the **single-agent degraded fallback** of that application (`#ai-review-engine` degradation): one agent applies the dimensions below across all lenses sequentially.
 > Either way there is **one rubric and one committed output** -- the nine dimensions here are the shared rubric the per-role fan-out also applies, and the only committed artifact is the decisions log `docs/instruction-rules-decisions.md` (open proposals are ephemeral: the per-role path writes a structured triage worksheet, this fallback presents them inline). No duplication (`#swe-reuse`).
 

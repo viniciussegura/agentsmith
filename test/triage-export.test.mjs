@@ -11,7 +11,7 @@ test('the generator never installs devtools/ into a consumer .claude', () => {
   const plan = planToolInstall([
     'devtools/triage-ui/server.mjs',
     'devtools/triage-ui/index.html',
-    'tools/claude/skills/instruction-review/SKILL.md',
+    'tools/claude/skills/code-review-board/SKILL.md',
   ]);
   // only the tools/<ai>/ path is installed; nothing from devtools/
   assert.equal(plan.length, 1);
@@ -23,7 +23,7 @@ test('planToolInstall never installs devtools/restructure/ into a consumer .clau
   const plan = planToolInstall([
     'devtools/restructure/some-script.mjs',
     'devtools/restructure/nested/helper.js',
-    'tools/claude/skills/instruction-review/SKILL.md',
+    'tools/claude/skills/code-review-board/SKILL.md',
   ]);
   // only the tools/<ai>/ path is installed; nothing from devtools/restructure/
   assert.equal(plan.length, 1);

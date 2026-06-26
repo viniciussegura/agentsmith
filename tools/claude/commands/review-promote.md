@@ -5,7 +5,7 @@ argument-hint: <issue-id...> <url>
 
 Promote one or more code-review board issues into the official tracker. Arguments: $ARGUMENTS
 
-Parse the arguments as one or more issue ids followed by the tracker URL/ref. For each issue id (use the `review-board` skill and `issue-format.md` for the store layout and schema):
+Parse the arguments as one or more issue ids followed by the tracker URL/ref. For each issue id (use the `code-review-board` skill and `issue-format.md` for the store layout and schema):
 
 - Set `promotedTo` to the URL and `status` to `promoted`, and move the file from `issues/<role>/` to `issues/<role>/promoted/`.
 - `promoted` is **not** a closing status: the issue is now owned by the external tracker, so later rounds neither re-raise nor reopen it, and its `lastConfirmedCommit`/`locations` are frozen.

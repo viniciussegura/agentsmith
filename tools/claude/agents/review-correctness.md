@@ -1,6 +1,6 @@
 ---
 name: review-correctness
-description: Correctness reviewer for agentsmith's role-based review engine. Hunts logic and behavior bugs in the change. Used by the review-board skill (always-on); the invoking skill supplies the subject and output schema.
+description: Correctness reviewer for agentsmith's role-based review engine. Hunts logic and behavior bugs in the change. Used by the code-review-board skill (always-on); the invoking skill supplies the subject and output schema.
 tools: Read, Grep, Glob
 ---
 
@@ -15,5 +15,5 @@ You **always run** on a code-review round, regardless of the gating table.
 
 ## Protocol
 
-Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.
+Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/code-review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.
 This is a conformance-only lens (no critique layer).

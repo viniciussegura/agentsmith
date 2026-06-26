@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseWorksheet } from '../devtools/triage-ui/migrate.mjs';
-import { validateFile } from '../devtools/triage-ui/schema.mjs';
+import { validateFile, migrateWorksheet } from '../devtools/triage-ui/schema.mjs';
 
 const MD = `# Instruction-review triage worksheet
 
@@ -158,4 +158,26 @@ test('a nested code fence inside current/draft is not truncated', () => {
   // and so does everything AFTER the nested block
   assert.match(e.current, /Trailing table after the code block\.$/);
   assert.match(e.draft, /Trailing line after the code block\.$/);
+});
+
+test('migrateWorksheet strips the client-only _live cache from entries and candidates', () => {
+  const out = migrateWorksheet({
+    round: 'r',
+    scorecard: null,
+    entries: [{
+      tag: 'a', kind: 'strengthen', role: 'swe', targetFile: 'instructions/x.md',
+      status: { state: 'ready' }, gap: 'g', decision: { verdict: 'park' }, applyLog: [],
+      draft: 'd', _live: 'LIVE TEXT',
+    }],
+    candidates: [{
+      tag: 'b', kind: 'new-rule', role: 'swe', targetFile: 'instructions/y.md',
+      gap: 'g', priority: 'low', decision: { verdict: 'park' }, _live: 'LIVE TEXT',
+    }],
+  });
+  assert.equal('_live' in out.entries[0], false, 'entry _live stripped');
+  assert.equal('_live' in out.candidates[0], false, 'candidate _live stripped');
+  // the rest of each object is preserved
+  assert.equal(out.entries[0].draft, 'd');
+  assert.equal(out.candidates[0].tag, 'b');
+  assert.deepEqual(validateFile(out), [], 'stays schema-valid');
 });

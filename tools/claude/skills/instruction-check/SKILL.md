@@ -63,4 +63,4 @@ Rules for credible findings:
 
 Open with a one-line verdict: `clean` or `N finding(s)`. Then the findings list, grouped by
 file. Close with the single most important fix to make first. No issue ids, no files written.
-If the change clearly warrants the heavier pass, say so and offer `/review-board`.
+If the change clearly warrants the heavier pass, say so and offer `/code-review-board`.

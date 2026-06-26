@@ -19,5 +19,5 @@ Composition is what you read; the correctness of the code under test is `correct
 
 ## Protocol
 
-Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.
+Shared reviewer protocol -- stance, inputs, method, output -- is in `.claude/skills/code-review-board/reviewer-common.md`; the spawn prompt provides it. Read it first.
 This is a conformance-only lens (no critique layer).

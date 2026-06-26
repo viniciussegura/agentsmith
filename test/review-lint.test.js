@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseId, idToSafe, lintStore } from '../tools/claude/skills/review-board/lint.mjs';
+import { parseId, idToSafe, lintStore } from '../tools/claude/skills/code-review-board/lint.mjs';
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), '../..');
 

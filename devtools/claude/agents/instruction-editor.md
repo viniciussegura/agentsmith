@@ -1,6 +1,6 @@
 ---
 name: instruction-editor
-description: Instruction-review reduce role for agentsmith's review engine. Consolidates per-role rule proposals, runs the global/structural rubric pass, and produces the dimension scorecard + consolidated proposal set written to the triage worksheet. Never edits instruction sources, never commits a file. Used by the instruction-review skill on a strong model.
+description: Instruction-review reduce role for agentsmith's review engine. Consolidates per-role rule proposals, runs the global/structural rubric pass, and produces the dimension scorecard + consolidated proposal set written to the triage worksheet. Never edits instruction sources, never commits a file. Used by the instruction-review-board skill on a strong model.
 tools: Read, Grep, Glob
 ---
 
