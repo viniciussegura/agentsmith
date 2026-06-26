@@ -102,7 +102,7 @@ over a per-board **args** descriptor, built by the pure builders in `round-args.
   persistCmd: <CLI string>,            // board persist (or 'true' no-op for instruction)
   preReduceCmd: <CLI string | null>,   // optional pre-reduce summary step (code)
   reducePrompt: <maintainer reduce prompt>,
-  plan?: { routingSchema } }           // present enables the Plan step
+  plan?: { routingSchema: <JSON-Schema object> } } // present enables the Plan step
 ```
 
 `runRound(deps)` is the testable body; the live Workflow script calls it with the
