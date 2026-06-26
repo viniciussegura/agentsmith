@@ -29,6 +29,11 @@ test('code round runs Review -> Verify -> Reduce -> Persist, every dispatch carr
   assert.equal(h.calls.filter((c) => c.opts.label?.startsWith('review:')).length, 2);
   assert.equal(h.calls.filter((c) => c.opts.label?.startsWith('verify:')).length, 2);
   assert.ok(h.calls.some((c) => c.opts.label === 'persist:apply'));
+  // code's two-step reduce: a pre-reduce CLI dispatch (persist.mjs summary) then a
+  // PM reduce whose prompt restores the directive contract (pm-directive.json).
+  assert.ok(h.calls.some((c) => c.opts.label === 'reduce:pre'), 'code runs a reduce:pre dispatch');
+  const reduce = h.calls.find((c) => c.opts.label === 'reduce');
+  assert.match(reduce.prompt, /pm-directive\.json/);
 });
 
 test('spec round skips Verify (verify=false)', async () => {
@@ -36,6 +41,8 @@ test('spec round skips Verify (verify=false)', async () => {
   await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log,
     args: { ...specArgs({ roundId: '1', scratch: '/p/x', subjectRef: 'spec.md', candidateLenses: ['security'] }) } });
   assert.ok(!h.phases.includes('Verify'), 'no Verify phase for spec');
+  // spec's preReduceCmd is null -> no reduce:pre dispatch.
+  assert.ok(!h.calls.some((c) => c.opts.label === 'reduce:pre'), 'no reduce:pre dispatch for spec');
 });
 
 test('a dispatch missing model throws (the in-driver assertion)', async () => {

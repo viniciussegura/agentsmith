@@ -18,6 +18,9 @@ test('codeArgs sets board=code, verify=true, the project-manager maintainer, and
   assert.equal(a.maintainer, 'project-manager');
   assert.deepEqual(a.candidateLenses, ['security', 'db']);
   assert.match(a.persistCmd, /persist\.mjs apply/);
+  assert.match(a.preReduceCmd, /persist\.mjs summary/);
+  assert.match(a.reducePrompt, /pm-directive\.json/);
+  assert.match(a.reducePrompt, /triage\.md/);
 });
 
 test('specArgs sets board=spec, verify=false, spec-specialist, guard persist', () => {
@@ -26,6 +29,7 @@ test('specArgs sets board=spec, verify=false, spec-specialist, guard persist', (
   assert.equal(a.verify, false);
   assert.equal(a.maintainer, 'spec-specialist');
   assert.match(a.persistCmd, /guard\.mjs/);
+  assert.equal(a.preReduceCmd, null);
 });
 
 test('instructionArgs sets board=instruction, verify=true, ai-engineer', () => {
