@@ -31,7 +31,8 @@ test('readManifest returns empty paths when absent or malformed', () => {
 test('writeManifest then readManifest round-trips, sorted and deduped', () => {
   const base = tmp();
   try {
-    writeManifest(base, ['b/x.md', 'a.md', 'b/x.md'], '2026-06-26T00:00:00.000Z');
+    const returned = writeManifest(base, ['b/x.md', 'a.md', 'b/x.md'], '2026-06-26T00:00:00.000Z');
+    assert.equal(returned, manifestPath(base));
     assert.equal(existsSync(manifestPath(base)), true);
     const m = readManifest(base);
     assert.deepEqual(m.paths, ['a.md', 'b/x.md']);
@@ -56,14 +57,28 @@ test('pruneOrphans deletes only listed paths and removes emptied dirs', () => {
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
 
-test('pruneOrphans removes a directory the deletion emptied', () => {
+test('pruneOrphans removes a directory the deletion emptied but keeps non-empty ancestors', () => {
   const base = tmp();
+  try {
+    mkdirSync(join(base, '.claude/skills/agentsmith-old'), { recursive: true });
+    mkdirSync(join(base, '.claude/skills/keep'), { recursive: true });
+    writeFileSync(join(base, '.claude/skills/agentsmith-old/SKILL.md'), 'x');
+    writeFileSync(join(base, '.claude/skills/keep/SKILL.md'), 'keep');
+    pruneOrphans(base, ['.claude/skills/agentsmith-old/SKILL.md']);
+    assert.equal(existsSync(join(base, '.claude/skills/agentsmith-old')), false, 'emptied dir removed');
+    assert.equal(existsSync(join(base, '.claude/skills')), true, 'ancestor with siblings kept');
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('pruneOrphans removes a multi-level chain the deletion emptied', () => {
+  const base = mkdtempSync(join(tmpdir(), 'agentsmith-mf-'));
   try {
     mkdirSync(join(base, '.claude/skills/agentsmith-old'), { recursive: true });
     writeFileSync(join(base, '.claude/skills/agentsmith-old/SKILL.md'), 'x');
     pruneOrphans(base, ['.claude/skills/agentsmith-old/SKILL.md']);
-    assert.equal(existsSync(join(base, '.claude/skills/agentsmith-old')), false, 'emptied dir removed');
-    assert.equal(existsSync(join(base, '.claude/skills')), true, 'ancestor with siblings kept (or base kept)');
+    assert.equal(existsSync(join(base, '.claude/skills/agentsmith-old')), false, 'leaf dir removed');
+    assert.equal(existsSync(join(base, '.claude/skills')), false, 'emptied parent removed');
+    assert.equal(existsSync(join(base, '.claude')), false, 'emptied grandparent removed');
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
 

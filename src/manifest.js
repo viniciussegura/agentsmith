@@ -3,7 +3,7 @@
 // longer produce) WITHOUT ever deleting a path agentsmith did not record writing
 // (#ai-tool-safety). Lives at .agentsmith/.install-manifest.json (gitignored).
 import {
-  readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync, rmdirSync,
+  readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync,
 } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
@@ -20,7 +20,7 @@ export function readManifest(base) {
   if (!existsSync(p)) return { version: 1, paths: [] };
   try {
     const m = JSON.parse(readFileSync(p, 'utf8'));
-    return { version: m.version ?? 1, paths: Array.isArray(m.paths) ? m.paths : [] };
+    return { version: m.version ?? 1, paths: Array.isArray(m.paths) ? m.paths.filter((e) => typeof e === 'string') : [] };
   } catch {
     return { version: 1, paths: [] };
   }
@@ -44,14 +44,13 @@ export function pruneOrphans(base, orphans) {
     rmSync(abs, { force: true });
     deleted.push(rel);
     let dir = dirname(abs);
-    // Remove only one level of empty parent directory
-    if (dir !== root && dir.startsWith(root)) {
+    while (dir !== root && dir.startsWith(root)) {
       try {
-        if (readdirSync(dir).length === 0) {
-          rmdirSync(dir);
-        }
+        if (readdirSync(dir).length > 0) break;
+        rmSync(dir, { recursive: true });
+        dir = dirname(dir);
       } catch {
-        // ignore errors (dir may have become non-empty or inaccessible)
+        break;
       }
     }
   }
