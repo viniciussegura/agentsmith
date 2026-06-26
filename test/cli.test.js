@@ -65,7 +65,7 @@ test('default run installs the claude adapter into .claude', () => {
     assert.ok(existsSync(join(dir, '.claude/commands/agentsmith-spec-review-board.md')), 'command installed');
     // the review-board adapter (reviewer personas, skill, commands)
     assert.ok(existsSync(join(dir, '.claude/agents/review-correctness.md')), 'a reviewer persona installed');
-    assert.ok(existsSync(join(dir, '.claude/agents/review-pm.md')), 'pm reduce persona installed');
+    assert.ok(existsSync(join(dir, '.claude/agents/project-manager.md')), 'pm maintainer persona installed');
     assert.ok(existsSync(join(dir, '.claude/skills/code-review-board/SKILL.md')), 'review-board skill installed');
     assert.ok(existsSync(join(dir, '.claude/skills/code-review-board/lint.mjs')), 'review-board store linter installed');
     assert.ok(existsSync(join(dir, '.claude/skills/code-review-board/reviewer-common.md')), 'shared reviewer protocol installed');

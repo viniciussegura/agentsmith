@@ -96,7 +96,7 @@ over a per-board **args** descriptor, built by the pure builders in `round-args.
   scratch: <round scratch dir>,
   store: <board store path>,
   subjectRef: <subject>,
-  maintainer: <agent name>,            // spec-specialist | review-pm→project-manager | ai-engineer
+  maintainer: <agent name>,            // spec-specialist | project-manager | ai-engineer
   candidateLenses: [<role>...],
   verify: boolean,                     // true for code/instruction, false for spec
   persistCmd: <CLI string>,            // board persist (or 'true' no-op for instruction)
@@ -118,10 +118,10 @@ two dispatches per round.
 | Board | Maintainer (plan + reduce) | Specialists | Schema | Verify | Persist (unchanged) |
 |---|---|---|---|---|---|
 | spec | `spec-specialist` | `review-<role>` over `spec_review:true` lenses | `Finding` | no | scratch ledger + `guard.mjs` |
-| code | `project-manager` *(was `review-pm`)* | `review-<role>` over config-selected roles | `Issue` | yes | issue store via `persist.mjs` |
+| code | `project-manager` | `review-<role>` over config-selected roles | `Issue` | yes | issue store via `persist.mjs` |
 | instruction | `ai-engineer` *(was `instruction-editor`)* | `review-<role>` over the participating lenses | `InstructionProposal` | yes | triage worksheet |
 
-`review-pm` and `instruction-editor` are **renamed and extended**, not duplicated:
+`project-manager` and `instruction-editor` are **renamed and extended**, not duplicated:
 each keeps its reduce duty and gains the plan duty. `spec-specialist` is unchanged.
 
 ## The two drivers and parity

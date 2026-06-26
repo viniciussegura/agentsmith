@@ -31,7 +31,8 @@ export function codeArgs(ctx) {
   return {
     ...base(ctx),
     board: 'code',
-    maintainer: 'review-pm', // review-pm until the Task 4 rename -> project-manager
+    maintainer: 'project-manager',
+    plan: { routingSchema: ROUTING_SCHEMA },
     verify: true,
     persistCmd: `node .claude/skills/code-review-board/persist.mjs apply ${ctx.store} ${ctx.roundId}`,
     preReduceCmd: `node .claude/skills/code-review-board/persist.mjs summary ${ctx.store} ${ctx.roundId}`,

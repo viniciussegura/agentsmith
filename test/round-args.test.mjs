@@ -11,11 +11,13 @@ test('ROUTING_SCHEMA requires lenses[] and perLens object', () => {
   assert.equal(ROUTING_SCHEMA.properties.lenses.type, 'array');
 });
 
-test('codeArgs sets board=code, verify=true, the review-pm maintainer, and the persist CLI', () => {
+test('codeArgs sets board=code, verify=true, the project-manager maintainer, plan, and the persist CLI', () => {
   const a = codeArgs({ roundId: 'r1', store: '/p/.agentsmith/review-board', subjectRef: 'base..HEAD', candidateLenses: ['security', 'db'] });
   assert.equal(a.board, 'code');
   assert.equal(a.verify, true);
-  assert.equal(a.maintainer, 'review-pm');
+  assert.equal(a.maintainer, 'project-manager');
+  assert.ok(a.plan, 'code enables the plan phase');
+  assert.equal(a.plan.routingSchema, ROUTING_SCHEMA);
   assert.deepEqual(a.candidateLenses, ['security', 'db']);
   assert.match(a.persistCmd, /persist\.mjs apply/);
   assert.match(a.preReduceCmd, /persist\.mjs summary/);

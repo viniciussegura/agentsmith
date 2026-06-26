@@ -16,7 +16,7 @@ Schema, status lifecycle, ids, and the store layout are in `issue-format.md`; re
 ## Roles
 
 Reviewers fan out in parallel on a **cheap model**, one sub-agent per selected role (`review-correctness`, `review-swe`, `review-security`, `review-db`, `review-qa`, `review-docs`, `review-frontend`, `review-ux`).
-The verifier (`review-verifier`) is a per-finding skeptic, also cheap and parallel; the PM reduce (`review-pm`) runs on a **strong model**.
+The verifier (`review-verifier`) is a per-finding skeptic, also cheap and parallel; the PM reduce (`project-manager`) runs on a **strong model**.
 Each reviewer is application-neutral: the spawn prompt has it read the shared protocol (`reviewer-common.md`) then its persona (`review-<role>.md`), supplies the **subject** (the diff + touched files, by reference), and names the **output schema** (`Issue`, per `issue-format.md`).
 Where sub-agents are unavailable, role-play each lens sequentially, emitting the same artifacts (`#ai-review-engine` degradation).
 
@@ -66,7 +66,7 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 
 ### 5. Reduce (PM role, strong model)
 
-- Spawn `review-pm` with `pm-input.json`; it consolidates priority, groups issues into canonical epics, marks duplicates, may down-rank/reject (with a recorded reason), and writes **both** `.agentsmith/review-board/rounds/<round-id>.triage.md` (the human report) and `.agentsmith/tmp/review-board/<round-id>/pm-directive.json` (the structured directive `persist.mjs` applies).
+- Spawn `project-manager` with `pm-input.json`; it consolidates priority, groups issues into canonical epics, marks duplicates, may down-rank/reject (with a recorded reason), and writes **both** `.agentsmith/review-board/rounds/<round-id>.triage.md` (the human report) and `.agentsmith/tmp/review-board/<round-id>/pm-directive.json` (the structured directive `persist.mjs` applies).
 
 ### 5b. Persist apply (main thread)
 
@@ -106,4 +106,4 @@ Per `#ai-review-engine`: real sub-agents when available; else one agent role-pla
 
 Parallel fan-out; cheap model for review/verify, strong only for the PM reduce; each reviewer gets only the diff + its touched files + its profile tags (never the whole repo); the diff is computed once and passed by reference; non-dirty issues carry forward without re-read; the PM groups on summaries and pulls full descriptions only for issues it merges.
 
-The orchestration span is now mechanical -- dispatch agents, collect scratch paths, run `persist.mjs` -- because reviewers/verifiers write JSON scratch the driver never ingests and persistence is a deterministic script. So run the **driver on a cheap model** where the host lets the operator pick the session model; the strong model stays reserved for the `review-pm` reduce (its own dispatch). This is guidance, not an enforced mechanism: a skill cannot set its own session model.
+The orchestration span is now mechanical -- dispatch agents, collect scratch paths, run `persist.mjs` -- because reviewers/verifiers write JSON scratch the driver never ingests and persistence is a deterministic script. So run the **driver on a cheap model** where the host lets the operator pick the session model; the strong model stays reserved for the `project-manager` reduce (its own dispatch). This is guidance, not an enforced mechanism: a skill cannot set its own session model.
