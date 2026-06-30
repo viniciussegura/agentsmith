@@ -25,6 +25,10 @@ const base = (ctx) => ({
   store: ctx.store,
   subjectRef: ctx.subjectRef,
   candidateLenses: ctx.candidateLenses ?? [],
+  // Post-round containment baseline (round-guard.mjs). Reviewers carry Write, so the
+  // round ends by asserting no agent wrote outside the gitignored scratch/store. The
+  // caller snapshots this file BEFORE fan-out; the driver's Guard phase checks it after.
+  guardBaseline: ctx.guardBaseline ?? `${ctx.scratch}/git-baseline.txt`,
 });
 
 export function codeArgs(ctx) {

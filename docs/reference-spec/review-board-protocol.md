@@ -17,13 +17,31 @@ The working-spec `2026-06-26-board-unification` §A simplified the round to six 
 this document is the corrected canonical form — the verify sub-step is preserved for
 code and instruction (review semantics unchanged).
 
-> **Known limitation (2026-06-30):** the **Workflow `-wf` driver** described below
-> (`board-round.mjs` + the `-wf` commands) is **not yet functional** under the real
-> Workflow runtime — a live smoke test hit script-shape and `args`-passing
-> incompatibilities. Use the **main-thread driver** (the board SKILLs) meanwhile.
-> See the technical-debt and the rework brief:
-> `docs/technical-debts/2026-06-26-wf-driver-nonfunctional.md`,
-> `docs/future-work/2026-06-26-board-round-live-smoke.md`.
+## Workflow-script runtime contract
+
+A Workflow `-wf` driver is **not** an ordinary module. The runtime imposes three hard
+constraints, established by live smoke: (1) `export const meta = {...}` must be the
+**first** statement; (2) **no second `export`** and **no `import`** (static or dynamic) —
+the script is evaluated in a non-module scope and must be **fully self-contained**;
+(3) the Workflow `args` input arrives as a **JSON string**, so the script `JSON.parse`s
+it before use. Because of (2), the tested body cannot be imported: `round-body.mjs` is
+the source of truth (unit-tested via `runRound`), and `board-round.mjs` is **generated**
+from it by `bin/build-board-round.js` (the agentsmith generate+drift pattern —
+`test/board-round-render.test.mjs` fails if the committed script drifts). The generated
+guard `JSON.parse`s `args` and calls `runRound` only when an `agent` function is present
+(i.e. under the runtime). Structured-output (`agent(prompt, {schema})`) returns the
+parsed object and is verified end-to-end.
+
+## Containment guard (agents carry Write)
+
+Reviewers, verifiers, and maintainers carry the **Write** tool — that is what makes the
+file handoff (each agent writes its own `findings/<role>.json` / `verdicts/` / store
+output) actually work; it is not a workaround. The deliberate containment is
+`round-guard.mjs`: the caller snapshots `git status --porcelain` **before** fan-out, and
+the round's final **Guard** phase (driver) / step-5b check (main thread) re-compares it.
+Every legitimate write target is gitignored (`.agentsmith/`, `.claude/`), so a clean
+round produces zero porcelain delta; any new entry means an agent wrote outside scratch
+and the round stops. Both drivers run this guard.
 
 ## The round (seven steps)
 

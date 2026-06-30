@@ -42,6 +42,8 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 - If `.agentsmith/review-board/config.yaml` is absent, create it from the **default config** (below) before selecting.
 - **Confirmation gate**: present the resolved `mode`, `targetRef`, and the selected role set, and **confirm the `baselineCommit`**, offering (with a recommended default marked): **(i-feature)** `merge-base` for a feature branch; **(i-main)** the prior `main`-round SHA; **(i-bootstrap)** default HEAD for a first-ever `main` round; **(ii)** a fresh full sweep (zero carry-forward); **(iii)** a user-provided hash. On an **absent local store** for a `main` round, present (i-bootstrap)/(ii)/(iii) and ask -- do not auto-pick. Confirm or override **in one interaction**. An explicit non-interactive run may skip the gate and use the computed default.
 
+- **Containment baseline** (last setup action). Reviewers, verifiers, and the PM carry the Write tool so the file handoff below works; before any of them run, snapshot the git state: `node .claude/skills/code-review-board/round-guard.mjs snapshot .agentsmith/tmp/review-board/<round-id>/git-baseline.txt`. Step 5b checks it — a round must write only under the gitignored scratch/store.
+
 ### 2. Reconcile + review (parallel, one sub-agent per selected role, cheap model)
 
 - A prior issue is **dirty** when `git diff <issue.lastConfirmedCommit>..<commit>` (with rename detection) touches any path in its `locations` -- diff to `commit` (the code under review) so branch-only changes are caught.
@@ -72,6 +74,7 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 
 - Run `node .claude/skills/code-review-board/persist.mjs apply .agentsmith/review-board <round-id>`. It reads the findings + verdicts + `pm-directive.json`, drops rejected findings, writes verified-new issues under their minted ids, applies reconcile and PM transitions, moves closing issues to `closed/`, writes `rounds/<round-id>.json`, updates epics, and runs `lint.mjs` as its final step.
 - A non-zero exit means the scratch was malformed or the write left the store invalid. Read the reported errors, fix the offending scratch/directive, and rerun -- `persist.mjs` is deterministic, so a clean rerun reproduces a clean store.
+- **Containment check.** After persist, run `node .claude/skills/code-review-board/round-guard.mjs check .agentsmith/tmp/review-board/<round-id>/git-baseline.txt`. A non-zero exit lists paths an agent wrote outside the gitignored scratch/store -- stop, inspect, and revert the stray writes before presenting; do not promote a round whose guard failed.
 
 ### 6. Present (main thread)
 

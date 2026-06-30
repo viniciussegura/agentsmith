@@ -48,6 +48,8 @@ Spawn `ai-engineer` (the maintainer's **plan** duty) with the candidate lens set
 
 ### 2. Fan-out (parallel, one sub-agent per planned role, cheap model)
 
+Roles and the verifier carry the Write tool (they write their own `findings/<role>.json` / `verdicts/`), so **before spawning** snapshot the git baseline for the containment guard: `node .claude/skills/code-review-board/round-guard.mjs snapshot .agentsmith/tmp/instruction-review/<round-id>/git-baseline.txt`. Step 5 checks it.
+
 Each role reviews the instruction set through its lens, emitting `InstructionProposal`s for: (a) **coverage** -- a rule its domain expects that is missing or too weak; (b) **per-lens quality** -- clarity, terseness, efficiency, enforceability of rules in its domain; (c) **ownership & placement** -- whether a rule it owns (or believes belongs to its lens) is owned by the right role and in the best file, proposing `rehome`/`reowner` where not.
 The global/structural rubric dimensions are **not** per-lens; they run once in reduce (step 4).
 
@@ -61,6 +63,8 @@ Spawn `ai-engineer` (the maintainer's reduce duty) with the verified proposals: 
 It then **accounts for every rubric dimension** (`proposal-format.md`): consolidate the per-lens verdicts from the role outputs, run the one-time global/structural rubric pass (cohesiveness, self-reference, lean-split, normative voice), and do the mechanical-nits sweep -- producing the **dimension scorecard** and nits list. These are ephemeral (presented, not committed).
 
 ### 5. Reduce output + handoff (main thread)
+
+**Containment check first.** Run `node .claude/skills/code-review-board/round-guard.mjs check .agentsmith/tmp/instruction-review/<round-id>/git-baseline.txt`. A round writes only the gitignored worksheet, so a non-zero exit means a role/verifier wrote outside scratch — stop, inspect, and revert before presenting.
 
 Present the **dimension scorecard** (a Strong/Good/Weak/Gaps verdict per rubric dimension, with `file`/`#tag` citations -- each cell is the worst of its per-rule findings, Strong when none) and the **mechanical-nits** list. The scorecard is never omitted **when reduce runs**; the setup gate's *Stop and process* path runs no reduce and so presents no new scorecard -- that is the one sanctioned no-scorecard path.
 

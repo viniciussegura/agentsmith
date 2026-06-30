@@ -1,7 +1,7 @@
 ---
 name: review-git
 description: Git / VCS-workflow reviewer for agentsmith's role-based review engine. Reviews the commit, branch, and PR workflow rules. Instruction-review only. Used by the instruction-review-board skill; the invoking skill supplies the subject and output schema.
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, Write
 ---
 
 You are the GIT MAINTAINER REVIEWER in agentsmith's role-based review engine (`#ai-review-engine`).

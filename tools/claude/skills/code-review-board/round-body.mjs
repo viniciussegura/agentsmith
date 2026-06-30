@@ -1,12 +1,3 @@
-// GENERATED from round-body.mjs by bin/build-board-round.js -- DO NOT EDIT.
-// Edit round-body.mjs (the tested source) and run `npm run build:board-round`.
-
-export const meta = {
-  name: 'board-round',
-  description: 'Run one review-board round (any board) deterministically: plan, fan-out, verify, reduce, persist.',
-  phases: [{ title: 'Plan' }, { title: 'Review' }, { title: 'Verify' }, { title: 'Reduce' }, { title: 'Persist' }],
-};
-
 // round-body.mjs — the testable body of the shared review-board round (#ai-review-engine).
 // SOURCE OF TRUTH. board-round.mjs (the Workflow script the runtime loads) is GENERATED
 // from this file by bin/build-board-round.js and must NOT be hand-edited — a Workflow
@@ -18,7 +9,7 @@ export const meta = {
 
 const MODEL = { maintainer: 'opus', specialist: 'sonnet', verifier: 'sonnet', persist: 'haiku' };
 
-async function runRound({ agent, parallel, phase, log, args }) {
+export async function runRound({ agent, parallel, phase, log, args }) {
   const { board, roundId, scratch, store, subjectRef, maintainer, candidateLenses, verify, persistCmd, preReduceCmd, reducePrompt, plan, guardBaseline } = args;
   const findings = (role) => `${scratch}/findings/${role}.json`;
   const guarded = (prompt, opts) => {
@@ -90,12 +81,4 @@ async function runRound({ agent, parallel, phase, log, args }) {
   }
 
   return { roundId, board, result, persist, guard };
-}
-
-// --- live Workflow entry: runs only under the Workflow runtime (the `agent` global).
-// The runtime delivers `args` as a JSON string; parse it before handing runRound a plain object.
-// eslint-disable-next-line no-undef
-if (typeof agent === 'function') {
-  // eslint-disable-next-line no-undef
-  await runRound({ agent, parallel, phase, log, args: typeof args === 'string' ? JSON.parse(args) : args });
 }

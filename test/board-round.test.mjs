@@ -1,7 +1,7 @@
 // test/board-round.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runRound } from '../tools/claude/skills/code-review-board/board-round.mjs';
+import { runRound } from '../tools/claude/skills/code-review-board/round-body.mjs';
 import { codeArgs, specArgs, instructionArgs, ROUTING_SCHEMA } from '../tools/claude/skills/code-review-board/round-args.mjs';
 
 // Build a recording harness: captures every agent() call + supports parallel/phase/log.
@@ -24,11 +24,14 @@ test('code round runs Plan -> Review -> Verify -> Reduce -> Persist, every dispa
   const h = harness();
   await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log,
     args: codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'base..HEAD', candidateLenses: ['security', 'db'] }) });
-  assert.deepEqual(h.phases, ['Plan', 'Review', 'Verify', 'Reduce', 'Persist']);
+  assert.deepEqual(h.phases, ['Plan', 'Review', 'Verify', 'Reduce', 'Persist', 'Guard']);
   // two maintainer-chosen reviewers + two verifiers + persist
   assert.equal(h.calls.filter((c) => c.opts.label?.startsWith('review:')).length, 2);
   assert.equal(h.calls.filter((c) => c.opts.label?.startsWith('verify:')).length, 2);
   assert.ok(h.calls.some((c) => c.opts.label === 'persist:apply'));
+  // the round closes with the containment guard (round-guard check against the baseline)
+  const guard = h.calls.find((c) => c.opts.label === 'guard:check');
+  assert.ok(guard && /round-guard\.mjs check/.test(guard.prompt), 'round ends with a guard:check dispatch');
   // code's two-step reduce: a pre-reduce CLI dispatch (persist.mjs summary) then a
   // PM reduce whose prompt restores the directive contract (pm-directive.json).
   assert.ok(h.calls.some((c) => c.opts.label === 'reduce:pre'), 'code runs a reduce:pre dispatch');

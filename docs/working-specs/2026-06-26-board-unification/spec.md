@@ -1,6 +1,18 @@
 # Board unification: one round choreography, two drivers, three boards
 
-Status: Approved
+Status: Implemented
+
+> **Implementation delta (2026-06-30).** Live smoke surfaced two things the spec did
+> not anticipate. (1) The review-engine agents were granted only `Read, Grep, Glob`,
+> yet every board commands them to **write** their own `findings/<role>.json` — a
+> latent contradiction that made the Workflow `-wf` driver (and the clean main-thread
+> handoff) non-functional. Resolution: the agents carry the **Write** tool, and a new
+> `round-guard.mjs` containment (snapshot `git status --porcelain` before fan-out, a
+> final **Guard** phase / step-5b check after) asserts no agent wrote outside the
+> gitignored scratch. (2) The Workflow runtime forbids `import`/second-`export` and
+> delivers `args` as a JSON string, so `board-round.mjs` is **generated** from the
+> tested `round-body.mjs` (`bin/build-board-round.js` + drift test). Both are now
+> canon in `docs/reference-spec/review-board-protocol.md`; this working-spec is frozen.
 
 ## Problem
 

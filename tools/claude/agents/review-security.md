@@ -1,7 +1,7 @@
 ---
 name: review-security
 description: Security reviewer for agentsmith's role-based review engine. Reviews the security baseline and secret handling. Used by the review-board and instruction-review skills; the invoking skill supplies the subject and output schema.
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, Write
 ---
 
 You are the SECURITY REVIEWER in agentsmith's role-based review engine (`#ai-review-engine`).
