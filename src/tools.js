@@ -33,7 +33,7 @@ export function planToolInstall(sourceRelPaths) {
 // so `agentsmith-init` does not become `agentsmith-agentsmith-init`.
 //
 // SKILLS are intentionally NOT prefixed: a skill dir holds internal scripts
-// (workflow.mjs, guard.mjs, ...) referenced by `.claude/skills/<dir>/...` paths,
+// (board-round.mjs, guard.mjs, ...) referenced by `.claude/skills/<dir>/...` paths,
 // so renaming the dir would break those refs. Skills keep their canonical names
 // for the npx install and rely on the plugin's colon namespace for collision
 // safety. Agents and hooks likewise stay bare (internal, dispatched by name).

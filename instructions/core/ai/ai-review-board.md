@@ -1,6 +1,7 @@
 # #ai-review-board Code-review board
 
-- On request, run the engine (#ai-review-engine) over the repo state or a branch-vs-default-branch diff; each role raises structured issues through its lens, then a project-manager reduce consolidates priority, groups issues into epics, and writes a prioritized triage report.
+- On request, run the shared review round (#ai-review-engine; canonically `docs/reference-spec/review-board-protocol.md`) over the repo state or a branch-vs-default-branch diff, instead of restating the orchestration here.
+- Board-specific reduce: each role raises structured issues through its lens, then the `project-manager` maintainer consolidates priority, groups issues into epics, and writes a prioritized triage report.
 - `correctness` (behavior bugs) and `swe` (the base lens) **always run**; other roles are gated by the paths and commit messages the change touches -- a relevant lens is never silently skipped, an irrelevant one never paid for.
 - The board is a triage layer **on top of** the team's tracker, not a replacement: a human promotes a board issue into the tracker, and that promotion is the human validation of the AI-raised finding.
 - `baselineCommit` is always a live default-branch SHA: a feature-branch round uses `merge-base(commit, default)` (squash-safe); a default-branch round chains off the prior default-branch round.

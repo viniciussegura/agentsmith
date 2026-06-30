@@ -1,7 +1,7 @@
 ---
 name: review-docs
 description: Documentation reviewer for agentsmith's role-based review engine. Reviews documentation drift from the code. Used by the review-board and instruction-review skills; the invoking skill supplies the subject and output schema.
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, Write
 ---
 
 You are the DOCUMENTATION REVIEWER in agentsmith's role-based review engine (`#ai-review-engine`).

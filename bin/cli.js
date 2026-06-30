@@ -10,6 +10,7 @@ import { planToolInstall } from '../src/tools.js';
 import { userImport } from '../src/userimport.js';
 import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
 import { runSpecIndex } from '../src/specindex.js';
+import { readManifest, orphanPaths, pruneOrphans, writeManifest } from '../src/manifest.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -182,19 +183,22 @@ const installSettings = (base, { absolute }) => {
   writeAbs(dest, `${JSON.stringify(next, null, 2)}\n`);
 };
 
-// Install tool adapters (tools/<ai>/** -> <base>/.<ai>/**). Namespaced and
-// non-destructive: only the adapter's own files are written.
-const installAdapters = (base, { absolute }) => {
-  if (!installTools) return;
-  // tools/<ai> ships always; devtools/claude (authoring-only) installs only under
-  // --dev. The dev root is listed at devtools/claude exactly (never devtools/),
-  // so dev-only runtime scripts (triage-ui, restructure) are never installed.
+// Plan the adapter install (pure: no disk writes). tools/<ai>/** always; the
+// authoring devtools/claude/** only under --dev. Returns planToolInstall's
+// { src, dest }[].
+const adapterPlan = () => {
+  if (!installTools) return [];
   const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
   if (dev) sources.push(...listToolSources(join(pkgRoot, 'devtools', 'claude'), 'devtools/claude'));
-  for (const { src, dest } of planToolInstall(sources)) {
+  return planToolInstall(sources);
+};
+
+// Write the planned adapter files, then wire settings (after the hook script is
+// on disk). settings.json is a MERGE target — deliberately NOT a manifest path.
+const writeAdapters = (base, plan, { absolute }) => {
+  for (const { src, dest } of plan) {
     writeAbs(resolve(base, dest), readFileSync(join(pkgRoot, src)));
   }
-  // Wire settings after the hook script is on disk, so it never references a missing file.
   installSettings(base, { absolute });
 };
 
@@ -204,11 +208,20 @@ if (has('--stdout')) {
   // User scope: write the generated instructions under the home directory, wire
   // ~/.claude/CLAUDE.md to import them, and install adapters for all projects.
   const base = homedir();
+  const plan = adapterPlan();
+  const currentPaths = [
+    built.corePath,
+    ...built.bundles.map((b) => b.path),
+    ...plan.map((p) => p.dest),
+  ];
+  const prev = readManifest(base);
+  const pruned = pruneOrphans(base, orphanPaths(prev.paths, currentPaths));
+  if (pruned.length) process.stderr.write(`agentsmith: pruned ${pruned.length} orphaned file(s)\n`);
+
   writeAbs(resolve(base, built.corePath), built.coreContent);
   for (const bundle of built.bundles) writeAbs(resolve(base, bundle.path), bundle.content);
 
-  // Wire the import before installing adapters, so a later adapter-file error
-  // cannot leave instructions written but unwired.
+  // Wire the CLAUDE.md import before installing adapters (unchanged), then:
   const claudeMd = resolve(base, '.claude/CLAUDE.md');
   const target = resolve(base, built.corePath).replace(/\\/g, '/');
   const existing = existsSync(claudeMd) ? readFileSync(claudeMd, 'utf8') : null;
@@ -216,9 +229,22 @@ if (has('--stdout')) {
   if (next !== null) writeAbs(claudeMd, next);
   else process.stderr.write(`agentsmith: kept existing import in ${claudeMd}\n`);
 
-  installAdapters(base, { absolute: true });
+  writeAdapters(base, plan, { absolute: true });
+  writeManifest(base, currentPaths, new Date().toISOString());
 } else {
   const cwd = process.cwd();
+  const plan = adapterPlan();
+  // Files agentsmith fully owns this run: core + bundles + adapter files.
+  // EXCLUDES the root stub (write-once) and settings.json (merged).
+  const currentPaths = [
+    built.corePath,
+    ...built.bundles.map((b) => b.path),
+    ...plan.map((p) => p.dest),
+  ];
+  const prev = readManifest(cwd);
+  const pruned = pruneOrphans(cwd, orphanPaths(prev.paths, currentPaths));
+  if (pruned.length) process.stderr.write(`agentsmith: pruned ${pruned.length} orphaned file(s)\n`);
+
   writeAbs(resolve(cwd, built.corePath), built.coreContent);
   for (const bundle of built.bundles) writeAbs(resolve(cwd, bundle.path), bundle.content);
 
@@ -231,5 +257,6 @@ if (has('--stdout')) {
     }
   }
 
-  installAdapters(cwd, { absolute: false });
+  writeAdapters(cwd, plan, { absolute: false });
+  writeManifest(cwd, currentPaths, new Date().toISOString());
 }

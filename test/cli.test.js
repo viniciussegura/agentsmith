@@ -65,7 +65,7 @@ test('default run installs the claude adapter into .claude', () => {
     assert.ok(existsSync(join(dir, '.claude/commands/agentsmith-spec-review-board.md')), 'command installed');
     // the review-board adapter (reviewer personas, skill, commands)
     assert.ok(existsSync(join(dir, '.claude/agents/review-correctness.md')), 'a reviewer persona installed');
-    assert.ok(existsSync(join(dir, '.claude/agents/review-pm.md')), 'pm reduce persona installed');
+    assert.ok(existsSync(join(dir, '.claude/agents/project-manager.md')), 'pm maintainer persona installed');
     assert.ok(existsSync(join(dir, '.claude/skills/code-review-board/SKILL.md')), 'review-board skill installed');
     assert.ok(existsSync(join(dir, '.claude/skills/code-review-board/lint.mjs')), 'review-board store linter installed');
     assert.ok(existsSync(join(dir, '.claude/skills/code-review-board/reviewer-common.md')), 'shared reviewer protocol installed');
@@ -112,7 +112,7 @@ test('--dev install adds the authoring tools alongside the shipped set', () => {
     run(dir, ['--dev']);
     assert.ok(existsSync(join(dir, SHIPPED)), 'shipped tool still present');
     assert.ok(existsSync(join(dir, IR)), 'authoring skill present under --dev');
-    assert.ok(existsSync(join(dir, '.claude/agents/instruction-editor.md')), 'instruction-editor present under --dev');
+    assert.ok(existsSync(join(dir, '.claude/agents/ai-engineer.md')), 'ai-engineer present under --dev');
     assert.ok(!existsSync(join(dir, TRIAGE)), 'triage-ui still not installed');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -201,4 +201,43 @@ test('an unrelated .claude file survives the install', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('a recorded orphan is pruned on the next run; an unrecorded consumer file survives', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir); // first run writes the manifest
+    const mfPath = join(dir, '.agentsmith/.install-manifest.json');
+    const mf = JSON.parse(readFileSync(mfPath, 'utf8'));
+
+    // simulate a prior run having produced a file the CURRENT sources no longer do
+    const ghost = join(dir, '.claude/commands/agentsmith-ghost.md');
+    writeFileSync(ghost, 'ghost');
+    mf.paths.push('.claude/commands/agentsmith-ghost.md');
+    writeFileSync(mfPath, `${JSON.stringify(mf, null, 2)}\n`);
+
+    // a consumer's own file, never in the manifest
+    const mine = join(dir, '.claude/commands/my-own.md');
+    writeFileSync(mine, 'mine');
+
+    run(dir); // second run prunes the ghost, spares my-own
+
+    assert.equal(existsSync(ghost), false, 'recorded orphan pruned');
+    assert.equal(existsSync(mine), true, 'unrecorded consumer file survived');
+    const after = JSON.parse(readFileSync(mfPath, 'utf8'));
+    assert.ok(!after.paths.includes('.claude/commands/agentsmith-ghost.md'), 'ghost dropped from manifest');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('settings.json and the root AGENTS.md stub are never pruned', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir);
+    run(dir); // a second run must not delete merge-target or write-once files
+    assert.equal(existsSync(join(dir, '.claude/settings.json')), true, 'settings.json kept');
+    assert.equal(existsSync(join(dir, 'AGENTS.md')), true, 'root stub kept');
+    const mf = JSON.parse(readFileSync(join(dir, '.agentsmith/.install-manifest.json'), 'utf8'));
+    assert.ok(!mf.paths.includes('.claude/settings.json'), 'settings.json not recorded');
+    assert.ok(!mf.paths.includes('AGENTS.md'), 'root stub not recorded');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
