@@ -2,6 +2,8 @@
 description: Run one instruction-review-board round via the deterministic Workflow driver (Claude Code only; same triage worksheet + schema as /instruction-review-board). Authoring-only (--dev).
 ---
 
+> **Prerequisite (session startup).** This board's agents — `ai-engineer` (maintainer) and the `ai`/`git` meta-lenses (`review-ai`, `review-git`) — are **`--dev`-only**. Claude Code registers agent *types* at session start, so they must be **installed before the session begins**: run `node bin/cli.js --dev`, then start (or restart) the session. Installing them mid-session updates the files on disk but does **not** register the new agent types — a run will fail with `agent type 'ai-engineer' not found`. The code/spec boards have no dev-only agents and are unaffected.
+
 Run **one** instruction-review round using the Workflow driver instead of the main-loop orchestrator. The unified `board-round.mjs` driver runs exactly one round (Plan → Review → Verify → Reduce → Persist). A round is always a **full audit** — there is no diff variant. The parked-check gate and the ownership-coverage-lint open stay **main-thread**: a deterministic round never needs a human decision mid-run (spec §G), so the gate runs before the driver is invoked.
 
 1. **Setup** (main thread). Do the `instruction-review-board` SKILL.md step-1 setup:
