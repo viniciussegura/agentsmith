@@ -17,6 +17,14 @@ The working-spec `2026-06-26-board-unification` §A simplified the round to six 
 this document is the corrected canonical form — the verify sub-step is preserved for
 code and instruction (review semantics unchanged).
 
+> **Known limitation (2026-06-30):** the **Workflow `-wf` driver** described below
+> (`board-round.mjs` + the `-wf` commands) is **not yet functional** under the real
+> Workflow runtime — a live smoke test hit script-shape and `args`-passing
+> incompatibilities. Use the **main-thread driver** (the board SKILLs) meanwhile.
+> See the technical-debt and the rework brief:
+> `docs/technical-debts/2026-06-26-wf-driver-nonfunctional.md`,
+> `docs/future-work/2026-06-26-board-round-live-smoke.md`.
+
 ## The round (seven steps)
 
 A **round** is a fixed seven-step choreography with **no inner loop**:

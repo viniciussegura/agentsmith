@@ -4,7 +4,7 @@
 
 | Date | Unit | Status |
 |---|---|---|
-| 2026-06-26 | [Board unification: one round choreography, two drivers, three boards](2026-06-26-board-unification/spec.md) | Implemented |
+| 2026-06-26 | [Board unification: one round choreography, two drivers, three boards](2026-06-26-board-unification/spec.md) | Approved |
 | 2026-06-26 | [Installer prune: remove orphaned generated files](2026-06-26-installer-prune/spec.md) | Implemented |
 | 2026-06-25 | [Instruction-set coexistence: precedence, gap, and drift](2026-06-25-instruction-set-coexistence/spec.md) | Implemented |
 | 2026-06-25 | [Records architecture: design-decisions log, spec index, plan pruning, authoring conformance](2026-06-25-records-architecture/spec.md) | Implemented |
