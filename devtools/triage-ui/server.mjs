@@ -204,8 +204,8 @@ export function createServer({
         // Per-entry progress goes to the terminal running `npm run triage`.
         const onProgress = (ev) => {
           if (ev.type === 'start') console.log(`[apply] ${ev.total} entr${ev.total === 1 ? 'y' : 'ies'}…`);
-          else if (ev.type === 'candidate') console.log(`[apply] candidate #${ev.tag} -> ${ev.outcome}`);
-          else if (ev.phase === 'begin') console.log(`[apply] [${ev.i + 1}/${ev.total}] #${ev.tag} (${ev.verdict})`);
+          else if (ev.type === 'candidate') console.log(`[apply] candidate ${ev.tag} -> ${ev.outcome}`);
+          else if (ev.phase === 'begin') console.log(`[apply] [${ev.i + 1}/${ev.total}] ${ev.tag} (${ev.verdict})`);
           else if (ev.phase === 'gate') console.log('[apply]         running node --test…');
           else if (ev.phase === 'done') console.log(`[apply]         -> ${ev.outcome}`);
         };

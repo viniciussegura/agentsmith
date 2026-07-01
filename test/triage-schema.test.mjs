@@ -30,8 +30,8 @@ test('valid strengthen entry passes', () => {
 
 test('valid entry per kind', () => {
   const newRule = {
-    tag: 't', kind: 'new-rule', role: 'swe', targetFile: 'f.md',
-    status: { state: 'ready' }, gap: 'g', draft: 'd',
+    tag: 't', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/t.md', draft: 'd',
+    status: { state: 'ready' }, gap: 'g',
     decision: { verdict: 'park' }, applyLog: [],
   };
   const rehome = {
@@ -64,6 +64,33 @@ test('per-kind required fields enforced', () => {
 
   const newRuleWithCurrent = { ...baseStrengthen(), kind: 'new-rule', current: 'x' };
   assert.ok(validateEntry(newRuleWithCurrent).some((m) => m.includes('must not carry "current"')));
+});
+
+test('new-rule targetFile must be <tag>.md (no clobbering an existing rule file)', () => {
+  const mk = (tag, targetFile) => ({
+    tag, kind: 'new-rule', role: 'security', targetFile, draft: 'd',
+    status: { state: 'ready' }, gap: 'g', decision: { verdict: 'park' }, applyLog: [],
+  });
+  // basename != <baretag>.md -> rejected (this is the swe-security clobber)
+  const bad = mk('swe-prompt-injection-sentinel', 'instructions/core/swe/swe-security.md');
+  assert.ok(validateEntry(bad).some((m) => m.includes('must be "swe-prompt-injection-sentinel.md"')));
+  // its own file (leading # in tag tolerated) -> clean
+  assert.deepEqual(validateEntry(mk('#swe-prompt-injection-sentinel', 'instructions/core/swe/swe-prompt-injection-sentinel.md')), []);
+  // strengthen is exempt (it edits an existing file in place)
+  const strengthen = { ...baseStrengthen(), targetFile: 'instructions/core/swe/swe-security.md', tag: 'swe-errors' };
+  assert.deepEqual(validateEntry(strengthen), []);
+});
+
+test('new-rule owner is optional but must be non-empty; priority must be a known value', () => {
+  const mk = (extra) => ({
+    tag: 'swe-x', kind: 'new-rule', role: 'swe', targetFile: 'instructions/core/swe/swe-x.md', draft: 'd',
+    status: { state: 'ready' }, gap: 'g', decision: { verdict: 'park' }, applyLog: [], ...extra,
+  });
+  assert.deepEqual(validateEntry(mk({})), []);                       // absent owner/priority OK
+  assert.deepEqual(validateEntry(mk({ owner: 'security' })), []);    // suggested owner OK
+  assert.deepEqual(validateEntry(mk({ priority: 'high' })), []);     // carried priority OK
+  assert.ok(validateEntry(mk({ owner: '  ' })).some((m) => m.includes('"owner" must be a non-empty string')));
+  assert.ok(validateEntry(mk({ priority: 'urgent' })).some((m) => m.includes('"priority" must be one of')));
 });
 
 test('status union: blocked/conditional require blockedOn; ready forbids it', () => {
@@ -148,7 +175,7 @@ test('v2: strengthen no longer requires current', () => {
 });
 
 test('v2: lastRoundReply must be a string when present', () => {
-  const e = { tag: 't', role: 'swe', targetFile: 'f', status: { state: 'ready' }, gap: 'g',
+  const e = { tag: 't', role: 'swe', targetFile: 't.md', status: { state: 'ready' }, gap: 'g',
     kind: 'new-rule', draft: '# #t', decision: { verdict: 'refine', details: 'q' }, applyLog: [], lastRoundReply: 5 };
   assert.notDeepEqual(validateEntry(e), []);
   assert.deepEqual(validateEntry({ ...e, lastRoundReply: '' }), []);
@@ -192,6 +219,11 @@ test('validateCandidate rejects bad priority, bad verdict, stray draft, non-stri
   assert.ok(validateCandidate(baseCandidate({ decision: { verdict: 'maybe' } })).some((m) => m.includes('verdict')));
   assert.ok(validateCandidate(baseCandidate({ draft: 'x' })).some((m) => m.includes('draft')));
   assert.ok(validateCandidate(baseCandidate({ decision: { verdict: 'wanted', details: 42 } })).some((m) => m.includes('details')));
+});
+
+test('validateCandidate accepts an optional suggested owner, rejects an empty one', () => {
+  assert.deepEqual(validateCandidate(baseCandidate({ owner: 'ux' })), []);
+  assert.ok(validateCandidate(baseCandidate({ owner: '  ' })).some((m) => m.includes('"owner" must be a non-empty string')));
 });
 
 test('validateCandidate allows optional free-text details on any verdict', () => {

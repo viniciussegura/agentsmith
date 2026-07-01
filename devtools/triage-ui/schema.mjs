@@ -101,6 +101,18 @@ export function validateEntry(entry, where = 'entry') {
     p.push(`${at}: "lastRoundReply" must be a string`);
   }
 
+  // owner: the tag's suggested ownership row (new-rule), editable in the UI and
+  // written to ownership.yaml by /instruction-apply. Optional; apply falls back to
+  // `role`. Resolvability is enforced by the ownership-coverage CI gate at adopt.
+  if ('owner' in entry && entry.owner !== undefined && !nonEmpty(entry.owner)) {
+    p.push(`${at}: "owner" must be a non-empty string`);
+  }
+  // priority: carried from the candidate on promotion so apply can sequence work
+  // without re-deriving it. Optional (legacy entries have none).
+  if ('priority' in entry && entry.priority !== undefined && !PRIORITIES.includes(entry.priority)) {
+    p.push(`${at}: "priority" must be one of ${PRIORITIES.join('|')}`);
+  }
+
   // kind + per-kind required fields
   if (!KINDS.includes(entry.kind)) {
     p.push(`${at}: "kind" must be one of ${KINDS.join('|')}`);
@@ -109,6 +121,16 @@ export function validateEntry(entry, where = 'entry') {
       case 'new-rule':
         if (!nonEmpty(entry.draft)) p.push(`${at}: new-rule requires "draft"`);
         if (entry.current !== undefined) p.push(`${at}: new-rule must not carry "current"`);
+        // One-tag-per-file: a new rule gets its OWN file. A targetFile whose basename
+        // isn't <tag>.md points at an existing rule's file — a whole-file adopt would
+        // overwrite that rule and orphan its ownership row (the swe-security clobber).
+        if (nonEmpty(entry.tag) && nonEmpty(entry.targetFile)) {
+          const bare = entry.tag.replace(/^#+/, '');
+          const base = entry.targetFile.split('/').pop();
+          if (base !== `${bare}.md`) {
+            p.push(`${at}: new-rule targetFile basename "${base}" must be "${bare}.md" (a new rule gets its own file; this points at an existing rule)`);
+          }
+        }
         break;
       case 'strengthen':
         if (!nonEmpty(entry.draft)) p.push(`${at}: strengthen requires "draft"`);
@@ -136,6 +158,9 @@ export function validateCandidate(c, where = 'candidate') {
   if (!nonEmpty(c.gap)) p.push(`${at}: missing/empty "gap"`);
   if (!KINDS.includes(c.kind)) p.push(`${at}: "kind" must be one of ${KINDS.join('|')}`);
   if (!PRIORITIES.includes(c.priority)) p.push(`${at}: "priority" must be one of ${PRIORITIES.join('|')}`);
+  // owner: suggested ownership.yaml owner for a new-rule candidate; carried onto
+  // the entry on promotion (with priority) so nothing is re-derived. Optional.
+  if ('owner' in c && c.owner !== undefined && !nonEmpty(c.owner)) p.push(`${at}: "owner" must be a non-empty string`);
   if ('draft' in c) p.push(`${at}: a candidate must not carry "draft"`);
   const d = c.decision;
   if (!isObj(d) || !CANDIDATE_VERDICTS.includes(d.verdict)) {

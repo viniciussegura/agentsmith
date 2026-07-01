@@ -85,6 +85,12 @@ textarea, select {
 }
 textarea.draft { min-height: 180px; }
 textarea.details { min-height: 60px; }
+.owner-edit { margin: 8px 0; }
+.owner-input {
+  width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px; font: inherit;
+}
+.owner-input:focus { outline: none; border-color: var(--accent); }
 .verdicts { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .verdicts label {
   padding: 5px 12px; border: 1px solid var(--border); border-radius: 16px; cursor: pointer;

@@ -53,6 +53,22 @@ test('adopt new-rule creates the file and the ownership row', async () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('adopt new-rule writes the suggested owner (not the raising role) to ownership.yaml', async () => {
+  // a frontend lens raises a ux-owned rule: owner must win over role.
+  const { root, triagePath } = fixture([{
+    tag: 'ui-thing', role: 'frontend', owner: 'ux', targetFile: 'instructions/core/swe/ui-thing.md',
+    status: { state: 'ready' }, gap: 'g', kind: 'new-rule',
+    draft: '# #ui-thing New\n\nbody', decision: { verdict: 'adopt' }, applyLog: [],
+  }]);
+  try {
+    const report = await apply({ root, triagePath, gate: NOOP_GATE });
+    assert.ok(report.adopted.includes('ui-thing'));
+    const own = readFileSync(join(root, 'instructions/ownership.yaml'), 'utf8');
+    assert.match(own, /^\s+ui-thing: ux$/m);
+    assert.doesNotMatch(own, /ui-thing: frontend/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('reject writes a canonical decisions-log line and splices', async () => {
   const { root, triagePath } = fixture([{
     tag: 'foo', role: 'swe', targetFile: 'instructions/core/swe/foo.md',

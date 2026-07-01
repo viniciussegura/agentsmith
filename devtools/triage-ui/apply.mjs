@@ -149,7 +149,8 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
       try {
         mkdirSync(dirname(abs), { recursive: true });
         writeFileSync(abs, e.draft.replace(/\n+$/, '') + '\n');
-        if (e.kind === 'new-rule') ensureOwnerRow(ownershipPath, e.tag, e.role);
+        // owner is the entry's suggested/edited ownership; fall back to the raising role.
+        if (e.kind === 'new-rule') ensureOwnerRow(ownershipPath, e.tag, e.owner || e.role);
         emit({ type: 'entry', phase: 'gate', i: pos, total, tag: e.tag, verdict: v });
         runGate(root);
       } catch (err) {
@@ -233,8 +234,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } catch { /* leave empty; only fold entries need it */ }
   const onProgress = (ev) => {
     if (ev.type === 'start') process.stderr.write(`applying ${ev.total} entr${ev.total === 1 ? 'y' : 'ies'}…\n`);
-    else if (ev.type === 'candidate') process.stderr.write(`  candidate #${ev.tag} -> ${ev.outcome}\n`);
-    else if (ev.phase === 'begin') process.stderr.write(`  [${ev.i + 1}/${ev.total}] #${ev.tag} (${ev.verdict})\n`);
+    else if (ev.type === 'candidate') process.stderr.write(`  candidate ${ev.tag} -> ${ev.outcome}\n`);
+    else if (ev.phase === 'begin') process.stderr.write(`  [${ev.i + 1}/${ev.total}] ${ev.tag} (${ev.verdict})\n`);
     else if (ev.phase === 'gate') process.stderr.write(`        running node --test…\n`);
     else if (ev.phase === 'done') process.stderr.write(`        -> ${ev.outcome}\n`);
   };

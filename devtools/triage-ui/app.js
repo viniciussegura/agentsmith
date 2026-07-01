@@ -524,6 +524,20 @@ async function renderProposalDetail() {
       ])
     : null;
 
+  // new-rule: the tag needs an ownership.yaml row. Let the human confirm/edit the
+  // owner the reviewer suggested (defaults to the raising role); /instruction-apply
+  // writes `<tag>: <owner>` on adopt. Left undefined here means "fall back to role".
+  let ownerRow = null;
+  if (e.kind === 'new-rule') {
+    const ownerInput = el('input', { type: 'text', class: 'owner-input' });
+    ownerInput.value = e.owner || e.role;
+    ownerInput.addEventListener('input', () => { e.owner = ownerInput.value.trim() || undefined; scheduleSave(); });
+    ownerRow = el('div', { class: 'owner-edit' }, [
+      el('label', { class: 'field', text: 'owner — ownership.yaml row (defaults to role)' }),
+      ownerInput,
+    ]);
+  }
+
   const nav = navbar(idx, state.data.entries.length, (i) => select('proposal', i));
 
   // rehome/reowner change metadata, not text, so a content diff would render the
@@ -546,6 +560,7 @@ async function renderProposalDetail() {
     el('div', { class: 'meta', text: `${e.kind} · ${e.role} · ${e.targetFile} · status: ${e.status?.state}` }),
     el('h2', { text: `#${e.tag}` }),
     el('div', { class: 'gap', text: e.gap || '' }),
+    ownerRow,
     ...changeSection,
     verdicts,
     detailsLabel,
