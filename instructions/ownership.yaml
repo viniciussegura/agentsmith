@@ -72,6 +72,7 @@ owners:
   ui-framework-idioms: frontend
   ui-component-reuse: frontend
   ui-inline-style: frontend
+  ui-error-boundary: frontend
 
   # ux -- the end-user experience and flow
   front-nielsen-heuristics: ux
@@ -83,6 +84,8 @@ owners:
   ui-destructive-confirm: ux
   ui-overlay-focus-flow: ux
   ui-perceived-performance: ux
+  ui-progressive-disclosure: ux
+  ui-navigation-state-preservation: ux
 
   # ai -- meta lens: agent behavior, planning, memory, the review engine (instruction-review only)
   ai-conversational: ai
