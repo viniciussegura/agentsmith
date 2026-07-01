@@ -37,10 +37,10 @@ decision:
 
 decisionText:
 
-### swe-async   new-rule · swe · core/swe.md
+### swe-async   new-rule · swe · core/swe/swe-async.md
 - kind: new-rule
 - role: swe
-- targetFile: instructions/core/swe.md
+- targetFile: instructions/core/swe/swe-async.md
 - status: ready
 - gap: no async rule
 

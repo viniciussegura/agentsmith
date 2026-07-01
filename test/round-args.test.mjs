@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ROUTING_SCHEMA, codeArgs, specArgs, instructionArgs, DATA_OPEN, DATA_CLOSE,
+  ROUTING_SCHEMA, codeArgs, specArgs, instructionArgs, DATA_OPEN, DATA_CLOSE, INSTRUCTION_PORTABILITY,
 } from '../tools/claude/skills/code-review-board/round-args.mjs';
 
 test('ROUTING_SCHEMA requires lenses[] and perLens object', () => {
@@ -41,6 +41,22 @@ test('instructionArgs sets board=instruction, verify=true, ai-engineer', () => {
   assert.equal(a.maintainer, 'ai-engineer');
   assert.ok(a.plan, 'instruction enables the plan phase');
   assert.equal(a.plan.routingSchema, ROUTING_SCHEMA);
+});
+
+test('instructionArgs carries the portability reviewNote + reduce genericize clause; code/spec do NOT', () => {
+  const inst = instructionArgs({ roundId: 'r', scratch: '/p/x', subjectRef: 'full-audit', candidateLenses: ['swe'] });
+  // fan-out injection: reviewNote is the portability constraint
+  assert.ok(inst.reviewNote, 'instruction board sets reviewNote');
+  assert.match(inst.reviewNote, /external client|domain-agnostic|portable/i);
+  assert.match(inst.reviewNote, /maintainer|lens/, 'names the banned house terms');
+  // reduce reinforces it (reuses the same string, not re-spelled)
+  assert.match(inst.reducePrompt, /genericize/i);
+  assert.equal(inst.reviewNote, INSTRUCTION_PORTABILITY);
+  // code/spec review THIS repo -> no portability note (they want repo-specific detail)
+  const code = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] });
+  const spec = specArgs({ roundId: '1', scratch: '/p/x', subjectRef: 'spec.md' });
+  assert.equal(code.reviewNote, undefined, 'code board injects no reviewNote');
+  assert.equal(spec.reviewNote, undefined, 'spec board injects no reviewNote');
 });
 
 test('DATA sentinels name the source and are distinct', () => {

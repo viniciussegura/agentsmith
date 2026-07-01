@@ -21,6 +21,10 @@ import { validateFile, validateCrossRefs, canonicalJSON, migrateWorksheet } from
 
 const read = (p) => readFileSync(p, 'utf8');
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Worksheet tags may be stored with or without a leading `#`. Ownership rows are
+// hashless (`ui-tabs: ux`) and decisions-log lines carry exactly one `#`, so both
+// writers normalize to the bare tag before composing their line.
+const bareTag = (t) => String(t).replace(/^#+/, '');
 
 function atomicWrite(path, content) {
   const tmp = path + '.tmp';
@@ -30,6 +34,7 @@ function atomicWrite(path, content) {
 
 /** Ensure `  <tag>: <owner>` exists in ownership.yaml, grouped after the owner's last row. Idempotent. */
 function ensureOwnerRow(ownershipPath, tag, owner) {
+  tag = bareTag(tag);
   const text = read(ownershipPath);
   const lines = text.split('\n');
   if (lines.some((l) => new RegExp('^\\s+' + esc(tag) + ':\\s').test(l))) return;
@@ -45,7 +50,7 @@ function ensureOwnerRow(ownershipPath, tag, owner) {
 /** Ensure the tag's decisions-log line (canonical grammar), one per tag, update in place. */
 function ensureDecisionLine(decisionsPath, verdict, e) {
   const lines = read(decisionsPath).split('\n');
-  const tag = e.tag;
+  const tag = bareTag(e.tag);
   const d = e.decision;
   const line =
     verdict === 'reject' ? `- \`#${tag}\` -- rejected: ${d.details}`
@@ -144,16 +149,31 @@ export async function apply({ root, triagePath, gate, liveTags = [], testTimeout
       try {
         mkdirSync(dirname(abs), { recursive: true });
         writeFileSync(abs, e.draft.replace(/\n+$/, '') + '\n');
-        if (e.kind === 'new-rule') ensureOwnerRow(ownershipPath, e.tag, e.role);
+        // owner is the entry's suggested/edited ownership; fall back to the raising role.
+        if (e.kind === 'new-rule') ensureOwnerRow(ownershipPath, e.tag, e.owner || e.role);
         emit({ type: 'entry', phase: 'gate', i: pos, total, tag: e.tag, verdict: v });
         runGate(root);
       } catch (err) {
         for (const [p, c] of snap) { if (c === null) rmSync(p, { force: true }); else writeFileSync(p, c); }
-        const msg = (err.stderr ? err.stderr.toString() : '') + (err.message || String(err));
-        e.decision = { verdict: 'park' };
+        // `node --test` writes its TAP failures to STDOUT, not stderr, so capture both
+        // (and cli.js warnings on stderr). Keeping only stderr previously reduced every
+        // gate failure to a bare "Command failed: node --test".
+        const out = (err.stdout ? err.stdout.toString() : '') + (err.stderr ? err.stderr.toString() : '');
+        const msg = (out + '\n' + (err.message || String(err))).trim();
+        // Prefer the actual failing line for the short report reason. A `not ok N -`
+        // line is the failed test itself; fall back to a generator warning, then any
+        // Error. Keyword-only matching is avoided — a passing subtest whose NAME contains
+        // "orphan"/"unresolved" would otherwise be mistaken for the failure.
+        const outLines = out.split('\n');
+        const hit = outLines.find((l) => /^\s*not ok /.test(l))
+          || outLines.find((l) => /warning --/.test(l))
+          || outLines.find((l) => /\bError:/.test(l));
+        const reason = (hit || err.message || 'gate failed').trim().slice(0, 200);
+        // Preserve the human's verdict (per the fail-behavior decision): the entry stays
+        // as-decided, gains a visible applyLog record, and re-attempts on the next apply.
         e.applyLog.push(`apply failed ${file.round}: ${msg.slice(0, 500)}`);
         rewrite();
-        report.failed.push({ tag: e.tag, reason: msg.split('\n')[0].slice(0, 200) });
+        report.failed.push({ tag: e.tag, reason });
         done('failed');
         i++;
         continue;
@@ -214,8 +234,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } catch { /* leave empty; only fold entries need it */ }
   const onProgress = (ev) => {
     if (ev.type === 'start') process.stderr.write(`applying ${ev.total} entr${ev.total === 1 ? 'y' : 'ies'}…\n`);
-    else if (ev.type === 'candidate') process.stderr.write(`  candidate #${ev.tag} -> ${ev.outcome}\n`);
-    else if (ev.phase === 'begin') process.stderr.write(`  [${ev.i + 1}/${ev.total}] #${ev.tag} (${ev.verdict})\n`);
+    else if (ev.type === 'candidate') process.stderr.write(`  candidate ${ev.tag} -> ${ev.outcome}\n`);
+    else if (ev.phase === 'begin') process.stderr.write(`  [${ev.i + 1}/${ev.total}] ${ev.tag} (${ev.verdict})\n`);
     else if (ev.phase === 'gate') process.stderr.write(`        running node --test…\n`);
     else if (ev.phase === 'done') process.stderr.write(`        -> ${ev.outcome}\n`);
   };

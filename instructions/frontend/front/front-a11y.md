@@ -8,3 +8,4 @@ Meet contrast ratios: 4.5:1 for body text, 3:1 for large text and UI affordances
 **Never** convey state by color alone -- pair it with text or an icon.
 Content that updates asynchronously (search results, notifications, status) **MUST** announce via an appropriate live region (`aria-live`, `role="status"`, `role="alert"`) at a politeness matching urgency.
 Animation and transitions **MUST** respect `prefers-reduced-motion: reduce` with a no-motion fallback.
+Every page with repeated navigation **MUST** provide a visible-on-focus skip link (`<a href="#main-content">Skip to content</a>`) as the first focusable element, targeting the main-content landmark (WCAG 2.4.1).

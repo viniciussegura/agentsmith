@@ -53,6 +53,22 @@ test('adopt new-rule creates the file and the ownership row', async () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('adopt new-rule writes the suggested owner (not the raising role) to ownership.yaml', async () => {
+  // a frontend lens raises a ux-owned rule: owner must win over role.
+  const { root, triagePath } = fixture([{
+    tag: 'ui-thing', role: 'frontend', owner: 'ux', targetFile: 'instructions/core/swe/ui-thing.md',
+    status: { state: 'ready' }, gap: 'g', kind: 'new-rule',
+    draft: '# #ui-thing New\n\nbody', decision: { verdict: 'adopt' }, applyLog: [],
+  }]);
+  try {
+    const report = await apply({ root, triagePath, gate: NOOP_GATE });
+    assert.ok(report.adopted.includes('ui-thing'));
+    const own = readFileSync(join(root, 'instructions/ownership.yaml'), 'utf8');
+    assert.match(own, /^\s+ui-thing: ux$/m);
+    assert.doesNotMatch(own, /ui-thing: frontend/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('reject writes a canonical decisions-log line and splices', async () => {
   const { root, triagePath } = fixture([{
     tag: 'foo', role: 'swe', targetFile: 'instructions/core/swe/foo.md',
@@ -82,7 +98,7 @@ test('rehome/reowner are reported skipped, untouched', async () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('a failed adopt restores the file, re-parks, and logs', async () => {
+test('a failed adopt restores the file, KEEPS the verdict, and logs the reason', async () => {
   const { root, triagePath } = fixture([{
     tag: 'swe-x', role: 'swe', targetFile: 'instructions/core/swe/swe-x.md',
     status: { state: 'ready' }, gap: 'g', kind: 'strengthen',
@@ -93,12 +109,58 @@ test('a failed adopt restores the file, re-parks, and logs', async () => {
     const report = await apply({ root, triagePath, gate: boom });
     assert.equal(report.failed.length, 1);
     assert.equal(report.failed[0].tag, 'swe-x');
+    assert.match(report.failed[0].reason, /gate boom/);
     // file restored to original
     assert.match(readFileSync(join(root, 'instructions/core/swe/swe-x.md'), 'utf8'), /# #swe-x Old/);
-    // entry re-parked + applyLog appended, still present
+    // verdict PRESERVED (not silently re-parked) + applyLog appended, still present
     const e = readTriage(triagePath).entries[0];
-    assert.equal(e.decision.verdict, 'park');
+    assert.equal(e.decision.verdict, 'adopt');
     assert.equal(e.applyLog.length, 1);
+    assert.match(e.applyLog[0], /gate boom/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a failed adopt surfaces the gate STDOUT (node --test reports there, not stderr)', async () => {
+  const { root, triagePath } = fixture([{
+    tag: 'swe-x', role: 'swe', targetFile: 'instructions/core/swe/swe-x.md',
+    status: { state: 'ready' }, gap: 'g', kind: 'strengthen',
+    draft: '# #swe-x New\n\nnew body', decision: { verdict: 'adopt' }, applyLog: [],
+  }]);
+  try {
+    // Mimic execFileSync throwing: TAP failure text on stdout, empty stderr.
+    const boom = () => { const e = new Error('Command failed: node --test'); e.stdout = Buffer.from('not ok 70 - lean-split gate (cross-boundary)\n'); e.stderr = Buffer.from(''); throw e; };
+    const report = await apply({ root, triagePath, gate: boom });
+    assert.match(report.failed[0].reason, /lean-split gate/);
+    assert.match(readTriage(triagePath).entries[0].applyLog[0], /lean-split gate/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('adopt new-rule with a #-prefixed tag writes a HASHLESS ownership row', async () => {
+  const { root, triagePath } = fixture([{
+    tag: '#swe-new', role: 'swe', targetFile: 'instructions/core/swe/swe-new.md',
+    status: { state: 'ready' }, gap: 'g', kind: 'new-rule',
+    draft: '# #swe-new New rule\n\nbody', decision: { verdict: 'adopt' }, applyLog: [],
+  }]);
+  try {
+    const report = await apply({ root, triagePath, gate: NOOP_GATE });
+    assert.ok(report.adopted.includes('#swe-new'));
+    const own = readFileSync(join(root, 'instructions/ownership.yaml'), 'utf8');
+    assert.match(own, /^\s+swe-new: swe$/m); // hashless, matches every other row
+    assert.doesNotMatch(own, /#swe-new:/);   // never the doubled/hashed form
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('reject with a #-prefixed tag writes a single-hash decisions line', async () => {
+  const { root, triagePath } = fixture([{
+    tag: '#foo', role: 'swe', targetFile: 'instructions/core/swe/foo.md',
+    status: { state: 'ready' }, gap: 'g', kind: 'new-rule', draft: '# #foo',
+    decision: { verdict: 'reject', details: 'because' }, applyLog: [],
+  }]);
+  try {
+    await apply({ root, triagePath, gate: NOOP_GATE });
+    const log = readFileSync(join(root, 'docs/instruction-rules-decisions.md'), 'utf8');
+    assert.match(log, /^- `#foo` -- rejected: because$/m); // single hash
+    assert.doesNotMatch(log, /##foo/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

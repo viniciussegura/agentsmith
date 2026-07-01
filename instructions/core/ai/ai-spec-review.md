@@ -7,6 +7,8 @@
 - Driver and degradation follow the shared round (#ai-review-engine); spec-specific: a sub-agent cannot spawn sub-agents, so the generalist routes and the driver (the author/main thread) executes the next round, and the convergence-guard math runs in `guard.mjs`, not the model.
 - A **review cycle** is a continuous run of rounds on one spec; round numbering and the convergence guard's state (round count and best open-blocking count) are **per cycle, not global**.
   Substantially revising a spec after a prior cycle converged, stalled, or hit the cap starts a **new cycle** with the count and best reset, even when round numbering continues for the reader.
+  **Substantially revised** means one or more blocking findings from the prior cycle are addressed by rewrites that alter the spec's scope, constraints, or interface contract — not minor wording fixes. 
+  A reword that leaves scope, constraints, and interface unchanged does **not** reset the cycle.
 - Convergence guard, checked after each review in this order: zero open blocking = converged; otherwise two consecutive reviews **within the cycle** that fail to beat the best (lowest) open-blocking count = stalled (earliest the cycle's third review); otherwise a **5-round-per-cycle** cap.
 - On stall or cap, stop and ask the user how to proceed, summarizing open blockers and any contested `wontfix`.
 - Only the final spec is committed; per-round reviews and rebuttals are ephemeral under `.agentsmith/tmp/spec-review/<spec-dir-name>/` and never committed.

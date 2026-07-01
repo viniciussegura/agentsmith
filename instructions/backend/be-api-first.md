@@ -11,8 +11,9 @@ Keep entity variations to a small, fixed set:
 3. `Entity`: when a single instance is requested; may return the complete available information.
 4. `EntityPOST` / `EntityPATCH`: used only in those endpoints; may have optional fields.
 
-When returning an instance, the data structure **MUST NOT** have optional fields.
+When returning an instance -- including the top-level response and any `EntityRef` sub-shapes embedded within it -- the data structure **MUST NOT** have optional fields.
 A field may be nullable, but never optional.
+This constraint applies at every nesting depth: an `EntityRef` embedded inside a response carries only required fields, each typed either as `T` or `T | null`, never `T | undefined` or marked `?`.
 This surfaces backend issues earlier: it is always clear when a value should have been returned.
 
 **Identifiers** -- every entity's `id` is stable, opaque, and never reused after deletion; do not expose internal auto-increment integers as public ids. Changing the id strategy for a live entity is a breaking change (#be-api-versioning).

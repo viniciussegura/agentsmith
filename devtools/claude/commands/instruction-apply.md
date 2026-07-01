@@ -7,13 +7,16 @@ Apply the instruction-review triage worksheet. $ARGUMENTS
 
 Read `.agentsmith/instruction-review/triage.json`. If it is absent or has no entries **and** no candidates, report "nothing to apply" and stop.
 
-Otherwise, delegate entirely to the shared engine:
+Otherwise this is a **four-step workflow you own** -- the engine is only step 1. Running `apply.mjs` alone is **incomplete**: it applies entry/candidate verdicts but does **not** fix nits, promote `wanted` candidates, or surface `refine` questions (it has no model; the triage UI's POST /api/apply calls the same engine and for the same reason also cannot do these -- they require this agent). You MUST complete all four steps:
 
-```
-node devtools/triage-ui/apply.mjs
-```
+1. **Run the engine** -- `node devtools/triage-ui/apply.mjs` (detailed below); it returns a JSON report with `adopted/…/wanted/nits/refined` lists.
+2. **Promote every `wanted` candidate** -- the report's `wanted` list; single-atomic-write promotion (below).
+3. **Fix every `auto` nit** -- the report's `nits` list; mechanical fix + strip from `scorecard.nits` (below).
+4. **Report + surface `refine`** -- print the report; for each `refine` entry surface its open question and prior reply for discussion this turn (below).
 
-The engine (shared with the triage UI's POST /api/apply) handles entries and candidates:
+Do not stop after step 1. A run that skips steps 2--4 silently drops the human's `wanted`/`nits`/`refine` intent.
+
+**Step 1 -- the engine** (shared with the triage UI's POST /api/apply) handles entries and candidates:
 
 - **Validate** -- `validateFile` + `validateCrossRefs` from `devtools/triage-ui/schema.mjs`; malformed entries are reported and skipped, never half-applied. `adopt` additionally requires `status.state === 'ready'`. The live instruction text is read from disk (no stored `current` in the schema).
 - **Process each entry by verdict:**
@@ -25,17 +28,17 @@ The engine (shared with the triage UI's POST /api/apply) handles entries and can
 - **Atomic splice** -- on each terminal verdict (`adopt`/`reject`/`fold`/`defer`), splice the entry from `entries[]` and rewrite `triage.json` atomically (temp + rename, canonical serializer); a crash resumes cleanly. `park` and `refine` entries remain as the carry.
 - **Candidate pass** -- after the entries loop the engine processes `candidates[]`: `reject` splices the candidate and appends one canonical decisions-log line (details default to "not pursued"); `wanted` is surfaced in the report but left in place for the agent promotion step (below); `park` is left unchanged.
 
-After the engine exits, for each tag in the `wanted` list, perform the **single-atomic-write promotion** (this is the explicit exception where the agent writes `triage.json` directly):
+**Step 2 -- promote `wanted` candidates.** After the engine exits, for each tag in the `wanted` list, perform the **single-atomic-write promotion** (this is the explicit exception where the agent writes `triage.json` directly):
 1. Read `.agentsmith/instruction-review/triage.json` and migrate it with `migrateWorksheet` (so the base is the canonical v3 form, including any reject-candidate splices the engine just made).
 2. Author a house-style (`#code-markdown`) draft for the candidate, **incorporating the candidate's `decision.details`** when present -- it is the human's free-text drafting guidance (e.g. "keep this rule language-agnostic, not UI-specific").
-3. Build the promoted entry in memory: `kind`/`role`/`targetFile`/`gap` inherited from the candidate; `draft` filled non-empty; `status: {state:'ready'}`; `decision: {verdict:'park'}`; `applyLog: []`.
+3. Build the promoted entry in memory: `kind`/`role`/`targetFile`/`gap`/`priority` (and `owner`, when the candidate suggested one) inherited from the candidate -- **carry `priority` and `owner` verbatim so promotion is lossless** (a dropped `priority` was the #be-worksheet-priority-continuity gap); `draft` filled non-empty; `status: {state:'ready'}`; `decision: {verdict:'park'}`; `applyLog: []`.
 4. Construct the next file object with the entry **added** and the candidate **removed** in one object literal.
 5. Validate locally with `validateFile` (must be problem-free).
 6. Write it in **one** atomic write (one candidate at a time, sequentially).
 If validation fails or the write 400s, neither mutation persists (the candidate stays `wanted`).
 Promotion never adopts -- the gate is the later human-driven `adopt`, which keeps the existing per-entry snapshot recovery.
 
-After the promotions, handle the `nits` list (scorecard nits the human flagged "you fix" with `fix:'auto'`, surfaced in the report). For each, the agent makes the mechanical fix the nit names -- a typo, a dead path, stray whitespace, a broken link -- then removes that nit from `scorecard.nits` in one atomic write of the migrated worksheet. A nit the agent cannot safely fix is left in place and reported. (Nits the human keeps for themselves carry no `fix` flag and are not in the report.)
+**Step 3 -- fix `auto` nits.** After the promotions, handle the `nits` list (scorecard nits the human flagged "you fix" with `fix:'auto'`, surfaced in the report). For each, the agent makes the mechanical fix the nit names -- a typo, a dead path, stray whitespace, a broken link -- then removes that nit from `scorecard.nits` in one atomic write of the migrated worksheet. A nit the agent cannot safely fix is left in place and reported. (Nits the human keeps for themselves carry no `fix` flag and are not in the report.)
 
-Report the engine's JSON result: **adopted / rejected / folded / deferred / refined / parked / skipped / failed / wanted / ignored / nits**. For each `refine` entry, surface its `decision.details` (the open question) and `decision.lastRoundReply` (the prior answer, if any) so discussion can happen this turn.
+**Step 4 -- report + surface `refine`.** Report the engine's JSON result: **adopted / rejected / folded / deferred / refined / parked / skipped / failed / wanted / ignored / nits**. For each `refine` entry, surface its `decision.details` (the open question) and `decision.lastRoundReply` (the prior answer, if any) so discussion can happen this turn.
 For each `wanted` candidate, confirm whether its promotion to a parked entry succeeded; for each `nits` entry, confirm whether the agent fixed it.

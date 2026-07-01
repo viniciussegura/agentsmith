@@ -10,7 +10,7 @@
 const MODEL = { maintainer: 'opus', specialist: 'sonnet', verifier: 'sonnet', persist: 'haiku' };
 
 export async function runRound({ agent, parallel, phase, log, args }) {
-  const { board, roundId, scratch, store, subjectRef, maintainer, candidateLenses, verify, persistCmd, preReduceCmd, reducePrompt, plan, guardBaseline } = args;
+  const { board, roundId, scratch, store, subjectRef, maintainer, candidateLenses, verify, persistCmd, preReduceCmd, reducePrompt, plan, guardBaseline, reviewNote } = args;
   const findings = (role) => `${scratch}/findings/${role}.json`;
   const guarded = (prompt, opts) => {
     if (!opts.model) throw new Error(`dispatch without explicit model: ${opts.label}`);
@@ -32,11 +32,15 @@ export async function runRound({ agent, parallel, phase, log, args }) {
     lenses = routing.lenses;
   }
 
+  // A board may inject a fan-out addendum (args.reviewNote) — e.g. the instruction
+  // board's portability constraint. Board-scoped, appended here so the shared reviewer
+  // personas stay board-neutral; unset boards (code/spec) get nothing extra.
   phase('Review');
   await parallel(lenses.map((role) => () =>
     guarded(
       `You are the review-${role} reviewer. Read reviewer-common.md. Subject: ${subjectRef}. ` +
-        `Write findings to ${findings(role)} per the board schema, then reply only with the path and counts.`,
+        `Write findings to ${findings(role)} per the board schema, then reply only with the path and counts.` +
+        (reviewNote ? `\n\n${reviewNote}` : ''),
       { label: `review:${role}`, phase: 'Review', agentType: `review-${role}`, model: MODEL.specialist },
     )));
 

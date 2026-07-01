@@ -524,6 +524,20 @@ async function renderProposalDetail() {
       ])
     : null;
 
+  // new-rule: the tag needs an ownership.yaml row. Let the human confirm/edit the
+  // owner the reviewer suggested (defaults to the raising role); /instruction-apply
+  // writes `<tag>: <owner>` on adopt. Left undefined here means "fall back to role".
+  let ownerRow = null;
+  if (e.kind === 'new-rule') {
+    const ownerInput = el('input', { type: 'text', class: 'owner-input' });
+    ownerInput.value = e.owner || e.role;
+    ownerInput.addEventListener('input', () => { e.owner = ownerInput.value.trim() || undefined; scheduleSave(); });
+    ownerRow = el('div', { class: 'owner-edit' }, [
+      el('label', { class: 'field', text: 'owner — ownership.yaml row (defaults to role)' }),
+      ownerInput,
+    ]);
+  }
+
   const nav = navbar(idx, state.data.entries.length, (i) => select('proposal', i));
 
   // rehome/reowner change metadata, not text, so a content diff would render the
@@ -546,6 +560,7 @@ async function renderProposalDetail() {
     el('div', { class: 'meta', text: `${e.kind} · ${e.role} · ${e.targetFile} · status: ${e.status?.state}` }),
     el('h2', { text: `#${e.tag}` }),
     el('div', { class: 'gap', text: e.gap || '' }),
+    ownerRow,
     ...changeSection,
     verdicts,
     detailsLabel,
@@ -671,12 +686,25 @@ function renderReport(report, errorMsg, commit) {
   if (errorMsg) {
     lines.push(el('div', { class: 'report-error', text: errorMsg }));
   } else if (report) {
-    const keys = ['adopted', 'rejected', 'folded', 'deferred', 'refined', 'parked', 'skipped', 'wanted', 'ignored', 'failed'];
+    const keys = ['adopted', 'rejected', 'folded', 'deferred', 'refined', 'parked', 'skipped', 'wanted', 'ignored'];
     for (const k of keys) {
       if (report[k] !== undefined) {
         lines.push(el('div', { class: 'report-row' }, [
           el('span', { class: 'report-key', text: k }),
           el('span', { class: 'report-val', text: String(report[k]) }),
+        ]));
+      }
+    }
+    // `failed` is [{tag, reason}], not a string list — render each loudly with its
+    // reason so a gate failure is never a silent [object Object]. The engine keeps the
+    // entry's verdict (it re-attempts next apply), so the reason is the actionable part.
+    const failed = Array.isArray(report.failed) ? report.failed : [];
+    if (failed.length) {
+      lines.push(el('div', { class: 'report-error', text: `failed (${failed.length}) — verdict kept, fix and re-apply:` }));
+      for (const f of failed) {
+        lines.push(el('div', { class: 'report-fail' }, [
+          el('span', { class: 'report-fail-tag', text: `#${String(f.tag).replace(/^#/, '')}` }),
+          el('span', { class: 'report-fail-reason', text: f.reason || 'gate failed' }),
         ]));
       }
     }

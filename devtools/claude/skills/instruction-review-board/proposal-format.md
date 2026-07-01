@@ -22,6 +22,7 @@ interface InstructionProposal {
   status: 'ready' | 'blocked' | 'conditional'; // proposal status (a deferred decision records the condition)
   blockedOn?: string; // a #tag or condition, when status is blocked/conditional
   targetFile?: string;    // new-rule/strengthen: the instructions/ file the rule belongs in
+  owner?: string;         // new-rule: suggested ownership.yaml owner; defaults to `role`
   draft?: string;         // new-rule/strengthen: a drop-in house-style rule block, once concrete
   proposedFile?: string;  // rehome: where the rule should move
   proposedOwner?: string; // reowner: the role / base lens / non-review marker it should be owned by
@@ -30,7 +31,12 @@ interface InstructionProposal {
 
 **Required per kind** (the reduce step rejects a proposal missing its kind's field): `new-rule` and `strengthen` require `targetFile`; `new-rule` also requires `draft` once concrete; `rehome` requires `proposedFile`; `reowner` requires `proposedOwner`, which must be a **resolvable owner** (a declared role, the `swe` base lens, or a known non-review marker -- else the `ai-engineer` reduce rejects/normalizes it).
 
+A `new-rule`'s `targetFile` **must be the rule's own file** -- `<group-dir>/<baretag>.md`, not an existing sibling rule's file (`validateEntry` rejects a mismatched basename): the tag set is one-rule-per-file, and adopt writes the draft whole-file, so pointing at an existing file would overwrite that rule and orphan its ownership row.
+A `new-rule` should also **suggest an `owner`** -- the role / base lens / non-review marker that should own the tag in `ownership.yaml`, which is **not always the raising `role`** (a `frontend` lens may raise a `ux`-owned tab rule). It defaults to `role` when unset, is editable in the triage UI, and `/instruction-apply` writes the `<tag>: <owner>` row on adopt (the ownership-coverage CI gate is the resolvability backstop).
+
 A `draft` is written **verbatim** into a `.md` by `/instruction-apply`, so author it in house markdown style -- `#code-markdown`: one sentence per line, hard-wrap only at sentence boundaries (never by column), lists/tables/fenced blocks left intact. (`#code-markdown`'s own trigger is "editing a `.md`"; a draft is the `.md`'s future content, so the style applies at authoring time.)
+
+A `draft` (and the `gap` it addresses) **MUST be portable**: the instruction set ships to external client projects across many domains and stacks, so state each rule as a general principle and never reference this repository's internals -- no file paths, script names, agent-type names, or house terms (`lens`, `maintainer`, `board`, `kickstart`, `fan-out`); name an inherently specific concept generically (e.g. "the coordinating subagent", not "the maintainer"). This is not a persona rule (the reviewer personas are shared with the code/spec boards, which *want* repo-specific detail): the instruction board injects it into fan-out via the round's `reviewNote` (`round-args.mjs` `INSTRUCTION_PORTABILITY`), and the `ai-engineer` reduce rejects or genericizes any draft that still carries repo jargon.
 
 The triage worksheet is the structured **`triage.json`** (`{ round, scorecard, candidates, entries }`; schema + validator in `devtools/triage-ui/schema.mjs`, full shape in the instruction-review-board SKILL).
 
@@ -58,6 +64,7 @@ interface Candidate {
   tag: string;
   kind: 'new-rule' | 'strengthen' | 'rehome' | 'reowner';
   role: string;
+  owner?: string;     // new-rule: suggested ownership.yaml owner; carried onto the entry on promotion
   targetFile: string;
   gap: string;
   priority: Priority;
@@ -74,7 +81,7 @@ interface Candidate {
 | verdict | meaning | who acts | effect |
 |---|---|---|---|
 | `park` (default) | undecided | — | left in `candidates`; re-surfaces next round |
-| `wanted` | "draft this" | `/instruction-apply` agent | agent authors a house-style draft, writes it into `triage.json` as a new entry (`verdict: park`, `status: ready`, draft filled), and removes the candidate in one atomic write |
+| `wanted` | "draft this" | `/instruction-apply` agent | agent authors a house-style draft, writes it into `triage.json` as a new entry (`verdict: park`, `status: ready`, draft filled, **`priority` and `owner` carried from the candidate**), and removes the candidate in one atomic write |
 | `reject` | "ignore this" | apply engine | splice from `candidates` + write one canonical decisions-log line so it does not re-surface |
 
 Each entry projects the proposal as typed fields plus a `decision` object (`verdict` defaulting to `park`; typed params `details`/`foldTarget`) and an `applyLog`.

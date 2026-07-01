@@ -78,6 +78,22 @@ test('instruction round: plan, review, verify, reduce; ai-engineer maintainer', 
   assert.ok(h.calls.some((c) => c.opts.label === 'plan' && c.opts.agentType === 'ai-engineer'));
 });
 
+test('instruction fan-out appends the board reviewNote to every reviewer; code fan-out does not', async () => {
+  const hi = harness({ lenses: ['swe', 'security'], perLens: {} });
+  await runRound({ agent: hi.agent, parallel: hi.parallel, phase: hi.phase, log: hi.log,
+    args: { ...instructionArgs({ roundId: 'r', scratch: '/p/x', subjectRef: 'full-audit', candidateLenses: ['swe', 'security'] }), plan: { routingSchema: ROUTING_SCHEMA } } });
+  const iReviews = hi.calls.filter((c) => c.opts.label?.startsWith('review:'));
+  assert.equal(iReviews.length, 2);
+  for (const c of iReviews) assert.match(c.prompt, /PORTABILITY \(instruction board\)/, 'each instruction reviewer gets the portability note');
+
+  const hc = harness();
+  await runRound({ agent: hc.agent, parallel: hc.parallel, phase: hc.phase, log: hc.log,
+    args: codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'base..HEAD', candidateLenses: ['security', 'db'] }) });
+  const cReviews = hc.calls.filter((c) => c.opts.label?.startsWith('review:'));
+  assert.ok(cReviews.length > 0);
+  for (const c of cReviews) assert.doesNotMatch(c.prompt, /PORTABILITY/, 'code reviewers get no portability note');
+});
+
 test('a dispatch missing model throws (the in-driver assertion)', async () => {
   const h = harness();
   // wrap agent to drop the model on the persist call

@@ -2,7 +2,7 @@
 
 The core concepts of agentsmith's tooling, expressed as pure TypeScript types.
 The canonical member of the reference spec (`#swe-reference-spec`): it reflects the model as it is **now** and carries no `Status:` line.
-This is how a reader should *understand* the model -- not a description of how it is stored (the on-disk YAML layout lives in `tools/claude/skills/code-review-board/issue-format.md`).
+This is how a reader should *understand* the model -- not a description of how it is stored (the on-disk store layout lives in `tools/claude/skills/code-review-board/issue-format.md`: the store machine files are JSON, only the hand-edited `config.yaml` is YAML).
 Per `#swe-entity`, every change to the entity schema updates this file; per `#swe-terminology`, these names are used identically everywhere.
 
 The portable instructions, the role registry, and the tag-ownership map are tooling **config** (like `manifest.json`), not core entities, and are documented as config rather than here.
