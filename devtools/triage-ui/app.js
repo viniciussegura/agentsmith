@@ -671,12 +671,25 @@ function renderReport(report, errorMsg, commit) {
   if (errorMsg) {
     lines.push(el('div', { class: 'report-error', text: errorMsg }));
   } else if (report) {
-    const keys = ['adopted', 'rejected', 'folded', 'deferred', 'refined', 'parked', 'skipped', 'wanted', 'ignored', 'failed'];
+    const keys = ['adopted', 'rejected', 'folded', 'deferred', 'refined', 'parked', 'skipped', 'wanted', 'ignored'];
     for (const k of keys) {
       if (report[k] !== undefined) {
         lines.push(el('div', { class: 'report-row' }, [
           el('span', { class: 'report-key', text: k }),
           el('span', { class: 'report-val', text: String(report[k]) }),
+        ]));
+      }
+    }
+    // `failed` is [{tag, reason}], not a string list — render each loudly with its
+    // reason so a gate failure is never a silent [object Object]. The engine keeps the
+    // entry's verdict (it re-attempts next apply), so the reason is the actionable part.
+    const failed = Array.isArray(report.failed) ? report.failed : [];
+    if (failed.length) {
+      lines.push(el('div', { class: 'report-error', text: `failed (${failed.length}) — verdict kept, fix and re-apply:` }));
+      for (const f of failed) {
+        lines.push(el('div', { class: 'report-fail' }, [
+          el('span', { class: 'report-fail-tag', text: `#${String(f.tag).replace(/^#/, '')}` }),
+          el('span', { class: 'report-fail-reason', text: f.reason || 'gate failed' }),
         ]));
       }
     }
