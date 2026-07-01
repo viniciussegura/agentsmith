@@ -6,3 +6,4 @@
 - AI PR bodies note the model(s) used.
 - No token or time figures in git -- they cannot be reliably sourced and go stale.
   Track spend in tooling (`/cost`, `rtk gain`) instead.
+- For how to invoke git safely (non-interactive flags, upstream setup, hook policy), see #git-tooling.

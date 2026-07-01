@@ -7,3 +7,5 @@
   When a file needs an author or committer email, use the value from `git config user.email`.
   Do not substitute a personal email seen in conversation context, memory, or chat history.
   When unsure, run `git config user.email` and use that.
+  Where CI is available, add a grep-based check (e.g. `git grep -n '@gmail.com\|@hotmail.com'`) alongside the secret-scanning step to catch personal addresses before they merge.
+  Existing violations **MUST** be remediated in the same PR that adds or touches the affected file.
