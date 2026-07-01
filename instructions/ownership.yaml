@@ -102,6 +102,7 @@ owners:
   ai-review-board: ai
   ai-instruction-review: ai
   ai-plan-deviation: ai
+  ai-subagent-dispatch: ai
 
   # git -- meta lens: VCS workflow, commits, branches, PRs (instruction-review only)
   git-title: git
