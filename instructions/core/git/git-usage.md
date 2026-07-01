@@ -5,5 +5,5 @@
   The `Co-Authored-By:` line names the same (or dominant) model.
 - AI PR bodies note the model(s) used.
 - No token or time figures in git -- they cannot be reliably sourced and go stale.
-  Track spend in tooling (`/cost`, `rtk gain`) instead.
+  Track spend in the project's own cost tooling instead of recording it in history.
 - For how to invoke git safely (non-interactive flags, upstream setup, hook policy), see #git-tooling.

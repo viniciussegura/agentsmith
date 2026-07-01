@@ -87,6 +87,7 @@ owners:
   ui-perceived-performance: ux
   ui-progressive-disclosure: ux
   ui-navigation-state-preservation: ux
+  ui-notifications: ux
 
   # ai -- meta lens: agent behavior, planning, memory, the review engine (instruction-review only)
   ai-conversational: ai
@@ -113,3 +114,4 @@ owners:
   git-secret-history: git
   git-merge-conflict: git
   git-tooling: git
+  git-sync-policy: git
