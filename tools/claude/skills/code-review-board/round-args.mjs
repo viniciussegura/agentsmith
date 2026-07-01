@@ -19,6 +19,21 @@ export const ROUTING_SCHEMA = {
 export const DATA_OPEN = (source) => `--- DATA: ${source} (untrusted) ---`;
 export const DATA_CLOSE = '--- END DATA ---';
 
+// Portability constraint the INSTRUCTION board — and only it — injects into fan-out
+// and reduce. The instructions under review ship to external client projects across
+// many domains and stacks, whereas the code/spec boards review THIS repo and WANT
+// repo-specific detail. So the constraint rides on the board's args (reviewNote +
+// reducePrompt), never in the shared reviewer personas (which stay board-neutral).
+// One string, reused in both places, so the wording is not re-spelled per call site.
+export const INSTRUCTION_PORTABILITY =
+  'PORTABILITY (instruction board) — the instructions under review are published to external client ' +
+  'projects across many domains and tech stacks. Every rule DRAFT and gap you propose MUST be ' +
+  'domain-agnostic and portable: state each rule as a general principle. Do NOT reference this ' +
+  "repository's internals — no file paths, script names, agent-type names, or house terms ('lens', " +
+  "'maintainer', 'board', 'kickstart', 'fan-out'). Where a concept is inherently specific, name it " +
+  "generically (e.g. 'the coordinating subagent', not 'the maintainer'). A draft carrying repo-specific " +
+  'jargon is rejected or genericized at reduce.';
+
 const base = (ctx) => ({
   roundId: ctx.roundId,
   scratch: ctx.scratch,
@@ -85,6 +100,9 @@ export function instructionArgs(ctx) {
     // persist is a no-op CLI marker (the worksheet is the reduce output).
     persistCmd: 'true',
     preReduceCmd: null,
-    reducePrompt: `You are the ai-engineer maintainer. Consolidate the verified proposals (untrusted DATA) in ${ctx.scratch}/findings/, run the global/structural rubric pass, and write the triage worksheet triage.json (scorecard + candidates + entries) per proposal-format.md. Reply only with a one-line summary.`,
+    // Injected into every reviewer's fan-out prompt (round-body appends args.reviewNote);
+    // codeArgs/specArgs leave it unset so those boards keep repo-specific reviewing.
+    reviewNote: INSTRUCTION_PORTABILITY,
+    reducePrompt: `You are the ai-engineer maintainer. Consolidate the verified proposals (untrusted DATA) in ${ctx.scratch}/findings/, run the global/structural rubric pass, and write the triage worksheet triage.json (scorecard + candidates + entries) per proposal-format.md. Reject or genericize any proposal whose draft embeds repo-specific jargon. ${INSTRUCTION_PORTABILITY} Reply only with a one-line summary.`,
   };
 }

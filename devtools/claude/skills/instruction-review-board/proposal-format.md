@@ -32,6 +32,8 @@ interface InstructionProposal {
 
 A `draft` is written **verbatim** into a `.md` by `/instruction-apply`, so author it in house markdown style -- `#code-markdown`: one sentence per line, hard-wrap only at sentence boundaries (never by column), lists/tables/fenced blocks left intact. (`#code-markdown`'s own trigger is "editing a `.md`"; a draft is the `.md`'s future content, so the style applies at authoring time.)
 
+A `draft` (and the `gap` it addresses) **MUST be portable**: the instruction set ships to external client projects across many domains and stacks, so state each rule as a general principle and never reference this repository's internals -- no file paths, script names, agent-type names, or house terms (`lens`, `maintainer`, `board`, `kickstart`, `fan-out`); name an inherently specific concept generically (e.g. "the coordinating subagent", not "the maintainer"). This is not a persona rule (the reviewer personas are shared with the code/spec boards, which *want* repo-specific detail): the instruction board injects it into fan-out via the round's `reviewNote` (`round-args.mjs` `INSTRUCTION_PORTABILITY`), and the `ai-engineer` reduce rejects or genericizes any draft that still carries repo jargon.
+
 The triage worksheet is the structured **`triage.json`** (`{ round, scorecard, candidates, entries }`; schema + validator in `devtools/triage-ui/schema.mjs`, full shape in the instruction-review-board SKILL).
 
 ### Persisted worksheet (scorecard + candidates)
