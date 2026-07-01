@@ -1,6 +1,6 @@
 # #ai-plan Specs and plans
 
-- A unit of work lives in one directory, `docs/working-specs/<YYYY-MM-DD>-<slug>/`, holding `spec.md` and/or `plan.md`.
+- A unit of work lives in one directory under working-specs (#swe-docs-layout), holding `spec.md` and/or `plan.md`.
   The directory may hold only `spec.md` (no plan yet) or only `plan.md` (trivial work that skipped a spec).
 - A working-spec directory is created on an approved feature branch (#git-branch-workflow); if not yet on one, confirm the branch first.
 - Each file carries a `Status:` line that is exactly one bare token: `Draft`, `Approved`, or `Implemented`.

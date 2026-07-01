@@ -57,6 +57,7 @@ owners:
   # docs
   swe-docs-drift: docs
   swe-public-surface-docs: docs
+  swe-docs-layout: docs
 
   # qa
   swe-done: qa
@@ -92,6 +93,8 @@ owners:
   ai-memory: ai
   ai-persistence: ai
   ai-session-hygiene: ai
+  ai-session-explore: ai
+  ai-status: ai
   ai-review-engine: ai
   ai-review-board: ai
   ai-instruction-review: ai
