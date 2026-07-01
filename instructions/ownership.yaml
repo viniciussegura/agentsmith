@@ -46,6 +46,7 @@ owners:
   swe-environment: security
   ai-untrusted-content: security
   ai-tool-safety: security
+  swe-prompt-injection-sentinel: security
 
   # db -- data modeling and the data-facing API contract
   swe-entity: db
