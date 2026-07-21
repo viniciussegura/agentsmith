@@ -1,10 +1,7 @@
-# #ai-done Definition of done for agents
+# #ai-done Agent additions to done
 
-In addition to #swe-done, AI agents should also:
+An AI agent's change is done only when #swe-done holds and, additionally:
 
-1. If in a user multiple requests work session, be sure to comply with #ai-multiple-requests definition of done.
-2. Follow #ai-session-hygiene.
-3. Revisit open remarks that may have been lost in conversation and not captured as persisted artifacts.
-4. Clearly state remaining open questions.
-5. Revisit _all_ technical debts and future work that surfaced while working on the feature and check if they still hold.
-  Update or drop them accordingly.
+1. Every technical debt (#swe-technical-debts) and future-work item (#swe-future-work) raised during this unit of work is re-read and still true -- updated or deleted otherwise.
+2. Anything committed to in conversation but never written to an artifact is either landed or recorded (#swe-future-work); the transcript is not a backlog.
+3. Remaining open questions are stated explicitly in the final message -- silence is not resolution.

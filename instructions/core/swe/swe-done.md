@@ -2,8 +2,9 @@
 
 A change is done only when all of these hold:
 
-1. Feature is complete.
-2. Tests for the changes are complete and pass locally.
+1. Every item the approved spec or the user's request covers is delivered.
+   A partial delivery is done only when the narrowing was surfaced and accepted (#ai-plan-deviation).
+2. Tests for the change pass locally.
    When the repo has no test harness, or the change is genuinely untestable, the verification actually performed is stated and recorded (#git-pr-body, #swe-technical-debts): "done" is never "it compiled."
    Invoking the untestable exception **requires naming the specific blocker** (e.g. "no test harness exists", "purely declarative config with no executable path") -- "hard to test" or "not worth testing" do not qualify.
    If the blocker is an absent harness and the language/runtime makes one straightforward to establish, the exception is unavailable until it is established (#swe-testing).
@@ -17,4 +18,5 @@ A change is done only when all of these hold:
    When it is unclear whether an artifact is throwaway or wanted, ask the user before deleting rather than guessing.
 
 Do not open or update a PR before all items hold.
+An AI agent carries further items on top of these (#ai-done).
 Separately, on finishing the work, also follow #ai-session-hygiene -- a reminder to capture session learnings, not a merge gate.

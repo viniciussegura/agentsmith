@@ -2,7 +2,7 @@
 
 Before executing an approved plan, ask and wait for answers to two questions:
 
-1. **Execution shape** -- sequential in the main thread, delegated to strictly sequential subagents, or delegated to subagents (fanning out when possible)? 
+1. **Execution shape** -- sequential in the main thread, delegated to strictly sequential subagents, or delegated to subagents fanned out in parallel where the work is independent?
    Give a rough per-option token estimate as an order-of-magnitude integer (e.g. ~2k, ~10k, ~50k) and the models that would be used.
 2. **Interaction shape** -- pause for checks and questions as they arise, or run non-stop and batch every question and decision at the end?
 
