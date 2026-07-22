@@ -40,6 +40,8 @@ owners:
   swe-decomposition: swe
   swe-design-decisions: swe
   swe-deep-modules: swe
+  swe-branch-lifespan: swe
+  swe-consolidation-audit: swe
 
   # security
   swe-security: security
