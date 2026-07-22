@@ -80,3 +80,10 @@ npm run build:plugin         # regenerate plugin.json + marketplace.json
 npm run build:index          # regenerate docs/working-specs/INDEX.md
 node bin/cli.js --dev        # dogfood install, including the authoring tools
 ```
+
+This repo's own project-scoped rules live in the committed root
+[`AGENTS.md`](AGENTS.md), under **Local rules** — the write-once consumer stub a
+build never overwrites. They are not part of the shipped set: rules under
+[`instructions/`](instructions/) go to every consumer, rules in `AGENTS.md` stay
+here. The forged core itself (`.agentsmith/`) is a build artifact and stays
+gitignored.
