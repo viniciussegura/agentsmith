@@ -11,6 +11,7 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
   Implementing a feature often surfaces related issues; fixing them on the same branch is expected.
   A branch may also bundle deliberately, _e.g._ a "release revision" collecting several fixes.
   Layered work on one branch is fine -- it squashes into a single commit by design.
+  That scope has an end: the branch ships once it stops converging (#swe-branch-lifespan).
 - The **squash-merge is performed by the human**, not the AI assistant -- via the host's merge button or `git merge --squash`.
   The squash-commit subject follows #git-title (it is the only commit that survives on `main`); its body summarizes the change and links the PR (#git-pr-body).
   Delete the source branch after a successful squash-merge.

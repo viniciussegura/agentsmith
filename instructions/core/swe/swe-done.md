@@ -9,7 +9,7 @@ A change is done only when all of these hold:
    Invoking the untestable exception **requires naming the specific blocker** (e.g. "no test harness exists", "purely declarative config with no executable path") -- "hard to test" or "not worth testing" do not qualify.
    If the blocker is an absent harness and the language/runtime makes one straightforward to establish, the exception is unavailable until it is established (#swe-testing).
 3. Documentation drift is resolved (#swe-docs-drift), including the reference spec when current behavior changed (#swe-reference-spec), the entity model when the schema changed (#swe-entity), and the design-decisions log when this change altered an existing decision's rationale (#swe-design-decisions); the working-specs index is current (#ai-plan) -- `agentsmith spec-index --check` passes.
-4. Branch consolidation is done (#swe-consolidation-audit).
+4. Branch consolidation is done (#swe-consolidation-audit), when the branch carries more than one unit of work (#ai-plan).
 5. Unused dependencies are pruned (#swe-deps).
 6. New shortcuts or limitations are recorded (#swe-technical-debts); deferred work is logged (#swe-future-work).
    Any new in-code deferral marker carries a date per #swe-dated-todos.
