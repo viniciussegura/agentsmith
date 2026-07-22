@@ -141,6 +141,21 @@ function resolve(dir, n, ids) {
   });
 }
 
+// The SKILL loop writes round-n's rebuttal at step 6, AFTER the round-n guard at
+// step 4 -- so a rebuttal is never on disk for its own guard call and must be
+// folded by a later one. The fixtures above pre-stage it, an ordering the live
+// driver cannot produce; this one follows the real sequence.
+test('rebuttal written after its own round is folded by the next guard run (live driver order)', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a'), finding('b')]);
+  assert.equal(runGuard({ scratchDir: dir, n: 1 }).b, 2);
+  resolve(dir, 1, ['a']); // author revises and rebuts only after the guard has run
+  writeReview(dir, 2, [finding('b')]);
+  const r = runGuard({ scratchDir: dir, n: 2 });
+  assert.equal(r.b, 1);
+  assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'resolved');
+});
+
 test('progress review resets the stall streak', () => {
   const dir = scratch();
   const all = [finding('a'), finding('b'), finding('c')];

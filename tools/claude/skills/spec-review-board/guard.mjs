@@ -62,8 +62,13 @@ export function runGuard({ scratchDir, n, newCycle = false }) {
     // is advisory and never mutates status here.
   }
 
-  const rebuttalPath = join(scratchDir, `round-${n}.rebuttal.json`);
-  if (existsSync(rebuttalPath)) {
+  // Every rebuttal written so far, not only round n's: the author writes round
+  // n's rebuttal AFTER the round-n guard call (SKILL loop step 6 follows step 4),
+  // so it is never on disk for its own run and a later run must pick it up.
+  // Re-applying an already-folded status is idempotent.
+  for (let i = 1; i <= n; i++) {
+    const rebuttalPath = join(scratchDir, `round-${i}.rebuttal.json`);
+    if (!existsSync(rebuttalPath)) continue;
     const reb = readJson(rebuttalPath);
     for (const [id, v] of Object.entries(reb.statuses ?? {})) {
       const cur = byId.get(id);
