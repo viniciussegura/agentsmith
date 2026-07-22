@@ -3,6 +3,7 @@
 How this repository organizes its records. Two families: **present-truth** is
 mutable, self-replacing, kept current, never stale; **point-in-time** is
 frozen/dated, the historical record.
+A member of the reference spec (`#swe-reference-spec`): it reflects the model as it is **now** and carries no `Status:` line.
 
 | Record | Directory | File name | Mutable? | Family | Answers |
 |---|---|---|---|---|---|
@@ -13,7 +14,7 @@ frozen/dated, the historical record.
 | Future-work | `docs/future-work/` | `<date>-<slug>.md` | removed when done | point-in-time | what we deferred |
 | Technical-debt | `docs/technical-debts/` | `<date>-<slug>.md` | removed when paid | point-in-time | what we compromised |
 
-The set of working specs is indexed at the generated [`docs/working-specs/INDEX.md`](working-specs/INDEX.md)
+The set of working specs is indexed at the generated [`docs/working-specs/INDEX.md`](../working-specs/INDEX.md)
 (`agentsmith spec-index`; a drift test is the backstop).
 
 ## Boundaries
@@ -35,14 +36,14 @@ The set of working specs is indexed at the generated [`docs/working-specs/INDEX.
 
 ## Where to look (intent → record)
 
-- *Why is the system designed this way?* → a [`docs/design-decisions/`](design-decisions/)
+- *Why is the system designed this way?* → a [`docs/design-decisions/`](../design-decisions/)
   file (linked from the relevant reference spec / working spec).
-- *What does the system do now, and how?* → the [reference spec](reference-spec/).
+- *What does the system do now, and how?* → the [reference spec](./).
 - *What happened in this unit of work, and why then?* → its frozen working spec
   (+ git).
 - *What does decision X affect?* → grep its slug across `docs/` (one-way linking
   is deliberate; no reverse index is maintained — see Boundary 1).
 
 This model is governed by the `#ai-plan`, `#swe-reference-spec`, and
-`#swe-design-decisions` rules under [`instructions/`](../instructions/), and its
-rationale is recorded in [`docs/design-decisions/records-architecture.md`](design-decisions/records-architecture.md).
+`#swe-design-decisions` rules under [`instructions/`](../../instructions/), and its
+rationale is recorded in [`docs/design-decisions/records-architecture.md`](../design-decisions/records-architecture.md).
