@@ -52,11 +52,11 @@ A **Finding** object:
   `lenses` is the consult set; the driver re-intersects it with the curated `spec_review: true` registry before spawning.
 - `findings/<role>.json` -- one per consulted specialist.
   `{ "role": "db", "new": [Finding, ...], "reconcile": [{ "id": "...", "transition": "still-open" | "resolved-by-text", "note": "..." }, ...] }`
-  A specialist sets `origin` to its own role on every `new` finding. **A `reconcile` entry never carries a tag** (only `transition`, spec-internal vocabulary -- not `blocking`/`nit`): tag authority stays with the generalist. **`transition` is advisory, never a status mutation:** `resolved-by-text` reports that the current spec text appears to address the prior finding; it signals the generalist/author but does **not** auto-set `status` -- the author's rebuttal remains the sole status writer.
+  A specialist sets `origin` to its own role on every `new` finding. **A `reconcile` entry never carries a tag** (only `transition`, spec-internal vocabulary -- not `blocking`/`nit`): tag authority stays with the generalist. **`transition` is advisory, never a status mutation:** `resolved-by-text` reports that the current spec text appears to address the prior finding; it signals the generalist/author but does **not** auto-set `status` -- the author's rebuttal is the only place a status is *authored*, and the reopen rule above is the only other thing that moves one.
 - `round-<n>.review.json` -- the generalist's converged review.
   `{ "round": n, "findings": [Finding, ...], "openBlocking": <int> }`
   The generalist's own findings carry `origin: "generalist"`; specialist findings keep their `<role>` origin. `openBlocking` is **informational**: `guard.mjs` computes `b(n)` from the merged ledger and that is authoritative; on divergence it warns and proceeds with its own count.
-- `round-<n>.rebuttal.json` -- the author's per-finding statuses (sole status source).
+- `round-<n>.rebuttal.json` -- the author's per-finding statuses (the only authored status source; `guard.mjs` additionally reopens a `resolved` per the rule above).
   `{ "round": n, "statuses": { "<id>": { "status": "resolved" | "wontfix", "note": "..." } } }`
 - `ledger.json` -- owned by `guard.mjs`:
 
@@ -65,11 +65,14 @@ A **Finding** object:
   "findings": [
     { /* ...Finding... */ "status": "open",   // "open" | "resolved" | "wontfix"
       "roundRaised": 1,
+      "statusRound": 2,                       // round whose rebuttal set `status`; absent while open
+      "reopenedAt": 3,                        // round that reopened a `resolved`; absent otherwise
       "tagHistory": [ { "round": 1, "tag": "blocking", "by": "db", "reason": null } ] }
   ] }
 ```
 
   `meta.best` is the cycle's lowest `b`; `null` before the cycle's first review. `tagHistory` is the audit trail (every raise + down-tag).
+  `statusRound` is what makes the reopen rule decidable -- it is the round the status came from, so a rebuttal written at or after the review that re-raises the finding is recognised as already answering it. `reopenedAt` is provenance in the same sense as `tagHistory`: without it a reopened finding is indistinguishable from one never resolved.
 
 ## Ledger (rendered view)
 
