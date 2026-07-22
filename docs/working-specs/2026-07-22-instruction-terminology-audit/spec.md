@@ -1,6 +1,6 @@
 # Instruction-set terminology audit: default branch, ship/land, actor noun
 
-Status: Approved
+Status: Implemented
 
 ## Problem
 

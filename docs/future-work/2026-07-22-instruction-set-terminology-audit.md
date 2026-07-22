@@ -2,28 +2,21 @@
 
 Date: 2026-07-22
 Status: Deferred (`#swe-future-work`)
-Context: the branch that added `#swe-branch-lifespan` and split `#swe-done` into tiers
+Context: discharged by `docs/working-specs/2026-07-22-instruction-terminology-audit/`, which audited the clusters this file flagged.
 
 ## The gap
 
-Splitting `#swe-done` by altitude exposed that `unit of work` was bound at two altitudes at once -- `#git-branch-workflow` used it for a whole branch, `#ai-plan` for one working-spec directory -- so transitively the set asserted that a branch is one working spec, which `#git-branch-workflow` itself denies two lines later.
-The clash was harmless until a rule had to count units per branch.
-
-That branch fixed the one clash it hit, and fixed the level-3 synonym spread it noticed in passing (`step` / `wave` / `task` -> `plan step`), landing the three-altitude vocabulary in `instructions/main.md`.
-It did **not** audit the rest of the set.
-Other concept clusters are unaudited and likely carry the same kind of silent drift -- candidates seen while working nearby: spec/plan/artifact, change/diff/commit, review/audit/check, done/complete/landed/shipped.
+An inventory of `instructions/` found seven clusters: `` `main` `` used as a rule referent instead of an example (D1); `ship` and `land` each naming two altitudes at once (D2); the hyphenated spelling of `subagent` used inconsistently in prose (D3); the actor noun `AI assistant` vs `AI agent` (D4); the orphaned term `logical units` (D5); `standard`, inventoried and found to carry no defect (D6); and `change` used as the done-gate subject (D7).
+`docs/working-specs/2026-07-22-instruction-terminology-audit/` audited all seven and settled six with renames landed directly in `instructions/`; D6 needed no rename.
+Three residues remain, listed below.
 
 ## The deferred work
 
-A full terminology audit of `instructions/`, run as an inventory rather than a read-through, since the drift is mechanically discoverable and only the synonym clustering needs judgment:
-
-1. Build a concept -> terms table across every rule file, from grep over candidate clusters.
-2. Adjudicate the canonical term per concept (human decision, not search).
-3. Apply the renames, and extend the `instructions/main.md` vocabulary block with any altitude-bearing term the audit settles.
-
-`#swe-terminology` is deliberately **not** the home for that vocabulary: it governs the software a project writes, not the instruction set itself.
+1. **The diff-sense `change` / `diff` / `commit` cluster**, scope `instructions/`. D7 settles only the gate sense.
+2. **No vocabulary-regression lint**, scope `instructions/ README.md tools/ devtools/ docs/future-work/` -- the scope this spec proved is real, per D3 and success criterion 2.
+3. **The `targetRef: 'main'` schema enum**, scope `docs/reference-spec/entity-model.md`, `tools/claude/skills/code-review-board/` -- per the Design B carve-out. Blocked on an entity-model change plus a **value backfill over existing `rounds/*.json`, or a dual-literal lookup in `SKILL.md` Setup's round-chaining** -- not a lint or persist change, since no script reads the field.
 
 ## Constraints
 
 - The set is installed by other projects. A rename ships a vocabulary change to every consumer, and a project-level instruction file or session memory holding the old noun keeps it until regenerated. Prefer one audited pass over a trickle of renames.
-- Frozen working specs (`#ai-plan`) are point-in-time and stay on the old vocabulary; only present-truth docs and `instructions/` are in scope.
+- Frozen working specs (`#ai-plan`) are point-in-time and stay on the old vocabulary.

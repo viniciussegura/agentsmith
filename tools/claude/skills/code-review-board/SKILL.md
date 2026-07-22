@@ -15,10 +15,10 @@ Schema, status lifecycle, ids, and the store layout are in `issue-format.md`; re
 
 ## Roles
 
-Reviewers fan out in parallel on a **cheap model**, one sub-agent per selected role (`review-correctness`, `review-swe`, `review-security`, `review-db`, `review-qa`, `review-docs`, `review-frontend`, `review-ux`).
+Reviewers fan out in parallel on a **cheap model**, one subagent per selected role (`review-correctness`, `review-swe`, `review-security`, `review-db`, `review-qa`, `review-docs`, `review-frontend`, `review-ux`).
 The verifier (`review-verifier`) is a per-finding skeptic, also cheap and parallel; the PM reduce (`project-manager`) runs on a **strong model**.
 Each reviewer is application-neutral: the spawn prompt has it read the shared protocol (`reviewer-common.md`) then its persona (`review-<role>.md`), supplies the **subject** (the diff + touched files, by reference), and names the **output schema** (`Issue`, per `issue-format.md`).
-Where sub-agents are unavailable, role-play each lens sequentially, emitting the same artifacts (`#ai-review-engine` degradation).
+Where subagents are unavailable, role-play each lens sequentially, emitting the same artifacts (`#ai-review-engine` degradation).
 
 ## Store and scratch
 
@@ -44,7 +44,7 @@ Where sub-agents are unavailable, role-play each lens sequentially, emitting the
 
 - **Containment baseline** (last setup action). Reviewers, verifiers, and the PM carry the Write tool so the file handoff below works; before any of them run, snapshot the git state: `node .claude/skills/code-review-board/round-guard.mjs snapshot .agentsmith/tmp/review-board/<round-id>/git-baseline.txt`. Step 5b checks it — a round must write only under the gitignored scratch/store.
 
-### 2. Reconcile + review (parallel, one sub-agent per selected role, cheap model)
+### 2. Reconcile + review (parallel, one subagent per selected role, cheap model)
 
 - A prior issue is **dirty** when `git diff <issue.lastConfirmedCommit>..<commit>` (with rename detection) touches any path in its `locations` -- diff to `commit` (the code under review) so branch-only changes are caught.
 - The dirty scan covers **open** issues and **recently-closed** ones (`closedInRound` within the window, default last 3 rounds), so a regression **reopens** the original id. Closing does **not** advance `lastConfirmedCommit`.
@@ -103,7 +103,7 @@ roles:
 
 ## Degradation
 
-Per `#ai-review-engine`: real sub-agents when available; else one agent role-plays each lens sequentially with the same schema and store; else a human supplies findings the agent maps onto the schema. The pipeline, schema, and store are identical across modes.
+Per `#ai-review-engine`: real subagents when available; else one agent role-plays each lens sequentially with the same schema and store; else a human supplies findings the agent maps onto the schema. The pipeline, schema, and store are identical across modes.
 
 ## Token discipline
 

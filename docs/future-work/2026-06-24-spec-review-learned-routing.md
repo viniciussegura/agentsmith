@@ -6,7 +6,7 @@ Context: `docs/working-specs/2026-06-24-spec-review-specialist-fanout/`
 
 ## The gap
 
-In the spec-review specialist fan-out, **round 1** has no prior generalist directive, so the **driver** bootstraps the specialist set by mapping spec content to candidate lenses (`routing-1.json`), biasing to include when unsure. This bootstrap is a heuristic: it can over-consult (a wasted cheap sub-agent) or, worse, miss a relevant lens at round 1 (a domain blocker surfaces a round later than it could).
+In the spec-review specialist fan-out, **round 1** has no prior generalist directive, so the **driver** bootstraps the specialist set by mapping spec content to candidate lenses (`routing-1.json`), biasing to include when unsure. This bootstrap is a heuristic: it can over-consult (a wasted cheap subagent) or, worse, miss a relevant lens at round 1 (a domain blocker surfaces a round later than it could).
 
 ## The deferred improvement
 

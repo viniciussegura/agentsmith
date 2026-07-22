@@ -7,5 +7,5 @@ It is the counterpart to working specs and plans (#ai-plan): those are immutable
 When the two disagree, the reference spec wins; a working spec is **never** consulted for current truth.
 A reference-spec document carries no `Status:` line: the `Draft`/`Approved`/`Implemented` lifecycle (#ai-plan) belongs to working specs and plans, whereas the reference spec has no states -- only the current truth.
 The entity model (#swe-entity) is its first and canonical member.
-Upkeep is not a separate mechanism: the reference spec is kept current under #swe-docs-drift and gated by #swe-done -- after a change ships, the reference spec is checked and any drift fixed in the same PR.
+Upkeep is not a separate mechanism: the reference spec is kept current under #swe-docs-drift and gated by #swe-done -- after a unit of work lands, the reference spec is checked and any drift fixed in the same PR.
 Where the two could be confused, use the qualified terms "working spec" and "reference spec" (#swe-terminology, #swe-naming); a bare "spec" is fine only where context makes which one unambiguous.

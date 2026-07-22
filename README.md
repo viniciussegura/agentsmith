@@ -50,7 +50,7 @@ The adapter install is non-destructive: it writes only the adapter's own files
 ## Bundled Claude Code tools
 
 Beyond the portable instructions, the Claude adapter ships skills and commands
-that realize the instruction protocols with real sub-agent delegation:
+that realize the instruction protocols with real subagent delegation:
 
 - **`/code-review-board`** (+ `/review-promote`) — a role-based review board:
   reviewer subagents fan out over a diff or the whole repo, findings are verified

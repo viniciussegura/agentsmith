@@ -19,12 +19,12 @@ Confirm the target spec path before starting.
 
 ## Roles
 
-- **Author / Driver** -- you, the orchestrating agent. You revise the spec and write rebuttals (judgment), and you dispatch sub-agents, execute the generalist's routing directive, and run `guard.mjs` (mechanical). The host forbids a sub-agent spawning sub-agents, so *you* dispatch both the generalist and the specialists -- the generalist routes, you execute.
-- **Generalist reviewer / maintainer** -- the `spec-specialist` sub-agent, spawned fresh each round (independent critique). It is the engine's **maintainer**: it both **plans** (judges which curated lenses to consult from the candidate menu and sets per-lens focus/questions -- the engine's Plan step) and **reduces** (owns the cross-cutting lens -- coherence/contradiction/testability/scope, subsuming `swe`+`correctness` -- **converges** the consulted specialists' findings into the one round review, and emits the next round's routing directive). Its reduce runs **in-loop**, once per round. Run it on a **strong** model.
-- **Specialists** -- `review-<role>` sub-agents for each consulted curated lens (`roles.yaml` `spec_review: true`). Each applies its domain lens to the spec, reconciles its prior findings, and answers the generalist's directed questions. Run them **cheap and parallel**.
+- **Author / Driver** -- you, the orchestrating agent. You revise the spec and write rebuttals (judgment), and you dispatch subagents, execute the generalist's routing directive, and run `guard.mjs` (mechanical). The host forbids a subagent spawning subagents, so *you* dispatch both the generalist and the specialists -- the generalist routes, you execute.
+- **Generalist reviewer / maintainer** -- the `spec-specialist` subagent, spawned fresh each round (independent critique). It is the engine's **maintainer**: it both **plans** (judges which curated lenses to consult from the candidate menu and sets per-lens focus/questions -- the engine's Plan step) and **reduces** (owns the cross-cutting lens -- coherence/contradiction/testability/scope, subsuming `swe`+`correctness` -- **converges** the consulted specialists' findings into the one round review, and emits the next round's routing directive). Its reduce runs **in-loop**, once per round. Run it on a **strong** model.
+- **Specialists** -- `review-<role>` subagents for each consulted curated lens (`roles.yaml` `spec_review: true`). Each applies its domain lens to the spec, reconciles its prior findings, and answers the generalist's directed questions. Run them **cheap and parallel**.
 
-Per `#ai-conversational`, every sub-agent dispatch states an explicit model id (specialists the cheapest tier that meets the bar; the generalist a model capable of sustained critical reasoning).
-Where sub-agents are unavailable, one agent role-plays the generalist and each consulted lens sequentially, emitting the same artifacts with the stance switch explicit (`#ai-review-engine` degradation); where `guard.mjs` is unavailable, compute the guard by hand from the ledger.
+Per `#ai-conversational`, every subagent dispatch states an explicit model id (specialists the cheapest tier that meets the bar; the generalist a model capable of sustained critical reasoning).
+Where subagents are unavailable, one agent role-plays the generalist and each consulted lens sequentially, emitting the same artifacts with the stance switch explicit (`#ai-review-engine` degradation); where `guard.mjs` is unavailable, compute the guard by hand from the ledger.
 
 ## Definitions
 
