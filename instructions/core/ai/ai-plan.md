@@ -11,6 +11,6 @@
 - Non-trivial changes start with a user-approved spec before a plan is written and executed.
 - A new working spec carries a short **Conformance** section stating it conforms to the current reference spec (#swe-reference-spec) and design decisions (#swe-design-decisions), or naming where and why it diverges and whether those present-truth docs must change. The statement's home is that named section, so author and reviewer both know where to look; it is enforced by the adversarial spec review (#ai-spec-review) -- a spec that silently contradicts present-truth without justification is a blocking finding. Any divergence's doc updates are applied at #swe-done.
 - A plan reaching `Implemented` **may be pruned** -- an explicit exception to the append-only rule above, for plans only (deletion, not in-place mutation), justified because a plan is execution scaffolding with no residual present-truth; the spec, the shipped code, and git carry the result. The spec is **never** pruned.
-- The set of working specs is indexed at generated `docs/working-specs/INDEX.md`, regenerated on any structural change to the set -- a spec added, a spec directory deleted or renamed, a `Status:` changed, or a plan pruned. 
-  The index **MUST** be current at #swe-done; how it is regenerated and drift-checked is the project's own tooling, not fixed by this rule. 
+- The set of working specs is indexed at generated `docs/working-specs/INDEX.md`, regenerated on any structural change to the set -- a spec added, a spec directory deleted or renamed, a `Status:` changed, or a plan pruned.
+  The index **MUST** be current at #swe-done; how it is regenerated and drift-checked is the project's own tooling, not fixed by this rule.
   Regeneration is mechanical upkeep, not a design step.
