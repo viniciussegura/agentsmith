@@ -5,7 +5,7 @@ A long branch rarely grows by one decision to overreach: each new unit _feels_ l
 **Replacement is not the signal.**
 A branch that throws out work it previously built is usually doing the right thing; the alternative is accreting on top of a design already known to be wrong.
 Work is shipped only once the branch merges to the default branch -- until then it is work-in-progress and may be **completely** refactored, including one whose working spec is `Implemented`: that status records that the code was written, not that the design was right.
-An earlier spec is superseded by a new one, never edited (#ai-plan).
+An earlier **working** spec is superseded by a new one, never edited; corrections to present truth go to the reference spec (#ai-plan).
 
 **Width is not the signal either.**
 A branch spanning multiple components is _justified_ for as long as one component is still teaching the others what shape to be.
@@ -13,12 +13,14 @@ Splitting along the component seam produces PRs with no independent value, and f
 
 **Convergence is the signal.**
 The branch has stopped converging when a new unit opens more questions than it closes.
-Before minting a new spec on a branch that already carries one, stop and classify it -- a spec may be both, so apply both checks:
+Before minting a new working spec on a branch that already carries one, stop and classify it -- a spec may be both, so apply both checks:
 
 - **It adds new scope.** The branch is becoming a release train: evaluate it against _When to ship_ below before minting.
-- **It revisits an earlier spec on this branch.** Revision is expected and healthy, but count the revisits of the same abstraction.
-  The first two are learning: supersede the earlier spec and continue, carrying no failed attempt forward as reviewable history.
-  From the third, the problem is not yet understood and another attempt just buys another wrong answer -- stop and land what the learning has already produced.
+- **It revisits an earlier working spec on this branch.** Revision is expected and healthy, but count the revisits of the same abstraction.
+  The first two are learning: supersede the earlier working spec and continue, carrying no failed attempt forward as reviewable history.
+  From the third, the problem itself is not yet understood, and another attempt in the same direction only compounds an unsure foundation.
+  Stop adding to it and re-examine the premise -- what the abstraction is for, and which constraint keeps breaking it -- surfacing that to the user before further work on it.
+  Whatever part of the branch does not rest on that abstraction is evaluated against _When to ship_ on its own.
 
 **When to ship.**
 The branch, or a candidate slice of it, is ready only if all four hold:
@@ -34,6 +36,6 @@ Say so and shorten the remaining work rather than force a boundary that is not t
 
 **What is not evidence.**
 
-- A spec, or a step within it, was reviewed: a review conducted inside the wrong foundation confirms nothing.
+- A working spec, or a step within it, was reviewed: a review conducted inside the wrong foundation confirms nothing.
 - Tests pass: incomplete tests, or tests written against the wrong foundation, confirm nothing.
 - Commit count: granularity is free and branches are squash-merged (#git-branch-workflow).
