@@ -2,6 +2,7 @@
 
 - A unit of work lives in one directory under working-specs (#swe-docs-layout), holding `spec.md` and/or `plan.md`.
   The directory may hold only `spec.md` (no plan yet) or only `plan.md` (trivial work that skipped a spec).
+  Work trivial enough to carry no directory at all is still a unit of work, tracked as a request rather than a spec (#ai-multiple-requests).
 - A working-spec directory is created on an approved feature branch (#git-branch-workflow); if not yet on one, confirm the branch first.
   Before minting one on a branch that already carries a working spec, apply #swe-branch-lifespan -- the branch may be due to ship rather than to grow.
 - Each file carries a `Status:` line that is exactly one bare token: `Draft`, `Approved`, or `Implemented`.

@@ -67,7 +67,7 @@ repo's* instruction source and cannot run in a consumer project. Dogfood install
 
 How this repo organizes its specs, decisions, and history — the
 present-truth / point-in-time families — is in
-[`docs/documentation-model.md`](docs/documentation-model.md). New work follows
+[`docs/reference-spec/documentation-model.md`](docs/reference-spec/documentation-model.md). New work follows
 `#ai-plan`: a working spec under `docs/working-specs/<date>-<slug>/`, indexed by
 `agentsmith spec-index`.
 

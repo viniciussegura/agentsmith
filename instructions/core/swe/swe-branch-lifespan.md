@@ -1,6 +1,6 @@
 # #swe-branch-lifespan Branch lifespan
 
-A long branch rarely grows by one decision to overreach: each new unit _feels_ like the next step of the current one, and no single step is obviously the wrong call.
+A long branch rarely grows by one decision to overreach: each new unit of work _feels_ like a continuation of the current one, and no single step is obviously the wrong call.
 
 **Replacement is not the signal.**
 A branch that throws out work it previously built is usually doing the right thing; the alternative is accreting on top of a design already known to be wrong.
@@ -14,7 +14,7 @@ Splitting along the component seam produces PRs with no independent value, and f
 
 **Convergence is the signal.**
 Before minting a new working spec on a branch that already carries one, stop and classify it.
-A branch converges while each new unit closes more than it opens; the two checks below are how that is observed (a spec may be both):
+A branch converges while each new unit of work closes more than it opens; the two checks below are how that is observed (a spec may be both):
 
 - **It adds new scope.** The branch is becoming a release train: before minting, ask whether the work already here forms a slice that could ship on its own (_When to ship_, conditions 1-2).
   If it does, ship it and start the new scope on a fresh branch.
@@ -36,6 +36,6 @@ Say so and shorten the remaining work rather than force a boundary that is not t
 
 **What is not evidence.**
 
-- A working spec, or a step within it, was reviewed: a review conducted inside the wrong foundation confirms nothing.
+- A working spec, or a plan step within it, was reviewed: a review conducted inside the wrong foundation confirms nothing.
 - Tests pass: incomplete tests, or tests written against the wrong foundation, confirm nothing.
 - Commit count: granularity is free and branches are squash-merged (#git-branch-workflow).

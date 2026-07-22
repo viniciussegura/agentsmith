@@ -4,3 +4,13 @@ Applies to human contributors and AI assistants (Claude Code, Copilot, Codex, Cu
 Precedence on conflict: user instructions in the active conversation > a more project-specific instruction file > this file.
 A project-scoped instruction file may override any rule here -- **EXCEPT** the safety baseline (#git-secret-history, #ai-untrusted-content, #swe-security, #ai-tool-safety), which a project may tighten but not waive.
 Each rule carries a `#tag` so it can be referenced in conversation.
+
+This set's own process vocabulary, fixed at three altitudes:
+
+| term | what it names |
+| --- | --- |
+| `deliverable` | what a branch delivers, at merge -- its scope of work, provisional and rarely written down in full |
+| `unit of work` | one working spec, or a request landed without one (#ai-plan, #ai-multiple-requests) |
+| `plan step` | an execution chunk inside a unit of work -- a step, a workstream, a commit |
+
+These name the process, not a project's domain: a project's own concepts follow #swe-terminology.
