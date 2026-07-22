@@ -72,7 +72,24 @@ export function runGuard({ scratchDir, n, newCycle = false }) {
     const reb = readJson(rebuttalPath);
     for (const [id, v] of Object.entries(reb.statuses ?? {})) {
       const cur = byId.get(id);
-      if (cur && (v.status === 'resolved' || v.status === 'wontfix')) cur.status = v.status;
+      if (cur && (v.status === 'resolved' || v.status === 'wontfix')) {
+        cur.status = v.status;
+        cur.statusRound = i;
+      }
+    }
+  }
+
+  // A reviewer re-raising a finding disputes the author's `resolved`: without
+  // this, a review converges on the author's say-so and the adversarial filter is
+  // one-sided. A re-emission at round n overrides a rebuttal from an earlier
+  // round only -- one written at round n or later already answers this review.
+  // `wontfix` is the author's call and is never overridden here; a contested one
+  // is surfaced to the user by the stall/cap path instead.
+  for (const f of review.findings ?? []) {
+    const cur = byId.get(f.id);
+    if (cur?.status === 'resolved' && (cur.statusRound ?? 0) < n) {
+      cur.status = 'open';
+      cur.reopenedAt = n;
     }
   }
 

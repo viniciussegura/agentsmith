@@ -156,30 +156,75 @@ test('rebuttal written after its own round is folded by the next guard run (live
   assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'resolved');
 });
 
+// The author owns `status`, but a reviewer re-raising a finding must be able to
+// dispute the claim -- otherwise a review converges on the author's say-so and the
+// adversarial filter is one-sided. A re-emission at round n overrides a rebuttal
+// from an earlier round; `wontfix` is an author decision the guard never overrides.
+test('re-emitting a resolved finding reopens it', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a'), finding('b')]);
+  runGuard({ scratchDir: dir, n: 1 });
+  resolve(dir, 1, ['a']);
+  writeReview(dir, 2, [finding('b')]); // 'a' not re-emitted -> stays resolved
+  assert.equal(runGuard({ scratchDir: dir, n: 2 }).b, 1);
+  writeReview(dir, 3, [finding('a'), finding('b')]); // reviewer disputes the fix
+  assert.equal(runGuard({ scratchDir: dir, n: 3 }).b, 2);
+  assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'open');
+});
+
+test('re-emitting a wontfix finding does NOT reopen it', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a')]);
+  runGuard({ scratchDir: dir, n: 1 });
+  writeJson(join(dir, 'round-1.rebuttal.json'), {
+    round: 1, statuses: { a: { status: 'wontfix', note: 'declined' } },
+  });
+  writeReview(dir, 2, [finding('a')]);
+  assert.equal(runGuard({ scratchDir: dir, n: 2 }).b, 0);
+  assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'wontfix');
+});
+
+test('a resolved finding re-emitted in the SAME round it was rebutted stays resolved', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a')]);
+  runGuard({ scratchDir: dir, n: 1 });
+  resolve(dir, 1, ['a']);
+  writeReview(dir, 2, [finding('a')]);
+  runGuard({ scratchDir: dir, n: 2 }); // reopens: rebuttal round 1 < review round 2
+  resolve(dir, 2, ['a']); // author fixes it again
+  writeReview(dir, 3, []); // reviewer drops it
+  assert.equal(runGuard({ scratchDir: dir, n: 3 }).b, 0);
+});
+
 test('progress review resets the stall streak', () => {
   const dir = scratch();
-  const all = [finding('a'), finding('b'), finding('c')];
-  writeReview(dir, 1, all); // b=3, best=3
+  const emit = (n, ids) => writeReview(dir, n, ids.map((id) => finding(id)));
+  emit(1, ['a', 'b', 'c']); // b=3, best=3
   runGuard({ scratchDir: dir, n: 1 });
-  writeReview(dir, 2, all); // b=3 non-progress streak1
+  emit(2, ['a', 'b', 'c']); // b=3 non-progress streak1
   runGuard({ scratchDir: dir, n: 2 });
-  writeReview(dir, 3, all); resolve(dir, 3, ['c']); // b=2 progress -> streak reset
+  resolve(dir, 2, ['c']); // author rebuts round 2 after its guard ran
+  emit(3, ['a', 'b']); // b=2 progress -> streak reset
   assert.equal(runGuard({ scratchDir: dir, n: 3 }).verdict, 'continue');
-  writeReview(dir, 4, all); // b=2 non-progress streak1
+  emit(4, ['a', 'b']); // b=2 non-progress streak1
   runGuard({ scratchDir: dir, n: 4 });
-  writeReview(dir, 5, all); // b=2 non-progress streak2 -> stalled
+  emit(5, ['a', 'b']); // b=2 non-progress streak2 -> stalled
   assert.equal(runGuard({ scratchDir: dir, n: 5 }).verdict, 'stalled');
 });
 
 test('5 progressing rounds without converge -> cap', () => {
   const dir = scratch();
-  const all = ['a', 'b', 'c', 'd', 'e'].map((id) => finding(id));
-  // b = 5,4,3,2,1 by resolving one blocker per round (progress each round, never 0)
-  writeReview(dir, 1, all);
+  // b = 5,4,3,2,1: the author resolves one blocker after each review, and the next
+  // review re-emits only what is still open. (Re-emitting a resolved one would
+  // reopen it -- that is the disputed-fix path, covered above, not this one.)
+  let open = ['a', 'b', 'c', 'd', 'e'];
+  writeReview(dir, 1, open.map((id) => finding(id)));
   assert.equal(runGuard({ scratchDir: dir, n: 1 }).verdict, 'continue'); // b=5 best=5
   for (let n = 2; n <= 5; n++) {
-    writeReview(dir, n, all);
-    resolve(dir, n, [['e'], ['d'], ['c'], ['b']][n - 2]); // resolve one more each round
+    const fixed = ['e', 'd', 'c', 'b'][n - 2];
+    resolve(dir, n - 1, [fixed]); // author rebuts round n-1 after its guard ran
+    open = open.filter((id) => id !== fixed);
+    writeReview(dir, n, open.map((id) => finding(id)));
     const r = runGuard({ scratchDir: dir, n });
     if (n < 5) assert.equal(r.verdict, 'continue', `round ${n}`);
     else assert.equal(r.verdict, 'cap'); // b=1, roundsInCycle=5

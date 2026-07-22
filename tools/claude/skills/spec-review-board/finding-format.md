@@ -28,6 +28,8 @@ Each finding the generalist or a specialist raises:
 
 A specialist can never close its own finding: it leaves the open-blocking set only by a generalist **down-tag** (tag action, removes it from `b(n)`) or an author **status** of `resolved`/`wontfix`.
 
+**Reopening.** `resolved` is the author's claim, not the last word: re-emitting a finding id in a later round's review **reopens** it, because a reviewer who still sees the defect is disputing that claim. `guard.mjs` reopens when the review round is later than the round whose rebuttal set the status -- a rebuttal written at that round or later already answers the review, so the status stands. `wontfix` is never reopened this way: it is the author's decision, and a contested one reaches the user through the stall/cap path instead.
+
 ## Scratch JSON shapes
 
 Machine artifacts under `.agentsmith/tmp/spec-review/<spec-dir-name>/`. Required
