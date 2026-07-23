@@ -13,6 +13,7 @@ import { parseArgs } from '../src/args.js';
 import { buildInstallPlan, buildUninstallPlan, renderPlan } from '../src/plan.js';
 import { applyPlan } from '../src/execute.js';
 import { confirm, runWizard, makeSeam } from '../src/prompt.js';
+import { SETTINGS_REL, CLAUDE_MD_REL } from '../src/settings.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -59,6 +60,42 @@ Examples:
   agentsmith install
   agentsmith install --scope user
   agentsmith uninstall --scope user --yes`;
+
+// Per-verb help: the verb's synopsis, its own flags, and one example. Reached via
+// `agentsmith install --help` / `uninstall --help` (parseArgs sets cmd.helpVerb).
+const VERB_HELP = {
+  install: `agentsmith install -- generate instructions (and tool adapters) under a scope
+
+Usage:
+  agentsmith install [--scope <user|project|PATH>] [--mode <single|split>] [--placement <root|nested>] [--no-tools] [--dev] [--clean] [--yes] [--dry-run]
+
+Flags:
+  --scope <user|project|PATH>  base directory the install tree roots at (default project)
+  --mode <single|split>        one inlined file vs. lean core + one file per bundle (default split)
+  --placement <root|nested>    core at base root vs. nested under .agentsmith/ with a stub (default nested)
+  --no-tools                   skip the tool adapters; write instructions only
+  --dev                        also install the authoring-only devtools adapter
+  --clean                      uninstall then reinstall this scope in one run (destructive)
+  --yes                        skip the confirmation prompt (durable authorization)
+  --dry-run                    print the plan and exit 0 without writing
+
+Example:
+  agentsmith install --scope user`,
+  uninstall: `agentsmith uninstall -- reverse an install of the same scope
+
+Usage:
+  agentsmith uninstall [--scope <user|project|PATH>] [--yes] [--dry-run]
+
+Flags:
+  --scope <user|project|PATH>  base directory to uninstall from (default project)
+  --yes                        skip the confirmation prompt (durable authorization)
+  --dry-run                    print the plan and exit 0 without writing
+
+Example:
+  agentsmith uninstall --scope user --yes`,
+};
+
+const helpFor = (verb) => VERB_HELP[verb] ?? HELP;
 
 // Every *.md (and any file) under tools/, relative to pkgRoot, recursively.
 function listToolSources(absDir, relBase) {
@@ -131,8 +168,9 @@ async function main() {
     if (!seam.isTTY) { process.stderr.write(`agentsmith: error -- no subcommand -- run 'agentsmith install' or 'agentsmith --help'\n`); process.exit(1); }
     cmd = await runWizard(seam);
   }
+  if (cmd.kind === 'aborted') { process.stderr.write(`agentsmith: aborted -- no recognized answer\n`); process.exit(0); }
   if (cmd.kind === 'error') { process.stderr.write(`${cmd.error}\n`); process.exit(1); }
-  if (cmd.kind === 'help') { process.stdout.write(`${HELP}\n`); process.exit(0); }
+  if (cmd.kind === 'help') { process.stdout.write(`${cmd.helpVerb ? helpFor(cmd.helpVerb) : HELP}\n`); process.exit(0); }
   if (cmd.kind === 'version') { process.stdout.write(`${pkgVersion}\n`); process.exit(0); }
 
   // Build outputs from the parsed flags. --mode drives layout; --placement the
@@ -183,12 +221,17 @@ async function main() {
   if (cmd.kind === 'uninstall' || (cmd.kind === 'install' && cmd.flags.clean)) {
     const prev = readManifest(base);
     const stubDest = resolve(base, 'AGENTS.md');
+    // Derive the prior install's core path from what the manifest recorded, not
+    // from this run's flags: uninstall has no --placement flag, so a bare
+    // uninstall would otherwise always assume the nested default and miss a
+    // --placement root import (correctness-3). AGENTS.md at the root => root core.
+    const prevCorePath = prev.paths.includes('AGENTS.md') ? 'AGENTS.md' : '.agentsmith/AGENTS.md';
     const plan = buildUninstallPlan({
-      base, absolute, manifestPaths: prev.paths,
+      base, absolute, manifestPaths: prev.paths, corePath: prevCorePath,
       stubContent: built.stub ? built.stub.content : null,
       stubOnDiskContent: existsSync(stubDest) ? readFileSync(stubDest, 'utf8') : null,
-      hasSettings: existsSync(resolve(base, '.claude/settings.json')),
-      hasClaudeMd: existsSync(resolve(base, '.claude/CLAUDE.md')),
+      hasSettings: existsSync(resolve(base, SETTINGS_REL)),
+      hasClaudeMd: existsSync(resolve(base, CLAUDE_MD_REL)),
       isUser,
     });
     if (cmd.kind === 'uninstall') {
@@ -201,8 +244,13 @@ async function main() {
     // install --clean: apply uninstall first (confirmed as destructive), then fall through to install.
     const decision = await confirm({ plan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: true, render: renderPlan });
     if (decision === 'abort') { process.stderr.write(`agentsmith: error -- refusing to clean-install without confirmation -- pass --yes\n`); process.exit(1); }
-    if (decision === 'skip') process.exit(0);
-    applyPlan(plan, { pkgRoot });
+    // A dry-run clean previews BOTH halves: skip the uninstall apply/early-exit and
+    // fall through so the install block below builds, prints, and (being dry-run)
+    // exits 0 without writing. A real skip (TTY 'n') still exits here.
+    if (!cmd.flags.dryRun) {
+      if (decision === 'skip') process.exit(0);
+      applyPlan(plan, { pkgRoot });
+    }
   }
 
   // install (fresh, or the install half of --clean).

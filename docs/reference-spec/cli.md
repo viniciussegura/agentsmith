@@ -25,7 +25,7 @@ Prints the intended-effects plan, gates it through the confirmation rules below,
 - `--placement <root|nested>` -- core file at the base root vs. nested under `.agentsmith/` with a root stub. Default `nested`.
 - `--no-tools` -- skip installing the tool adapters (`.claude/{skills,agents,commands,hooks}/`); instructions-only.
 - `--dev` -- also install the authoring-only devtools adapter (`devtools/claude/`), for dogfooding this repo.
-- `--clean` -- build an uninstall plan for the target scope and an install plan, then apply uninstall followed by install in one invocation. Guarantees no cross-version residue even when the manifest has drifted or been lost. Destructive (see Confirmation gate).
+- `--clean` -- build an uninstall plan for the target scope and an install plan, then apply uninstall followed by install in one invocation. Guarantees no cross-version residue even when the manifest has drifted or been lost. Destructive (see Confirmation gate). With `--dry-run` both halves are previewed (the uninstall plan then the install plan) and nothing is applied.
 - `--yes` -- skip the interactive confirmation prompt; a durable authorization for a destructive run off a TTY.
 - `--dry-run` -- print the plan and exit `0` without touching disk.
 
@@ -82,8 +82,8 @@ agentsmith --stdout --mode single
 
 ### `--help` / `-h` and `--version`
 
-`--help` prints a usage synopsis, the subcommand list with a one-line description each, the flags grouped under the subcommand they belong to, and two or three examples, then exits `0`.
-`agentsmith install --help` / `agentsmith uninstall --help` print just that verb's flags and examples.
+`--help` (or `-h`) prints the top-level usage synopsis -- the subcommand and query-flag list, a short scope note, and a few examples -- then exits `0`.
+`agentsmith install --help` / `agentsmith uninstall --help` print just that verb's synopsis, its own flags, and one example.
 `--version` prints the resolved package version -- the same value the source-revision-stamp fallback uses -- and exits `0`.
 Help and version are queries: they never build or apply a plan.
 
@@ -126,13 +126,16 @@ The gate then branches on whether the command is destructive:
 
 A destructive run off a TTY never proceeds silently: absence of a TTY is not durable authorization, an explicit `--yes` is.
 This gate is independent of any AI-agent interaction mode; it applies identically to a human at a terminal, a CI job, and an AI agent driving the CLI.
+For `install --clean`, `--dry-run` prints both the uninstall and the install plan (the full preview of the two-stage run) before exiting `0`; a real run gates each stage separately.
 
 ## Interactive wizard
 
 Bare `agentsmith` on a TTY runs the wizard: verb (install / uninstall) -> scope (project / user / directory path) -> then, only on the install path, content mode (split / single) -> placement (root / nested) -> tool adapters (yes / no) -> dev adapters (yes / no); the uninstall path skips the four install-only prompts and goes straight from scope to the plan.
 It then prints the resulting plan and runs the same confirmation gate as a parsed command line.
-Every prompt shows its default; an empty answer accepts the default.
-The wizard can be aborted at any point (Ctrl-C, or an empty answer at the verb prompt), leaving the disk untouched.
+Each prompt validates its answer against the allowed set.
+The content and placement prompts show a default that an empty answer accepts; the verb prompt has no default.
+An empty or unrecognized answer at the verb, content, or placement prompt is re-asked once, and a second unrecognized answer aborts the wizard (`agentsmith: aborted`, exit `0`, disk untouched) rather than silently steering into a different action.
+The wizard can also be aborted at any point with Ctrl-C, leaving the disk untouched.
 The wizard is an input source, not a second code path: it produces the same `{ command, scope, flags }` shape a parsed command line would, and flows through the identical plan/confirm/execute path.
 
 ## Plugin coexistence

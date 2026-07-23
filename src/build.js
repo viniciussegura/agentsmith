@@ -24,7 +24,6 @@ const STUB = [
  * @param {'lean'|'full'} [opts.layout='lean']
  * @param {'nested'|'root'} [opts.placement='nested']
  * @param {string}   [opts.output='AGENTS.md']    Core filename when placement is root.
- * @param {string}   [opts.out]                   Explicit core path override.
  * @returns {{ corePath, coreContent, bundles: {path,content}[], stub: {path,content}|null, dangling: string[], crossBoundary: string[] }}
  */
 export function buildOutputs({
@@ -37,9 +36,8 @@ export function buildOutputs({
   layout = 'lean',
   placement = 'nested',
   output = 'AGENTS.md',
-  out,
 }) {
-  const corePath = out || (placement === 'nested' ? '.agentsmith/AGENTS.md' : output);
+  const corePath = placement === 'nested' ? '.agentsmith/AGENTS.md' : output;
   const coreDir = ppath.dirname(corePath.split(/[\\/]/).join('/')) || '.';
   const hrefFor = (name) => ppath.relative(coreDir, `${BUNDLE_DIR}/${name}.md`);
 
@@ -70,7 +68,7 @@ export function buildOutputs({
   const dangling = danglingTags({ coreText: coreContent, bundleTexts });
   const crossBoundary = coreToBundleRefs({ coreText: coreContent, bundleTexts });
 
-  const stub = placement === 'nested' && !out ? { path: 'AGENTS.md', content: STUB } : null;
+  const stub = placement === 'nested' ? { path: 'AGENTS.md', content: STUB } : null;
 
   return { corePath, coreContent, bundles: bundleFiles, stub, dangling, crossBoundary };
 }

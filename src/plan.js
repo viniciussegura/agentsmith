@@ -1,5 +1,5 @@
 import { orphanPaths } from './manifest.js';
-import { HOOK_REL } from './settings.js';
+import { SETTINGS_REL, CLAUDE_MD_REL } from './settings.js';
 
 // buildInstallPlan: assemble the ordered op list for an install (pure).
 export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, flags, prevManifestPaths, stubExists }) {
@@ -25,23 +25,23 @@ export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, fl
   for (const a of adapterPlan) ops.push({ kind: 'write', path: a.dest, src: a.src });
 
   // User-scope import wiring.
-  if (scope.kind === 'user') ops.push({ kind: 'writeImport', path: '.claude/CLAUDE.md', target: built.corePath });
+  if (scope.kind === 'user') ops.push({ kind: 'writeImport', path: CLAUDE_MD_REL, target: built.corePath });
 
   // settings.json: merge our hook when tools installed, else un-merge any stale entry (bug-2 fix).
-  const commandPath = absolute ? HOOK_REL : HOOK_REL; // resolved to absolute by execute when absolute=true
+  // execute.js resolves the hook command path from plan.absolute; nothing here to precompute.
   ops.push(flags.tools
-    ? { kind: 'mergeSettings', path: '.claude/settings.json', commandPath }
-    : { kind: 'unmergeSettings', path: '.claude/settings.json' });
+    ? { kind: 'mergeSettings', path: SETTINGS_REL }
+    : { kind: 'unmergeSettings', path: SETTINGS_REL });
 
   return { base, absolute, ops, manifestPaths };
 }
 
 // buildUninstallPlan: reverse an install of the same scope (pure).
-export function buildUninstallPlan({ base, absolute, manifestPaths, stubContent, stubOnDiskContent, hasSettings, hasClaudeMd, isUser }) {
+export function buildUninstallPlan({ base, absolute, manifestPaths, corePath, stubContent, stubOnDiskContent, hasSettings, hasClaudeMd, isUser }) {
   const ops = [];
   if (manifestPaths.length) ops.push({ kind: 'prune', paths: manifestPaths });
-  if (hasSettings) ops.push({ kind: 'unmergeSettings', path: '.claude/settings.json' });
-  if (isUser && hasClaudeMd) ops.push({ kind: 'removeImport', path: '.claude/CLAUDE.md' });
+  if (hasSettings) ops.push({ kind: 'unmergeSettings', path: SETTINGS_REL });
+  if (isUser && hasClaudeMd) ops.push({ kind: 'removeImport', path: CLAUDE_MD_REL, target: corePath });
   // Root stub: delete only if unmodified; else keep. Skipped when AGENTS.md is
   // already a manifest path (a --placement root install owns the real core there,
   // pruned above) -- avoids a spurious keepStub for a file already deleted.

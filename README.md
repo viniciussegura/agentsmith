@@ -26,20 +26,13 @@ npx github:viniciussegura/agentsmith install          # latest
 npx github:viniciussegura/agentsmith#v0.1.0 install    # pinned, reproducible
 ```
 
-agentsmith is a verb-first CLI: `install`, `uninstall`, and `spec-index` are
-subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
-Bare `agentsmith` (no verb) opens an interactive wizard on a TTY, or errors off
-one. Full flag reference, the confirmation gate, and plugin-coexistence detail
-live in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md); this section
-is a summary.
+agentsmith is a verb-first CLI: `install`, `uninstall`, and `spec-index` are subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
+Bare `agentsmith` (no verb) opens an interactive wizard on a TTY, or errors off one.
+Full flag reference, the confirmation gate, and plugin-coexistence detail live in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md); this section is a summary.
 
-By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per
-on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at
-the core (an existing stub is left untouched), and installs the tool adapters
-(e.g. `tools/claude/` into `.claude/`). Whether you commit the generated
-`AGENTS.md` is your call — agentsmith only produces the file. Before writing
-anything, it prints the intended-effects plan and, on a TTY without `--yes`,
-asks for confirmation.
+By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
+Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
+Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
 
 ```bash
 agentsmith install                    # project scope, default mode/placement

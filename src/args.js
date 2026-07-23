@@ -21,7 +21,7 @@ function collect(tokens, known) {
     if (!known.has(t)) return err(`unknown flag: ${t}`);
     if (VALUE_FLAGS.has(t)) {
       const v = tokens[i + 1];
-      if (v === undefined || v.startsWith('--')) return err(`${t} requires a value`);
+      if (v === undefined || v.startsWith('-')) return err(`${t} requires a value`);
       i++;
       if (t === '--scope') { if (out._scope !== undefined) return err('--scope given more than once'); out._scope = v; }
       if (t === '--mode') out._mode = v;
@@ -41,8 +41,6 @@ export function parseArgs(argv) {
   if (argv.length === 0) return { kind: 'wizard' };
   if (argv[0] === '--help' || argv[0] === '-h') return { kind: 'help' };
   if (argv[0] === '--version') return { kind: 'version' };
-
-  if (argv[0] === 'spec-index') return { kind: 'spec-index', flags: { check: argv.includes('--check') } };
 
   if (argv[0] === '--stdout') {
     const c = collect(argv.slice(1), STDOUT_FLAGS);

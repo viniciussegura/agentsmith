@@ -295,6 +295,58 @@ test('install --clean recovers from a stale manifest (drops orphans)', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('uninstall --scope user removes the CLAUDE.md import block, preserving user content', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  const home = mkdtempSync(join(tmpdir(), 'agentsmith-home-'));
+  try {
+    const claudeMd = join(home, '.claude/CLAUDE.md');
+    mkdirSync(dirname(claudeMd), { recursive: true });
+    writeFileSync(claudeMd, '# my own global rules\n');
+    runUser(dir, home); // install --scope user wires the import
+    assert.match(readFileSync(claudeMd, 'utf8'), /agentsmith: generated user instructions/, 'import present after install');
+
+    execFileSync('node', [cli, 'uninstall', '--scope', 'user', '--yes'], {
+      cwd: dir, env: { ...process.env, HOME: home, USERPROFILE: home },
+    });
+    const after = readFileSync(claudeMd, 'utf8');
+    assert.doesNotMatch(after, /agentsmith: generated user instructions/, 'import block removed on uninstall');
+    assert.match(after, /^# my own global rules/m, 'user content preserved');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('--scope <PATH> installs into that explicit directory, not cwd', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    const target = join(dir, 'target-proj');
+    mkdirSync(target, { recursive: true });
+    execFileSync('node', [cli, 'install', '--scope', target], { cwd: dir });
+    assert.ok(existsSync(join(target, '.agentsmith/AGENTS.md')), 'core written under the path scope');
+    assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'nothing written to cwd');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('--scope pointing at a file (not a directory) errors non-zero', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    const filePath = join(dir, 'a-file.txt');
+    writeFileSync(filePath, 'x');
+    assert.throws(() => execFileSync('node', [cli, 'install', '--scope', filePath], { cwd: dir, stdio: 'ignore' }));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('install --dry-run in a fresh dir writes nothing', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    execFileSync('node', [cli, 'install', '--dry-run'], { cwd: dir });
+    assert.equal(existsSync(join(dir, '.agentsmith')), false, 'no .agentsmith written');
+    assert.equal(existsSync(join(dir, '.claude')), false, 'no .claude written');
+    assert.equal(existsSync(join(dir, 'AGENTS.md')), false, 'no root stub written');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('install/uninstall never touch a simulated plugin-cache path', () => {
   const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
   try {

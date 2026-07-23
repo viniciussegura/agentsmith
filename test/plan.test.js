@@ -48,6 +48,7 @@ test('install prunes recorded orphans no longer produced', () => {
 
 test('uninstall plan prunes all manifest paths, un-merges, removes import (user)', () => {
   const p = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: ['.agentsmith/AGENTS.md', '.claude/skills/x/SKILL.md'],
+    corePath: '.agentsmith/AGENTS.md',
     stubContent: 'STUB', stubOnDiskContent: 'STUB', hasSettings: true, hasClaudeMd: true, isUser: true });
   const kinds = p.ops.map((o) => o.kind);
   assert.ok(kinds.includes('prune'));
@@ -55,6 +56,18 @@ test('uninstall plan prunes all manifest paths, un-merges, removes import (user)
   assert.ok(kinds.includes('removeImport'));
   assert.ok(p.ops.some((o) => o.kind === 'prune' && o.paths.includes('.claude/skills/x/SKILL.md')));
   assert.equal(p.manifestPaths.length, 0);
+});
+
+test('removeImport carries the actual core target, so a root-placement import is matchable', () => {
+  const nested = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: ['.agentsmith/AGENTS.md'],
+    corePath: '.agentsmith/AGENTS.md',
+    stubContent: 'STUB', stubOnDiskContent: null, hasSettings: false, hasClaudeMd: true, isUser: true });
+  assert.equal(nested.ops.find((o) => o.kind === 'removeImport').target, '.agentsmith/AGENTS.md');
+
+  const root = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: ['AGENTS.md'],
+    corePath: 'AGENTS.md',
+    stubContent: 'STUB', stubOnDiskContent: null, hasSettings: false, hasClaudeMd: true, isUser: true });
+  assert.equal(root.ops.find((o) => o.kind === 'removeImport').target, 'AGENTS.md');
 });
 
 test('uninstall skips the stub branch when AGENTS.md is a manifest path (--placement root)', () => {

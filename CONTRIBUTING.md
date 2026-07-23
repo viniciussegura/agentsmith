@@ -28,7 +28,7 @@ src/sections.js    pure: splits manifest sections into core vs on-demand bundles
 src/bundles.js     on-demand index + #tag reference-integrity + ownership coverage lint
 src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** install paths
 src/specindex.js   pure: renders docs/working-specs/INDEX.md
-bin/cli.js         reads sources, writes the files
+bin/cli.js         verb-first CLI: install / uninstall / spec-index, plus the --stdout query
 bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
 bin/spec-index.js  regenerate / --check the working-specs index
 test/              tests for the generator

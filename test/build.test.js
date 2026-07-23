@@ -109,13 +109,6 @@ test('lean with no bundles emits no on-demand index and no bundle files', () => 
   assert.doesNotMatch(out.coreContent, /On-demand instructions/);
 });
 
-test('out override sets corePath and suppresses the stub', () => {
-  const out = buildOutputs({ ...base, layout: 'lean', placement: 'nested', out: 'custom/AGENTS.md' });
-  assert.equal(out.corePath, 'custom/AGENTS.md');
-  assert.equal(out.stub, null);
-  assert.match(out.coreContent, /\.agentsmith\/agents\/frontend\.md/, 'bundle href still reaches .agentsmith');
-});
-
 test('multi-bundle lean lists every bundle href', () => {
   const out = buildOutputs({
     ...base,

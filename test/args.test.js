@@ -41,6 +41,12 @@ test('--scope needs a value', () => {
   assert.equal(parseArgs(['install', '--scope']).kind, 'error');
 });
 
+test('a single-dash token is not swallowed as a flag value', () => {
+  const c = parseArgs(['install', '--scope', '-h']);
+  assert.equal(c.kind, 'error');
+  assert.match(c.error, /requires a value/i);
+});
+
 test('stdout rejects disk flags, accepts --mode', () => {
   assert.equal(parseArgs(['--stdout', '--mode', 'single']).kind, 'stdout');
   assert.equal(parseArgs(['--stdout', '--scope', 'user']).kind, 'error');
@@ -53,11 +59,25 @@ test('uninstall parses scope + yes/dry-run only', () => {
   assert.equal(parseArgs(['uninstall', '--mode', 'single']).kind, 'error'); // install-only flag
 });
 
-test('help and version and spec-index', () => {
+test('help and version', () => {
   assert.equal(parseArgs(['--help']).kind, 'help');
   assert.equal(parseArgs(['-h']).kind, 'help');
   assert.equal(parseArgs(['install', '--help']).kind, 'help');
   assert.equal(parseArgs(['install', '--help']).helpVerb, 'install');
   assert.equal(parseArgs(['--version']).kind, 'version');
-  assert.equal(parseArgs(['spec-index', '--check']).kind, 'spec-index');
+});
+
+test('invalid --mode / --placement values are hard errors', () => {
+  const m = parseArgs(['install', '--mode', 'xyz']);
+  assert.equal(m.kind, 'error');
+  assert.match(m.error, /--mode must be single\|split/);
+  const p = parseArgs(['install', '--placement', 'xyz']);
+  assert.equal(p.kind, 'error');
+  assert.match(p.error, /--placement must be nested\|root/);
+});
+
+test('an unknown subcommand is a hard error', () => {
+  const c = parseArgs(['foo']);
+  assert.equal(c.kind, 'error');
+  assert.match(c.error, /unknown subcommand: foo/);
 });

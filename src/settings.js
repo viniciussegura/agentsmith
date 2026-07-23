@@ -4,6 +4,12 @@ const norm = (p) => p.replace(/\\/g, '/');
 // tool adapter under tools/claude/hooks/agentsmith/ -> .claude/hooks/agentsmith/.
 export const HOOK_REL = '.claude/hooks/agentsmith/require-explicit-model.mjs';
 
+// Base-relative locations of the two adapter files agentsmith edits (rather than
+// owns): the settings.json it merges its hook into, and the CLAUDE.md it wires a
+// user-scope import into. Centralized so a rename lands in one place (#code-style).
+export const SETTINGS_REL = '.claude/settings.json';
+export const CLAUDE_MD_REL = '.claude/CLAUDE.md';
+
 // Ownership marker. Every hook command agentsmith injects points at a script under
 // this path segment, so on reinstall we identify our own prior entries by the path
 // alone -- no separate manifest to keep in sync. The path *is* the provenance.
