@@ -1,6 +1,6 @@
 # Spec: `agentsmith` CLI subcommand redesign
 
-Status: Draft
+Status: Approved
 
 ## Conformance
 
