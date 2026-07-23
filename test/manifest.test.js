@@ -106,3 +106,15 @@ test('pruneOrphans refuses to delete an orphan that escapes base, deletes an in-
     assert.equal(existsSync(join(base, 'in-base.md')), false, 'in-base orphan IS deleted');
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });
+
+test('pruneOrphans never deletes base itself for a `.`/`` manifest entry, and does not throw', () => {
+  const base = tmp();
+  try {
+    writeFileSync(join(base, 'keep.md'), 'keep');
+    let deleted;
+    assert.doesNotThrow(() => { deleted = pruneOrphans(base, ['.', '']); });
+    assert.deepEqual(deleted, [], 'base-resolving entries are skipped, nothing deleted');
+    assert.equal(existsSync(base), true, 'base directory survives');
+    assert.equal(existsSync(join(base, 'keep.md')), true, 'base contents survive');
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});

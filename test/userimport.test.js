@@ -67,3 +67,10 @@ test('userImport then userUnimport round-trips', () => {
   const round = userUnimport(userImport(original, TARGET), TARGET);
   assert.equal(round, original);
 });
+
+test('userUnimport does not collapse unrelated blank runs elsewhere in the file', () => {
+  // A user file whose own content has a 3+ blank-line run (e.g. inside fenced code).
+  const original = '# mine\n\n```\nline1\n\n\n\nline2\n```\n';
+  const withBlock = userImport(original, TARGET);
+  assert.equal(userUnimport(withBlock, TARGET), original, 'only the agentsmith seam is touched');
+});

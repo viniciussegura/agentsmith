@@ -62,6 +62,10 @@ export function userUnimport(existingContent, targetPath) {
       let j = i + 1;
       while (j < lines.length && lines[j].trim() === '') j++;
       if (j < lines.length && isOurImport(lines[j].trim())) {
+        // Also drop the blank separator line(s) userImport appended before the
+        // block -- seam-local only, so unrelated blank runs elsewhere in the
+        // user's file (e.g. inside fenced code) are never touched.
+        while (kept.length && kept[kept.length - 1].trim() === '') kept.pop();
         removed = true;
         i = j; // skip through the import line
         continue;
@@ -70,8 +74,8 @@ export function userUnimport(existingContent, targetPath) {
     kept.push(lines[i]);
   }
   if (!removed) return null;
-  // Collapse a trailing run of blank lines the removal may have left, keeping one final newline.
-  let out = kept.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\n+$/,'\n');
-  if (out === '\n') out = '';
+  let out = kept.join('\n');
+  if (out.trim() === '') return '';
+  if (existingContent.endsWith('\n') && !out.endsWith('\n')) out += '\n';
   return out;
 }

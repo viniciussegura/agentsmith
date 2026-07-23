@@ -28,6 +28,12 @@ const has = (flag) => args.includes(flag);
 // working-specs index for the project in CWD (#ai-plan). Delegated here so npx
 // consumers reach it through the one `agentsmith` bin -- no second entrypoint.
 if (args[0] === 'spec-index') {
+  // Same fail-loud contract as the verb parser: reject anything but --check.
+  const unknown = args.slice(1).filter((a) => a !== '--check');
+  if (unknown.length) {
+    process.stderr.write(`agentsmith: error -- unknown flag(s) for spec-index: ${unknown.join(', ')}\n`);
+    process.exit(1);
+  }
   const r = runSpecIndex({ cwd: process.cwd(), check: has('--check') });
   if (r.missing) {
     process.stderr.write(`agentsmith: no docs/working-specs/ in ${process.cwd()} -- nothing to index\n`);

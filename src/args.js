@@ -24,8 +24,8 @@ function collect(tokens, known) {
       if (v === undefined || v.startsWith('-')) return err(`${t} requires a value`);
       i++;
       if (t === '--scope') { if (out._scope !== undefined) return err('--scope given more than once'); out._scope = v; }
-      if (t === '--mode') out._mode = v;
-      if (t === '--placement') out._placement = v;
+      if (t === '--mode') { if (out._mode !== undefined) return err('--mode given more than once'); out._mode = v; }
+      if (t === '--placement') { if (out._placement !== undefined) return err('--placement given more than once'); out._placement = v; }
     } else if (t === '--no-tools') out.noTools = true;
     else if (t === '--dev') out.dev = true;
     else if (t === '--clean') out.clean = true;

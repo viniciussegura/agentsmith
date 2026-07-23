@@ -81,3 +81,8 @@ test('an unknown subcommand is a hard error', () => {
   assert.equal(c.kind, 'error');
   assert.match(c.error, /unknown subcommand: foo/);
 });
+
+test('a repeated --mode or --placement is a hard error (consistent with --scope)', () => {
+  assert.equal(parseArgs(['install', '--mode', 'split', '--mode', 'single']).kind, 'error');
+  assert.equal(parseArgs(['install', '--placement', 'root', '--placement', 'nested']).kind, 'error');
+});

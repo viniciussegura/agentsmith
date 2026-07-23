@@ -40,9 +40,10 @@ export function pruneOrphans(base, orphans) {
   const deleted = [];
   for (const rel of orphans) {
     const abs = resolve(base, rel);
-    // Containment guard: never delete a path that resolves outside base -- a
-    // drifted/tampered manifest could name a `..`-relative or absolute entry.
-    if (abs !== root && !abs.startsWith(root + sep)) continue;
+    // Containment guard: never delete base itself, nor a path that resolves
+    // outside base -- a drifted/tampered manifest could name `.`, a `..`-relative,
+    // or an absolute entry.
+    if (abs === root || !abs.startsWith(root + sep)) continue;
     if (!existsSync(abs)) continue;
     rmSync(abs, { force: true });
     deleted.push(rel);
