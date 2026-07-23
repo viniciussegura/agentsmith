@@ -8,11 +8,12 @@ This spec conforms to the current reference spec and design decisions with one d
 
 - No reference-spec document describes the CLI invocation surface today; the CLI is documented only in `README.md` and `CONTRIBUTING.md`.
   Those are the present-truth surfaces this change updates (#swe-docs-drift), and no `docs/reference-spec/` file is contradicted.
+  This change **creates** `docs/reference-spec/cli.md` as the new present-truth home for the CLI surface (#swe-reference-spec), which the README and `--help` then summarize rather than duplicate.
 - No existing design-decisions file governs the CLI flag model, so none is contradicted.
 - **Divergence (intentional, breaking):** the bare invocation `agentsmith` / `node bin/cli.js` no longer performs a silent project install.
   It becomes the interactive wizard on a TTY and a hard error off a TTY.
   This is a breaking change to a documented entry point, taken deliberately while the package is pre-1.0 (`1.0.0-rc.16`).
-  It is recorded here rather than in a decision file because it is local to this unit of work; if a CLI reference-spec doc is later warranted, the standing rationale moves there.
+  The new `docs/reference-spec/cli.md` documents the *present-truth* surface (WHAT the CLI is); the transition rationale for breaking bare invocation stays here as working-spec history and is not itself reference-spec material.
 
 ## Motivation
 
@@ -37,6 +38,8 @@ A secondary provenance gap: an `npx github:...` install produces an `AGENTS.md` 
 - Provide an interactive wizard when invoked bare on a TTY.
 - Fix both field bugs and restore the source-revision stamp on npx installs.
 - Collapse three overlapping "where does it go" flags into two orthogonal, self-describing axes.
+- Guarantee the CLI's install/uninstall blast radius never touches the coexisting Claude Code plugin's files.
+- Land the present-truth documentation: a new CLI reference-spec (`docs/reference-spec/cli.md`) and a rewritten README, both current at #swe-done.
 
 ## Non-goals
 
@@ -153,6 +156,18 @@ The `settings.json` and `CLAUDE.md` edits inherit the existing malformed-input g
 `install --clean` builds an uninstall plan for the target scope and an install plan, then applies uninstall followed by install in one invocation.
 It guarantees no cross-version residue even when the manifest has drifted or been lost -- a belt-and-suspenders complement to the per-run orphan prune, which already deletes paths a new version stopped producing but cannot recover a lost manifest.
 
+### Plugin coexistence
+
+agentsmith ships two independent delivery channels: the CLI generator (this tool) and the Claude Code plugin (`/plugin install agentsmith`).
+A user may run both, and the CLI's install/uninstall is bounded so it never touches the plugin's files.
+
+- **Disjoint paths.** The plugin's skills/agents/commands/hook live under the plugin cache subtree (`~/.claude/plugins/...`), managed by `/plugin`. The CLI writes only under the install base's `.claude/{skills,agents,commands,hooks}/` (`~/.claude/...` for `--scope user`). The two subtrees do not overlap.
+- **Manifest-bounded prune.** `uninstall` and the orphan-prune delete only paths recorded in `.agentsmith/.install-manifest.json`; `pruneOrphans` never touches an unlisted path, and the plugin cache is never recorded. **Uninstalling the CLI install cannot erase the plugin's tools.**
+- **Settings vs `plugin.json`.** The plugin registers its `PreToolUse` hook through its own `plugin.json` (loaded by Claude Code), not the user's `settings.json`. The CLI's merge/un-merge edits only `settings.json`, so it neither adds to nor removes the plugin's hook registration. Both hook commands share the path marker `/hooks/agentsmith/` (the CLI's `settings.json` ownership marker), which is safe because they live in different files: the marker means "an agentsmith-owned hook entry *in settings.json*", which a plugin hook never is.
+- **Duplication, not erasure, is the real caveat.** A full CLI `install` alongside the plugin installs a *second* copy of every skill/agent/command under `.claude/`, duplicating the plugin's registrations. Installing with `--no-tools` (instructions only) is the documented way to run the CLI beside the plugin. This redesign does not change that; the README calls it out.
+
+This section is a design **guarantee**, tested: an install/uninstall run with a simulated plugin-cache path present asserts that path is untouched.
+
 ### Confirmation gate
 
 The plan is always printed before any write or delete.
@@ -228,6 +243,8 @@ Unit tests (single documented harness, `node --test`):
 
 Integration test (`install --clean` drift recovery): install, then stale the manifest (remove or truncate it) and drop an orphan file the current sources do not produce; run `install --clean`; assert the orphan is gone and the tree matches a fresh install.
 
+Integration test (plugin coexistence): with a simulated plugin-cache path (`<base>/.claude/plugins/...`) and file present, run `install` then `uninstall`; assert the simulated plugin path is untouched by both (bounded-manifest guarantee).
+
 Every bug fix starts with a failing test that reproduces it (#swe-testing): the `----no-tools`-style unknown flag exiting `0`, and the stale hook entry after a `--no-tools` run.
 
 ## Docs drift
@@ -235,8 +252,9 @@ Every bug fix starts with a failing test that reproduces it (#swe-testing): the 
 The call-site and command-doc migrations are enumerated in **In-repo consumers to update** above (README, CONTRIBUTING, `agentsmith-init.md`, `instruction-apply.md`, the instruction-review SKILL, the technical-debt file); that list is the authoritative set.
 Beyond it, this change also touches:
 
+- `docs/reference-spec/cli.md` -- **created**: the present-truth CLI surface (subcommands, the three axes, `--stdout`/`--help`/`--version`, the confirmation gate, plugin coexistence). README and `--help` summarize it; it is the single place current CLI truth lives (#swe-reference-spec).
 - `docs/working-specs/INDEX.md` -- regenerated (`agentsmith spec-index`).
-- No `docs/reference-spec/` or `docs/design-decisions/` file currently documents the CLI; none needs editing.
+- No `docs/design-decisions/` file governs the CLI; none needs editing.
 
 The `docs/technical-debts/2026-06-02-stale-user-import.md` debt is **closed** (file deleted) as stated in the consumers list, not merely narrowed, unless implementation surfaces a residual.
 
