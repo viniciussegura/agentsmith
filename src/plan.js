@@ -42,8 +42,10 @@ export function buildUninstallPlan({ base, absolute, manifestPaths, stubContent,
   if (manifestPaths.length) ops.push({ kind: 'prune', paths: manifestPaths });
   if (hasSettings) ops.push({ kind: 'unmergeSettings', path: '.claude/settings.json' });
   if (isUser && hasClaudeMd) ops.push({ kind: 'removeImport', path: '.claude/CLAUDE.md' });
-  // Root stub: delete only if unmodified; else keep.
-  if (stubOnDiskContent != null) {
+  // Root stub: delete only if unmodified; else keep. Skipped when AGENTS.md is
+  // already a manifest path (a --placement root install owns the real core there,
+  // pruned above) -- avoids a spurious keepStub for a file already deleted.
+  if (stubOnDiskContent != null && !manifestPaths.includes('AGENTS.md')) {
     ops.push(stubOnDiskContent === stubContent ? { kind: 'prune', paths: ['AGENTS.md'] } : { kind: 'keepStub', path: 'AGENTS.md' });
   }
   ops.push({ kind: 'prune', paths: ['.agentsmith/.install-manifest.json'] });

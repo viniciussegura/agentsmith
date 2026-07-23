@@ -57,6 +57,13 @@ test('uninstall plan prunes all manifest paths, un-merges, removes import (user)
   assert.equal(p.manifestPaths.length, 0);
 });
 
+test('uninstall skips the stub branch when AGENTS.md is a manifest path (--placement root)', () => {
+  const p = buildUninstallPlan({ base: '/b', absolute: false, manifestPaths: ['AGENTS.md'],
+    stubContent: 'STUB', stubOnDiskContent: 'FULL CORE', hasSettings: false, hasClaudeMd: false, isUser: false });
+  assert.ok(!p.ops.some((o) => o.kind === 'keepStub'), 'no spurious keepStub for a pruned root core');
+  assert.ok(p.ops.some((o) => o.kind === 'prune' && o.paths.includes('AGENTS.md')), 'root core still pruned');
+});
+
 test('uninstall keeps an edited stub', () => {
   const p = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: [],
     stubContent: 'STUB', stubOnDiskContent: 'EDITED BY USER', hasSettings: false, hasClaudeMd: false, isUser: false });

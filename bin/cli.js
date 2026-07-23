@@ -180,9 +180,8 @@ async function main() {
     process.stderr.write(`agentsmith: error -- --scope path is not a directory: ${base}\n`); process.exit(1);
   }
 
-  const prev = readManifest(base);
-
   if (cmd.kind === 'uninstall' || (cmd.kind === 'install' && cmd.flags.clean)) {
+    const prev = readManifest(base);
     const stubDest = resolve(base, 'AGENTS.md');
     const plan = buildUninstallPlan({
       base, absolute, manifestPaths: prev.paths,
