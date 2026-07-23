@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const cli = resolve(fileURLToPath(import.meta.url), '../../bin/cli.js');
 
 function run(cwd, args = []) {
-  execFileSync('node', [cli, ...args], { cwd });
+  execFileSync('node', [cli, 'install', ...args], { cwd });
 }
 
 test('default run emits lean core, bundle, and a root stub', () => {
@@ -119,7 +119,7 @@ test('--dev install adds the authoring tools alongside the shipped set', () => {
 
 // Run the CLI with HOME/USERPROFILE pointed at a throwaway home dir.
 function runUser(cwd, home, args = []) {
-  execFileSync('node', [cli, '--user', ...args], {
+  execFileSync('node', [cli, 'install', '--scope', 'user', ...args], {
     cwd,
     env: { ...process.env, HOME: home, USERPROFILE: home },
   });
@@ -239,5 +239,69 @@ test('settings.json and the root AGENTS.md stub are never pruned', () => {
     const mf = JSON.parse(readFileSync(join(dir, '.agentsmith/.install-manifest.json'), 'utf8'));
     assert.ok(!mf.paths.includes('.claude/settings.json'), 'settings.json not recorded');
     assert.ok(!mf.paths.includes('AGENTS.md'), 'root stub not recorded');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('an unknown flag exits non-zero (bug 2: ----no-tools must not silently full-install)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    assert.throws(() => execFileSync('node', [cli, 'install', '----no-tools'], { cwd: dir, stdio: 'ignore' }));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('install --no-tools removes the stale settings hook (bug 1)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir);                                   // full install: hook present
+    run(dir, ['--no-tools']);                   // prunes script AND un-merges entry
+    const s = JSON.parse(readFileSync(join(dir, '.claude/settings.json'), 'utf8'));
+    assert.ok(!JSON.stringify(s).includes('/hooks/agentsmith/'), 'stale hook entry removed');
+    assert.ok(!existsSync(join(dir, '.claude/hooks/agentsmith/require-explicit-model.mjs')), 'hook script pruned');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('uninstall removes the CLI install (files, settings hook, manifest)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir);
+    execFileSync('node', [cli, 'uninstall', '--yes'], { cwd: dir });
+    assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'core removed');
+    assert.ok(!existsSync(join(dir, '.claude/skills/spec-review-board/SKILL.md')), 'adapter removed');
+    assert.ok(!existsSync(join(dir, '.agentsmith/.install-manifest.json')), 'manifest removed');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('uninstall off a TTY without --yes aborts non-zero (safety floor)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir);
+    assert.throws(() => execFileSync('node', [cli, 'uninstall'], { cwd: dir, stdio: 'ignore' }));
+    assert.ok(existsSync(join(dir, '.agentsmith/AGENTS.md')), 'still present after refused uninstall');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('install --clean recovers from a stale manifest (drops orphans)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    run(dir);
+    const orphan = join(dir, '.claude/commands/agentsmith-ghost.md');
+    writeFileSync(orphan, 'ghost');
+    const mfPath = join(dir, '.agentsmith/.install-manifest.json');
+    const mf = JSON.parse(readFileSync(mfPath, 'utf8')); mf.paths.push('.claude/commands/agentsmith-ghost.md');
+    writeFileSync(mfPath, `${JSON.stringify(mf, null, 2)}\n`);
+    execFileSync('node', [cli, 'install', '--clean', '--yes'], { cwd: dir });
+    assert.ok(!existsSync(orphan), 'orphan gone after clean');
+    assert.ok(existsSync(join(dir, '.agentsmith/AGENTS.md')), 'fresh install present');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('install/uninstall never touch a simulated plugin-cache path', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
+  try {
+    const pluginFile = join(dir, '.claude/plugins/marketplaces/agentsmith/SKILL.md');
+    mkdirSync(dirname(pluginFile), { recursive: true }); writeFileSync(pluginFile, 'PLUGIN');
+    run(dir);
+    execFileSync('node', [cli, 'uninstall', '--yes'], { cwd: dir });
+    assert.equal(readFileSync(pluginFile, 'utf8'), 'PLUGIN', 'plugin cache untouched by install+uninstall');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
