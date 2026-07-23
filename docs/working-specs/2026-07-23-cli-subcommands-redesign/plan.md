@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: Draft
+Status: Approved
 
 **Goal:** Replace agentsmith's flag-only CLI with a verb-first `install`/`uninstall` model plus an interactive wizard, a printed-plan confirmation gate, and both field-bug fixes, without changing generated instruction content.
 
