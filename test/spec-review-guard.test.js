@@ -172,26 +172,103 @@ test('re-emitting a resolved finding reopens it', () => {
   assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'open');
 });
 
-test('re-emitting a wontfix finding does NOT reopen it', () => {
+test('re-emitting a wontfix finding does NOT reopen it, but a dispute yields `contested` not `converged`', () => {
   const dir = scratch();
   writeReview(dir, 1, [finding('a')]);
   runGuard({ scratchDir: dir, n: 1 });
   writeJson(join(dir, 'round-1.rebuttal.json'), {
     round: 1, statuses: { a: { status: 'wontfix', note: 'declined' } },
   });
-  writeReview(dir, 2, [finding('a')]);
-  assert.equal(runGuard({ scratchDir: dir, n: 2 }).b, 0);
-  assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'wontfix');
+  writeReview(dir, 2, [finding('a')]); // reviewer re-raises the sole wontfix -> disputed
+  const r = runGuard({ scratchDir: dir, n: 2 });
+  assert.equal(r.b, 0);
+  assert.equal(r.verdict, 'contested'); // NOT converged: the dispute reaches the user
+  assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'wontfix'); // still the author's call
 });
 
-test('a resolved finding re-emitted in the SAME round it was rebutted stays resolved', () => {
+test('an undisputed wontfix converges (not re-emitted -> no dispute)', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a')]);
+  runGuard({ scratchDir: dir, n: 1 });
+  writeJson(join(dir, 'round-1.rebuttal.json'), {
+    round: 1, statuses: { a: { status: 'wontfix', note: 'declined' } },
+  });
+  writeReview(dir, 2, []); // reviewer accepts the wontfix by not re-raising it
+  assert.equal(runGuard({ scratchDir: dir, n: 2 }).verdict, 'converged');
+});
+
+// The durability property the reopen fix must guarantee (correctness-1/db-1):
+// once a dispute reopens a finding, a LATER round that simply omits its id --
+// with no fresh rebuttal -- must NOT let the stale pre-reopen `resolved` replay.
+test('a reopened finding stays open when a later round omits it (reopen is durable)', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a'), finding('b')]);
+  runGuard({ scratchDir: dir, n: 1 });
+  resolve(dir, 1, ['a']); // author resolves a after guard 1
+  writeReview(dir, 2, [finding('a'), finding('b')]); // reviewer disputes -> reopen
+  assert.equal(runGuard({ scratchDir: dir, n: 2 }).b, 2);
+  const a2 = readLedger(dir).findings.find((f) => f.id === 'a');
+  assert.equal(a2.status, 'open');
+  assert.equal(a2.reopenedAt, 2);
+  assert.equal(a2.statusRound, undefined); // absent while open
+  writeReview(dir, 3, [finding('b')]); // a omitted; NO round-2 rebuttal for it
+  const r = runGuard({ scratchDir: dir, n: 3 });
+  assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'open'); // not reverted
+  assert.equal(r.b, 2); // a still counted -- the dispute survives
+});
+
+// The complement: a rebuttal from the reopen round (or later) DOES re-settle,
+// even if the next round omits the id -- distinguishing a fresh answer from the
+// stale pre-reopen one the test above forbids.
+test('a rebuttal at the reopen round re-settles a reopened finding', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a'), finding('b')]);
+  runGuard({ scratchDir: dir, n: 1 });
+  resolve(dir, 1, ['a']);
+  writeReview(dir, 2, [finding('a'), finding('b')]); // reopen at round 2
+  assert.equal(runGuard({ scratchDir: dir, n: 2 }).b, 2);
+  resolve(dir, 2, ['a']); // author answers the dispute after guard 2 (statusRound will be 2 == reopenedAt)
+  writeReview(dir, 3, [finding('b')]); // reviewer accepts, omits a
+  const r = runGuard({ scratchDir: dir, n: 3 });
+  assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'resolved'); // fresh answer sticks
+  assert.equal(r.b, 1);
+});
+
+test('re-running guard at the same n is idempotent (ledger and verdict identical)', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a'), finding('b'), finding('c')]);
+  const r1 = runGuard({ scratchDir: dir, n: 1 });
+  const ledger1 = JSON.stringify(readLedger(dir));
+  const r1again = runGuard({ scratchDir: dir, n: 1 }); // crash/retry of the same round
+  const ledger2 = JSON.stringify(readLedger(dir));
+  assert.deepEqual(r1again, r1); // same verdict/b/best
+  assert.equal(ledger2, ledger1); // no double-bumped roundsInCycle or streak
+  assert.equal(readLedger(dir).meta.roundsInCycle, 1);
+});
+
+test('a rebuttal id with no ledger match is ignored, not applied to another finding', () => {
+  const dir = scratch();
+  writeReview(dir, 1, [finding('a')]);
+  runGuard({ scratchDir: dir, n: 1 });
+  writeJson(join(dir, 'round-1.rebuttal.json'), {
+    round: 1, statuses: { typo_id: { status: 'resolved', note: 'meant a' } },
+  });
+  writeReview(dir, 2, [finding('a')]);
+  assert.doesNotThrow(() => runGuard({ scratchDir: dir, n: 2 }));
+  assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'open'); // untouched by the orphan
+});
+
+// A finding reopened at round 2 and re-resolved by the round-2 rebuttal is back
+// to resolved once round 3 omits it (b=0). The reopen-durability boundary itself
+// is pinned by the two dedicated tests below; this guards the b=0 outcome.
+test('a reopened-then-re-resolved finding is resolved once a later round omits it', () => {
   const dir = scratch();
   writeReview(dir, 1, [finding('a')]);
   runGuard({ scratchDir: dir, n: 1 });
   resolve(dir, 1, ['a']);
   writeReview(dir, 2, [finding('a')]);
   runGuard({ scratchDir: dir, n: 2 }); // reopens: rebuttal round 1 < review round 2
-  resolve(dir, 2, ['a']); // author fixes it again
+  resolve(dir, 2, ['a']); // author fixes it again (round-2 rebuttal == reopen round)
   writeReview(dir, 3, []); // reviewer drops it
   assert.equal(runGuard({ scratchDir: dir, n: 3 }).b, 0);
 });

@@ -28,7 +28,7 @@ Each finding the generalist or a specialist raises:
 
 A specialist can never close its own finding: it leaves the open-blocking set only by a generalist **down-tag** (tag action, removes it from `b(n)`) or an author **status** of `resolved`/`wontfix`.
 
-**Reopening.** `resolved` is the author's claim, not the last word: re-emitting a finding id in a later round's review **reopens** it, because a reviewer who still sees the defect is disputing that claim. `guard.mjs` reopens when the review round is later than the round whose rebuttal set the status -- a rebuttal written at that round or later already answers the review, so the status stands. `wontfix` is never reopened this way: it is the author's decision, and a contested one reaches the user through the stall/cap path instead.
+**Reopening.** `resolved` is the author's claim, not the last word: re-emitting a finding id in a later round's review **reopens** it, because a reviewer who still sees the defect is disputing that claim. `guard.mjs` reopens when the review round is later than the round whose rebuttal set the status -- a rebuttal written at that round or later already answers the review, so the status stands. A reopen is **durable**: once reopened, a finding stays open until a rebuttal from the reopen round or later re-settles it, so a later round that simply omits the id does not let the stale pre-reopen `resolved` replay (status is otherwise re-derived from the rebuttal files every run, not preserved by omission the way `tag` is). `wontfix` is never reopened this way: it is the author's decision. A re-emitted `wontfix` is instead a **contested** decision -- the guard yields the `contested` verdict (below) so the dispute reaches the user rather than converging silently.
 
 ## Scratch JSON shapes
 
@@ -61,7 +61,7 @@ A **Finding** object:
 - `ledger.json` -- owned by `guard.mjs`:
 
 ```jsonc
-{ "meta": { "cycle": 1, "roundsInCycle": 2, "best": 3, "nonProgressStreak": 0 },
+{ "meta": { "cycle": 1, "roundsInCycle": 2, "best": 3, "nonProgressStreak": 0, "lastRound": 2 },
   "findings": [
     { /* ...Finding... */ "status": "open",   // "open" | "resolved" | "wontfix"
       "roundRaised": 1,
@@ -71,8 +71,8 @@ A **Finding** object:
   ] }
 ```
 
-  `meta.best` is the cycle's lowest `b`; `null` before the cycle's first review. `tagHistory` is the audit trail (every raise + down-tag).
-  `statusRound` is what makes the reopen rule decidable -- it is the round the status came from, so a rebuttal written at or after the review that re-raises the finding is recognised as already answering it. `reopenedAt` is provenance in the same sense as `tagHistory`: without it a reopened finding is indistinguishable from one never resolved.
+  `meta.best` is the cycle's lowest `b`; `null` before the cycle's first review. `meta.lastRound` is the highest round number already folded, so a same-`n` re-run of the guard does not double-advance the per-cycle counters. `tagHistory` is the audit trail (every raise + down-tag).
+  `statusRound` is what makes the reopen rule decidable -- it is the round the status came from, so a rebuttal written at or after the review that re-raises the finding is recognised as already answering it; it is **absent while the finding is open** (a reopen deletes it). `reopenedAt` records the most recent round that reopened the finding: it is a single scalar, not a history (a finding reopened more than once keeps only the latest round), enough to tell a reopened finding from one never resolved and to make the durability skip decidable -- it is deliberately **not** the append-only audit trail `tagHistory` is.
 
 ## Ledger (rendered view)
 

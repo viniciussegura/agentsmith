@@ -56,18 +56,19 @@ For each round `n` starting at 1. Steps 1-4 are the shared round (the engine's *
 2. **Specialist fan-out** (Review; parallel, cheap). Specialists carry the Write tool (they write their own `findings/<role>.json`), so **before spawning** snapshot the git baseline for the containment guard: `node .claude/skills/code-review-board/round-guard.mjs snapshot <scratch-dir>/git-baseline.txt`. Then spawn each consulted `review-<role>` with: the spec, its prior findings + the rebuttal/ledger, its directed questions, the diff (re-consults only), and the spec-review altitude framing. Each writes `findings/<role>.json` (`new` + `reconcile`, `origin` set) and returns a path + count. Then overwrite each consulted lens's `snapshots/<role>.md` to the current spec.
 3. **Generalist converge** (Reduce; strong, fresh). Spawn `spec-specialist` with: the spec, `n`, the prior rebuttal + ledger, every `findings/<role>.json`, and the curated menu. It writes `round-<n>.review.json` (converged, generalist-set tags, origins preserved, `tagReason` on any down-tag) + `routing-<n+1>.json`, and returns a path + open-blocking count.
 4. **Guard** (Persist). Run `node guard.mjs <scratch-dir> <n>` (add `--new-cycle` only when starting a fresh cycle). It merges the review into `ledger.json`, computes `b(n)`, updates `meta`, and prints the verdict. Read the printed verdict, not the ledger internals. Then run the **containment** check `node .claude/skills/code-review-board/round-guard.mjs check <scratch-dir>/git-baseline.txt` (distinct from the convergence `guard.mjs` above); a non-zero exit means a specialist wrote outside the gitignored scratch — stop and revert before acting on the verdict.
-5. **Act on the verdict.** `converged` -> present the final spec (open nits may remain). `stalled`/`cap` -> stop; summarize open blockers + any contested `wontfix` and ask the user how to proceed. `continue` -> step 6.
+5. **Act on the verdict.** `converged` -> present the final spec (open nits may remain). `stalled`/`cap`/`contested` -> stop; summarize open blockers + any contested `wontfix` and ask the user how to proceed. `continue` -> step 6.
 6. **Revise + rebuttal** (author, judgment). Revise the spec to address the findings; write `round-<n>.rebuttal.json` (per id: `resolved` what-changed / `wontfix` why-not). The next `guard.mjs` run folds the statuses in. Continue to round `n+1`.
 
 ## Convergence guard
 
 `guard.mjs` evaluates, checked in this order, first match wins (unchanged from the single-reviewer loop, now reading the one converged ledger):
 
-1. **Converged** -- `b(n) = 0`. Present the final spec.
-2. **Stalled** -- two consecutive reviews in the cycle both fail to beat `best` (earliest the cycle's third review; a progress review resets the tally).
-3. **Round cap** -- 5 rounds per cycle.
+1. **Converged** -- `b(n) = 0` and no `wontfix` was re-emitted this round. Present the final spec.
+2. **Contested** -- `b(n) = 0` but a `wontfix` was re-emitted this round (a disputed author decision). Stop and surface it rather than converging silently.
+3. **Stalled** -- two consecutive reviews in the cycle both fail to beat `best` (earliest the cycle's third review; a progress review resets the tally).
+4. **Round cap** -- 5 rounds per cycle.
 
-On stall or cap, summarize the open blocking findings and any `wontfix` the generalist contests so the user can decide.
+On stall, cap, or contested, summarize the open blocking findings and any `wontfix` the generalist contests so the user can decide.
 
 ## Token discipline
 

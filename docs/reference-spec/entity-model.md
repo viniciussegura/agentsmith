@@ -152,3 +152,45 @@ interface Candidate {  // a verified-but-undrafted proposal awaiting triage (no 
 ```
 
 `scorecard` is a per-round artifact (each reduce overwrites it; `null` when the setup gate's stop-and-process path runs). A cell or global verdict is never asserted on its own -- it is the worst-score roll-up of its `details` findings (`strong` when none), and the validator enforces that equality. An `Entry` is the drafted form a `wanted` candidate is promoted into (it adds `draft`, `status`, `decision` with the full `Verdict` set, and an `applyLog`); see the worksheet schema for its per-kind fields.
+
+## Spec review
+
+The entities the spec-review application (`#ai-spec-review`) accumulates while hardening a spec: one `SpecReviewLedger` per spec, holding the findings and the convergence state that `guard.mjs` owns. The on-disk shape (`ledger.json`) and the scratch artifacts around it live in `tools/claude/skills/spec-review-board/finding-format.md`; this is the model a reader should understand.
+
+```typescript
+// One finding under review on a spec. Distinct from the code-review `Issue` and from
+// the instruction-review worksheet `Finding`: a spec-review finding is never promoted
+// to a tracker -- it lives only for the review cycle, then is discarded with the scratch.
+// Identity is `id`, minted by the generalist, stable across the cycle (a reopen reuses it).
+interface SpecReviewFinding {
+  id: string;
+  origin: string;              // the raising lens role id, or 'generalist'
+  tag: 'blocking' | 'nit';     // owned by the generalist; may be down-tagged with a reason
+  tagReason?: string;
+  problem: string;
+  fix: string;
+  status: 'open' | 'resolved' | 'wontfix'; // owned by the author's rebuttal; a reopen forces 'open'
+  roundRaised: number;
+  statusRound?: number;        // round whose rebuttal set `status`; ABSENT while open (a reopen deletes it)
+  reopenedAt?: number;         // most recent round that reopened the finding; a scalar, not a history
+  tagHistory: { round: number; tag: 'blocking' | 'nit'; by: string; reason: string | null }[];
+}
+
+// The per-cycle convergence state. `b(n)` -- open-blocking findings after review n -- drives
+// the verdict; `lastRound` makes a same-n guard re-run idempotent (no double-advance).
+interface SpecReviewMeta {
+  cycle: number;
+  roundsInCycle: number;
+  best: number | null;         // the cycle's lowest b; null before its first review
+  nonProgressStreak: number;
+  lastRound: number;           // highest round already folded
+}
+
+// One ledger per spec under review, mutated in place across a cycle's rounds, never committed.
+interface SpecReviewLedger {
+  meta: SpecReviewMeta;
+  findings: SpecReviewFinding[];
+}
+```
+
+The guard's verdict after each review is `converged` (b=0, no contested `wontfix`), `contested` (b=0 but a `wontfix` was re-emitted this round), `stalled`, `cap`, or `continue`; only `converged` ends the cycle without stopping for the user.
