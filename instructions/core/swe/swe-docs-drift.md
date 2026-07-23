@@ -8,3 +8,4 @@ This includes, but is not limited to, the reference spec (#swe-reference-spec) a
 Changes to config files are in scope for `CONTRIBUTING` drift: any prose is checked and updated in the same PR.
 Discover the affected docs, do not eyeball them: search the docs for the identifiers, flags, commands, and paths the change touched, and check each hit.
 A doc *example* (snippet, CLI invocation, config block, request/response) is stale when it no longer runs or matches the current surface; update it in the same PR or delete it.
+`#swe-done` item 3 restates this obligation per unit of work, so drift is resolved per unit rather than only at the PR.

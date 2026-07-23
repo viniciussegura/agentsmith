@@ -28,6 +28,8 @@ Each finding the generalist or a specialist raises:
 
 A specialist can never close its own finding: it leaves the open-blocking set only by a generalist **down-tag** (tag action, removes it from `b(n)`) or an author **status** of `resolved`/`wontfix`.
 
+**Reopening.** `resolved` is the author's claim, not the last word: re-emitting a finding id in a later round's review **reopens** it, because a reviewer who still sees the defect is disputing that claim. `guard.mjs` reopens when the review round is later than the round whose rebuttal set the status -- a rebuttal written at that round or later already answers the review, so the status stands. A reopen is **durable**: once reopened, a finding stays open until a rebuttal from the reopen round or later re-settles it, so a later round that simply omits the id does not let the stale pre-reopen `resolved` replay (status is otherwise re-derived from the rebuttal files every run, not preserved by omission the way `tag` is). `wontfix` is never reopened this way: it is the author's decision. A re-emitted `wontfix` is instead a **contested** decision -- the guard yields the `contested` verdict (below) so the dispute reaches the user rather than converging silently.
+
 ## Scratch JSON shapes
 
 Machine artifacts under `.agentsmith/tmp/spec-review/<spec-dir-name>/`. Required
@@ -50,24 +52,27 @@ A **Finding** object:
   `lenses` is the consult set; the driver re-intersects it with the curated `spec_review: true` registry before spawning.
 - `findings/<role>.json` -- one per consulted specialist.
   `{ "role": "db", "new": [Finding, ...], "reconcile": [{ "id": "...", "transition": "still-open" | "resolved-by-text", "note": "..." }, ...] }`
-  A specialist sets `origin` to its own role on every `new` finding. **A `reconcile` entry never carries a tag** (only `transition`, spec-internal vocabulary -- not `blocking`/`nit`): tag authority stays with the generalist. **`transition` is advisory, never a status mutation:** `resolved-by-text` reports that the current spec text appears to address the prior finding; it signals the generalist/author but does **not** auto-set `status` -- the author's rebuttal remains the sole status writer.
+  A specialist sets `origin` to its own role on every `new` finding. **A `reconcile` entry never carries a tag** (only `transition`, spec-internal vocabulary -- not `blocking`/`nit`): tag authority stays with the generalist. **`transition` is advisory, never a status mutation:** `resolved-by-text` reports that the current spec text appears to address the prior finding; it signals the generalist/author but does **not** auto-set `status` -- the author's rebuttal is the only place a status is *authored*, and the reopen rule above is the only other thing that moves one.
 - `round-<n>.review.json` -- the generalist's converged review.
   `{ "round": n, "findings": [Finding, ...], "openBlocking": <int> }`
   The generalist's own findings carry `origin: "generalist"`; specialist findings keep their `<role>` origin. `openBlocking` is **informational**: `guard.mjs` computes `b(n)` from the merged ledger and that is authoritative; on divergence it warns and proceeds with its own count.
-- `round-<n>.rebuttal.json` -- the author's per-finding statuses (sole status source).
+- `round-<n>.rebuttal.json` -- the author's per-finding statuses (the only authored status source; `guard.mjs` additionally reopens a `resolved` per the rule above).
   `{ "round": n, "statuses": { "<id>": { "status": "resolved" | "wontfix", "note": "..." } } }`
 - `ledger.json` -- owned by `guard.mjs`:
 
 ```jsonc
-{ "meta": { "cycle": 1, "roundsInCycle": 2, "best": 3, "nonProgressStreak": 0 },
+{ "meta": { "cycle": 1, "roundsInCycle": 2, "best": 3, "nonProgressStreak": 0, "lastRound": 2 },
   "findings": [
     { /* ...Finding... */ "status": "open",   // "open" | "resolved" | "wontfix"
       "roundRaised": 1,
+      "statusRound": 2,                       // round whose rebuttal set `status`; absent while open
+      "reopenedAt": 3,                        // round that reopened a `resolved`; absent otherwise
       "tagHistory": [ { "round": 1, "tag": "blocking", "by": "db", "reason": null } ] }
   ] }
 ```
 
-  `meta.best` is the cycle's lowest `b`; `null` before the cycle's first review. `tagHistory` is the audit trail (every raise + down-tag).
+  `meta.best` is the cycle's lowest `b`; `null` before the cycle's first review. `meta.lastRound` is the highest round number already folded, so a same-`n` re-run of the guard does not double-advance the per-cycle counters. `tagHistory` is the audit trail (every raise + down-tag).
+  `statusRound` is what makes the reopen rule decidable -- it is the round the status came from, so a rebuttal written at or after the review that re-raises the finding is recognised as already answering it; it is **absent while the finding is open** (a reopen deletes it). `reopenedAt` records the most recent round that reopened the finding: it is a single scalar, not a history (a finding reopened more than once keeps only the latest round), enough to tell a reopened finding from one never resolved and to make the durability skip decidable -- it is deliberately **not** the append-only audit trail `tagHistory` is.
 
 ## Ledger (rendered view)
 

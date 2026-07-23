@@ -46,7 +46,7 @@ Not every code lens maps to instruction rules, so role **participation** is per-
 
 Spawn `ai-engineer` (the maintainer's **plan** duty) with the candidate lens set and the ownership-coverage-lint output (presented as untrusted DATA): it returns `{lenses, perLens}` -- the subset of lenses to actually consult and a per-lens focus map (e.g. concentrating the owning lens on a lint orphan). It must not merely echo the candidate set. The fan-out below runs the **maintainer-chosen** lenses, not the raw candidate set. (In the `-wf` driver this is the Plan phase of `board-round.mjs`; the lint output is the kickstart's `plannerInputs` DATA.)
 
-### 2. Fan-out (parallel, one sub-agent per planned role, cheap model)
+### 2. Fan-out (parallel, one subagent per planned role, cheap model)
 
 Roles and the verifier carry the Write tool (they write their own `findings/<role>.json` / `verdicts/`), so **before spawning** snapshot the git baseline for the containment guard: `node .claude/skills/code-review-board/round-guard.mjs snapshot .agentsmith/tmp/instruction-review/<round-id>/git-baseline.txt`. Step 5 checks it.
 
@@ -137,4 +137,4 @@ Per-role raw outputs and verify transcripts are ephemeral under `.agentsmith/tmp
 
 ## Degradation
 
-Per `#ai-review-engine`: real sub-agents when available; else one agent role-plays each lens sequentially (this is the path `prompts/review-instructions.md` describes as the single-umbrella fallback, its nine dimensions becoming the shared rubric); else a human supplies proposals onto the same schema. One decisions log, one rubric.
+Per `#ai-review-engine`: real subagents when available; else one agent role-plays each lens sequentially (this is the path `prompts/review-instructions.md` describes as the single-umbrella fallback, its nine dimensions becoming the shared rubric); else a human supplies proposals onto the same schema. One decisions log, one rubric.
