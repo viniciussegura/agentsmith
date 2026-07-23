@@ -61,7 +61,7 @@ For each round `n` starting at 1. Steps 1-4 are the shared round (the engine's *
 
 ## Convergence guard
 
-`guard.mjs` evaluates, checked in this order, first match wins (unchanged from the single-reviewer loop, now reading the one converged ledger):
+`guard.mjs` evaluates, checked in this order, first match wins (it reads the one converged ledger; the `contested` verdict was added on top of the original converged/stalled/cap set):
 
 1. **Converged** -- `b(n) = 0` and no `wontfix` was re-emitted this round. Present the final spec.
 2. **Contested** -- `b(n) = 0` but a `wontfix` was re-emitted this round (a disputed author decision). Stop and surface it rather than converging silently.
