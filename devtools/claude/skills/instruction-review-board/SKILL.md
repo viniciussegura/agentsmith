@@ -125,7 +125,7 @@ The engine processes each entry by verdict. Instructions are now **one file per 
 - `park` (default): leave the entry.
 - `rehome` / `reowner`: **skipped** (deferred to a future engine version); reported as `skipped`.
 
-After each adopt, regenerate (`node bin/cli.js`) and gate on `node --test` (#swe-done). **Recovery is per-entry, not file-wide:** snapshot pre-edit content; on failure restore only those snapshots, set the entry's `decision` to `{ verdict: 'park' }`, and push the failure string to `entry.applyLog` (rewrite via canonical serializer); continue.
+After each adopt, regenerate (`node bin/cli.js install`) and gate on `node --test` (#swe-done). **Recovery is per-entry, not file-wide:** snapshot pre-edit content; on failure restore only those snapshots, set the entry's `decision` to `{ verdict: 'park' }`, and push the failure string to `entry.applyLog` (rewrite via canonical serializer); continue.
 
 ### A4. Commit + report
 
