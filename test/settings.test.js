@@ -69,3 +69,14 @@ test('tolerates a malformed hooks value', () => {
   const next = mergeSettings({ hooks: 'oops' }, owned);
   assert.deepEqual(next.hooks.PreToolUse, owned.PreToolUse);
 });
+
+test('mergeSettings(existing, {}) removes agentsmith hooks, keeps user hooks', () => {
+  const withOurs = mergeSettings(
+    { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'user-thing' }] }] } },
+    agentsmithHooks('.claude/hooks/agentsmith/require-explicit-model.mjs'),
+  );
+  const unmerged = mergeSettings(withOurs, {});
+  const entries = unmerged.hooks.PreToolUse || [];
+  assert.ok(entries.some((e) => e.matcher === 'Bash'), 'user hook preserved');
+  assert.ok(!entries.some((e) => e.hooks?.some((h) => h.command.includes('/hooks/agentsmith/'))), 'agentsmith hook removed');
+});
