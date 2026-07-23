@@ -1,21 +1,24 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
 import { resolveSections, demoteForBasename } from '../src/sections.js';
 import { planToolInstall } from '../src/tools.js';
-import { userImport } from '../src/userimport.js';
-import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
 import { runSpecIndex } from '../src/specindex.js';
-import { readManifest, orphanPaths, pruneOrphans, writeManifest } from '../src/manifest.js';
+import { readManifest, writeManifest } from '../src/manifest.js';
 import { sourceRevision } from '../src/revision.js';
+import { parseArgs } from '../src/args.js';
+import { buildInstallPlan, buildUninstallPlan, renderPlan } from '../src/plan.js';
+import { applyPlan } from '../src/execute.js';
+import { confirm, runWizard, makeSeam } from '../src/prompt.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(join(pkgRoot, 'manifest.json'), 'utf8'));
 const read = (rel) => readFileSync(join(pkgRoot, rel), 'utf8');
+const pkgVersion = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8')).version;
 
 const args = process.argv.slice(2);
 const has = (flag) => args.includes(flag);
@@ -41,11 +44,21 @@ if (args[0] === 'spec-index') {
   process.exit(0);
 }
 
-const layout = has('--full') || has('--inline') ? 'full' : 'lean';
-const placement = has('--root') ? 'root' : 'nested';
-const installTools = !has('--no-tools');
-const userScope = has('--user');
-const dev = has('--dev');
+const HELP = `agentsmith -- forge AGENTS.md for any project
+
+Usage:
+  agentsmith install   [--scope <user|project|PATH>] [--mode <single|split>] [--placement <root|nested>] [--no-tools] [--dev] [--clean] [--yes] [--dry-run]
+  agentsmith uninstall [--scope <user|project|PATH>] [--yes] [--dry-run]
+  agentsmith spec-index [--check]
+  agentsmith --stdout  [--mode <single|split>]
+  agentsmith                       (bare: interactive wizard)
+
+Scope: 'project' (cwd, default), 'user' (home), or a directory path.
+       A directory literally named user/project is reached as ./user.
+Examples:
+  agentsmith install
+  agentsmith install --scope user
+  agentsmith uninstall --scope user --yes`;
 
 // Every *.md (and any file) under tools/, relative to pkgRoot, recursively.
 function listToolSources(absDir, relBase) {
@@ -58,12 +71,6 @@ function listToolSources(absDir, relBase) {
     else out.push(rel);
   }
   return out;
-}
-const outIdx = args.indexOf('--out');
-const out = outIdx !== -1 ? args[outIdx + 1] : undefined;
-if (outIdx !== -1 && (out === undefined || out.startsWith('--'))) {
-  process.stderr.write('agentsmith: error -- --out requires a path argument\n');
-  process.exit(1);
 }
 
 // Recursive module lister: ordered { path, demote } for a section's subtree.
@@ -107,143 +114,112 @@ for (const b of bundles) {
   }
 }
 
-const { commit, date } = sourceRevision({
-  pkgRoot,
-  pkgVersion: JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8')).version,
-});
-const built = buildOutputs({
-  preamble: read(manifest.preamble),
-  modules: coreModules.map(({ path, demote }) => ({ text: read(path), demote })),
-  bundles: bundles.map((b) => ({
-    name: b.name,
-    title: b.title,
-    when: b.when,
-    modules: b.modules.map(({ path, demote }) => ({ text: read(path), demote })),
-  })),
-  source: manifest.source,
-  commit,
-  date,
-  layout,
-  placement,
-  output: manifest.output,
-  out,
-});
+const { commit, date } = sourceRevision({ pkgRoot, pkgVersion });
 
-if (built.dangling.length) {
-  process.stderr.write(
-    `agentsmith: warning -- unresolved #tag references: ${built.dangling.join(', ')}\n`,
-  );
-}
-
-if (built.crossBoundary.length) {
-  const list = built.crossBoundary
-    .map((c) => `#${c.from || '(core preamble)'} -> bundle-only #${c.tag}`)
-    .join(', ');
-  process.stderr.write(
-    `agentsmith: warning -- core rule references a bundle-only #tag: ${list}\n`,
-  );
-}
-
-const writeAbs = (dest, content) => {
-  mkdirSync(dirname(dest), { recursive: true });
-  writeFileSync(dest, content);
-  process.stderr.write(`agentsmith: wrote ${dest}\n`);
-};
-
-// Merge agentsmith's owned hooks into <base>/.claude/settings.json without clobbering
-// the consumer's own settings. Project installs use a project-relative command (hooks
-// run from the project root); user installs need the absolute home path (a user hook's
-// cwd is the active project, not home). Idempotent across reinstalls.
-const installSettings = (base, { absolute }) => {
-  const dest = resolve(base, '.claude/settings.json');
-  let existing = null;
-  if (existsSync(dest)) {
-    try {
-      existing = JSON.parse(readFileSync(dest, 'utf8'));
-    } catch {
-      process.stderr.write(`agentsmith: warning -- ${dest} is not valid JSON; left untouched\n`);
-      return;
-    }
-  }
-  const commandPath = absolute ? resolve(base, HOOK_REL) : HOOK_REL;
-  const next = mergeSettings(existing, agentsmithHooks(commandPath));
-  writeAbs(dest, `${JSON.stringify(next, null, 2)}\n`);
-};
-
-// Plan the adapter install (pure: no disk writes). tools/<ai>/** always; the
-// authoring devtools/claude/** only under --dev. Returns planToolInstall's
-// { src, dest }[].
-const adapterPlan = () => {
-  if (!installTools) return [];
+// computeAdapterPlan wraps listToolSources + planToolInstall (dev adds devtools/claude).
+function computeAdapterPlan(dev) {
   const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
   if (dev) sources.push(...listToolSources(join(pkgRoot, 'devtools', 'claude'), 'devtools/claude'));
   return planToolInstall(sources);
-};
+}
 
-// Write the planned adapter files, then wire settings (after the hook script is
-// on disk). settings.json is a MERGE target — deliberately NOT a manifest path.
-const writeAdapters = (base, plan, { absolute }) => {
-  for (const { src, dest } of plan) {
-    writeAbs(resolve(base, dest), readFileSync(join(pkgRoot, src)));
+async function main() {
+  let cmd = parseArgs(process.argv.slice(2));
+  const seam = makeSeam();
+
+  if (cmd.kind === 'wizard') {
+    if (!seam.isTTY) { process.stderr.write(`agentsmith: error -- no subcommand -- run 'agentsmith install' or 'agentsmith --help'\n`); process.exit(1); }
+    cmd = await runWizard(seam);
   }
-  installSettings(base, { absolute });
-};
+  if (cmd.kind === 'error') { process.stderr.write(`${cmd.error}\n`); process.exit(1); }
+  if (cmd.kind === 'help') { process.stdout.write(`${HELP}\n`); process.exit(0); }
+  if (cmd.kind === 'version') { process.stdout.write(`${pkgVersion}\n`); process.exit(0); }
 
-if (has('--stdout')) {
-  process.stdout.write(built.coreContent);
-} else if (userScope) {
-  // User scope: write the generated instructions under the home directory, wire
-  // ~/.claude/CLAUDE.md to import them, and install adapters for all projects.
-  const base = homedir();
-  const plan = adapterPlan();
-  const currentPaths = [
-    built.corePath,
-    ...built.bundles.map((b) => b.path),
-    ...plan.map((p) => p.dest),
-  ];
+  // Build outputs from the parsed flags. --mode drives layout; --placement the
+  // core location (absent on uninstall/stdout -> nested default).
+  const layout = cmd.flags.mode === 'single' ? 'full' : 'lean';
+  const placement = cmd.flags.placement ?? 'nested';
+  const built = buildOutputs({
+    preamble: read(manifest.preamble),
+    modules: coreModules.map(({ path, demote }) => ({ text: read(path), demote })),
+    bundles: bundles.map((b) => ({
+      name: b.name,
+      title: b.title,
+      when: b.when,
+      modules: b.modules.map(({ path, demote }) => ({ text: read(path), demote })),
+    })),
+    source: manifest.source,
+    commit,
+    date,
+    layout,
+    placement,
+    output: manifest.output,
+  });
+
+  if (built.dangling.length) {
+    process.stderr.write(
+      `agentsmith: warning -- unresolved #tag references: ${built.dangling.join(', ')}\n`,
+    );
+  }
+  if (built.crossBoundary.length) {
+    const list = built.crossBoundary
+      .map((c) => `#${c.from || '(core preamble)'} -> bundle-only #${c.tag}`)
+      .join(', ');
+    process.stderr.write(
+      `agentsmith: warning -- core rule references a bundle-only #tag: ${list}\n`,
+    );
+  }
+
+  if (cmd.kind === 'stdout') { process.stdout.write(built.coreContent); process.exit(0); }
+
+  // Resolve scope -> base + absolute.
+  const isUser = cmd.scope.kind === 'user';
+  const base = isUser ? homedir() : cmd.scope.kind === 'path' ? resolve(process.cwd(), cmd.scope.path) : process.cwd();
+  const absolute = isUser || cmd.scope.kind === 'path';
+  if (cmd.scope.kind === 'path' && existsSync(base) && !statSync(base).isDirectory()) {
+    process.stderr.write(`agentsmith: error -- --scope path is not a directory: ${base}\n`); process.exit(1);
+  }
+
   const prev = readManifest(base);
-  const pruned = pruneOrphans(base, orphanPaths(prev.paths, currentPaths));
-  if (pruned.length) process.stderr.write(`agentsmith: pruned ${pruned.length} orphaned file(s)\n`);
 
-  writeAbs(resolve(base, built.corePath), built.coreContent);
-  for (const bundle of built.bundles) writeAbs(resolve(base, bundle.path), bundle.content);
-
-  // Wire the CLAUDE.md import before installing adapters (unchanged), then:
-  const claudeMd = resolve(base, '.claude/CLAUDE.md');
-  const target = resolve(base, built.corePath).replace(/\\/g, '/');
-  const existing = existsSync(claudeMd) ? readFileSync(claudeMd, 'utf8') : null;
-  const next = userImport(existing, target);
-  if (next !== null) writeAbs(claudeMd, next);
-  else process.stderr.write(`agentsmith: kept existing import in ${claudeMd}\n`);
-
-  writeAdapters(base, plan, { absolute: true });
-  writeManifest(base, currentPaths, new Date().toISOString());
-} else {
-  const cwd = process.cwd();
-  const plan = adapterPlan();
-  // Files agentsmith fully owns this run: core + bundles + adapter files.
-  // EXCLUDES the root stub (write-once) and settings.json (merged).
-  const currentPaths = [
-    built.corePath,
-    ...built.bundles.map((b) => b.path),
-    ...plan.map((p) => p.dest),
-  ];
-  const prev = readManifest(cwd);
-  const pruned = pruneOrphans(cwd, orphanPaths(prev.paths, currentPaths));
-  if (pruned.length) process.stderr.write(`agentsmith: pruned ${pruned.length} orphaned file(s)\n`);
-
-  writeAbs(resolve(cwd, built.corePath), built.coreContent);
-  for (const bundle of built.bundles) writeAbs(resolve(cwd, bundle.path), bundle.content);
-
-  if (built.stub) {
-    const stubDest = resolve(cwd, built.stub.path);
-    if (existsSync(stubDest)) {
-      process.stderr.write(`agentsmith: kept existing ${stubDest}\n`);
-    } else {
-      writeAbs(stubDest, built.stub.content);
+  if (cmd.kind === 'uninstall' || (cmd.kind === 'install' && cmd.flags.clean)) {
+    const stubDest = resolve(base, 'AGENTS.md');
+    const plan = buildUninstallPlan({
+      base, absolute, manifestPaths: prev.paths,
+      stubContent: built.stub ? built.stub.content : null,
+      stubOnDiskContent: existsSync(stubDest) ? readFileSync(stubDest, 'utf8') : null,
+      hasSettings: existsSync(resolve(base, '.claude/settings.json')),
+      hasClaudeMd: existsSync(resolve(base, '.claude/CLAUDE.md')),
+      isUser,
+    });
+    if (cmd.kind === 'uninstall') {
+      const decision = await confirm({ plan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: true, render: renderPlan });
+      if (decision === 'abort') { process.stderr.write(`agentsmith: error -- refusing to uninstall without confirmation -- pass --yes\n`); process.exit(1); }
+      if (decision === 'skip') process.exit(0);
+      applyPlan(plan, { pkgRoot });
+      process.exit(0);
     }
+    // install --clean: apply uninstall first (confirmed as destructive), then fall through to install.
+    const decision = await confirm({ plan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: true, render: renderPlan });
+    if (decision === 'abort') { process.stderr.write(`agentsmith: error -- refusing to clean-install without confirmation -- pass --yes\n`); process.exit(1); }
+    if (decision === 'skip') process.exit(0);
+    applyPlan(plan, { pkgRoot });
   }
 
-  writeAdapters(cwd, plan, { absolute: false });
-  writeManifest(cwd, currentPaths, new Date().toISOString());
+  // install (fresh, or the install half of --clean).
+  const adapterPlan = cmd.flags.tools ? computeAdapterPlan(cmd.flags.dev) : [];
+  const installPlan = buildInstallPlan({
+    base, absolute, built, adapterPlan, scope: cmd.scope, flags: cmd.flags,
+    prevManifestPaths: readManifest(base).paths, stubExists: existsSync(resolve(base, 'AGENTS.md')),
+  });
+  const decision = await confirm({ plan: installPlan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: false, render: renderPlan });
+  if (decision === 'skip') process.exit(0);
+  applyPlan(installPlan, { pkgRoot });
+  writeManifest(base, installPlan.manifestPaths, new Date().toISOString());
+}
+
+// Run the pipeline only when invoked as the CLI, not when a module (e.g. a test)
+// imports makeListModules from this file.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => { process.stderr.write(`agentsmith: ${e.message}\n`); process.exit(1); });
 }
