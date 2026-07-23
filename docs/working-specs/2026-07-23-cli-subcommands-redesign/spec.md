@@ -64,6 +64,7 @@ agentsmith                                       # bare: TTY -> wizard; non-TTY 
 - `--stdout` is a **top-level query flag**, not a subcommand and not part of `install`.
   It generates the core content and prints it to stdout, writing nothing.
   It stays verb-free because every in-repo consumer invokes `node bin/cli.js --stdout` with no verb (the build script, tests, the triage UI, review prompts, the instruction-review skill); keeping it top-level means zero call-site churn.
+  Being a pure generate-and-print query, `--stdout` accepts only content flags (`--mode`) and ignores/rejects scope and disk flags (`--scope`, `--placement`, `--clean`, `--yes`, `--dry-run`); combining it with them is a flag-validation error.
 - Bare invocation with no verb and no recognized top-level flag: interactive wizard when stdin is a TTY; otherwise `error: no subcommand -- run 'agentsmith install' or 'agentsmith --help'`, exit 1.
 
 ### The three axes
@@ -78,7 +79,8 @@ They collapse into two orthogonal axes plus scope; each flag names exactly one a
 | placement | core file at base-root vs nested under `.agentsmith/` | `--placement` | `nested` \| `root` |
 
 - `--scope project` targets the current working directory (the default); `--scope user` targets the home directory; `--scope PATH` treats `PATH` as the base directory.
-  A value that is neither `project` nor `user` is taken as a path.
+  A value that is neither `project` nor `user` is taken as a path; a directory literally named `user` or `project` is reached with a path-form value (`./user`), which the README and `--help` document.
+  A `PATH` scope is validated before any op: it must be (or, for install, be creatable as) a directory; an `uninstall`/`install --clean` on a path that holds no agentsmith manifest prunes nothing (the `pruneOrphans` bound) rather than erroring.
 - `--mode single` inlines every bundle into one file (the old `--full` / `--inline`); `--mode split` writes the lean core plus one file per on-demand bundle (the default).
 - `--placement root` writes the real core to the base root as `AGENTS.md`; `--placement nested` writes the core under `.agentsmith/` with a root stub pointing at it (the default).
 - `--out` is **removed**: it has zero consumers in the repo, and `--scope PATH` plus `--placement` cover every real relocation.
@@ -94,6 +96,24 @@ It is the single representation three features share.
 - Execution applies the plan to disk.
 
 Printing and applying consume one structure, so the preview can never drift from what runs.
+
+**User-facing rendering.** The op names above are the internal enum; they are never printed verbatim.
+The plan renders for the reader (#swe-display-messages), grouped by effect and with destructive effects visually distinct from additive ones so a `y/N` on a destructive run is unambiguous:
+
+```text
+agentsmith will:
+  write   5 files under .agentsmith/ and .claude/
+  update  .claude/settings.json  (add agentsmith hook)
+  keep    ./AGENTS.md            (your stub, unchanged)
+
+agentsmith uninstall will REMOVE:
+  delete  39 files under ~/.agentsmith/ and ~/.claude/
+  update  ~/.claude/settings.json   (remove agentsmith hook)
+  update  ~/.claude/CLAUDE.md        (remove agentsmith import)
+```
+
+Removals are labelled `delete`/`REMOVE`; additive effects are `write`/`update`.
+Counts summarize large groups rather than listing every path.
 
 ### Decomposition
 
@@ -111,6 +131,10 @@ The redesign splits it so each unit has one purpose and is testable in isolation
 
 The parser is the single source of truth for known flags, which is what makes fail-loud validation possible (the high-severity bug fix).
 
+**Injectable I/O seam (for testability).** `src/prompt.js` takes its terminal I/O as an injected dependency rather than reaching for `process.stdin`/`stdout` directly: a seam `{ isTTY: boolean, ask: (question) => Promise<answer> }`.
+Production wiring passes the real `process.stdout.isTTY` and a `readline`-backed `ask`; tests pass a fake `isTTY` flag and a scripted `ask` that returns queued answers.
+Both the confirmation prompt and the wizard consume this one seam, so both are testable without a real TTY (see Testing).
+
 ### `uninstall` (full clean)
 
 Uninstall reverses everything an install of the same scope wrote, reusing existing primitives.
@@ -122,6 +146,8 @@ Uninstall reverses everything an install of the same scope wrote, reusing existi
 - **`~/.claude/CLAUDE.md`** (user scope): remove the marked import block via a new pure `userUnimport(existingContent, targetPath)` -- the inverse of `userImport`, removing the `<!-- agentsmith: generated user instructions -->` marker and its import line, and nothing else.
 - **Root stub:** delete only if it still matches the generated stub content; if the user edited it, keep it and report that it was kept.
 
+The `settings.json` and `CLAUDE.md` edits inherit the existing malformed-input guard (`installSettings` already warns and leaves an unparseable `settings.json` untouched rather than clobbering it); the un-merge and un-import paths do the same, so a hand-corrupted file is never overwritten.
+
 ### `install --clean`
 
 `install --clean` builds an uninstall plan for the target scope and an install plan, then applies uninstall followed by install in one invocation.
@@ -130,21 +156,31 @@ It guarantees no cross-version residue even when the manifest has drifted or bee
 ### Confirmation gate
 
 The plan is always printed before any write or delete.
-Then:
+The gate then branches on **whether the command is destructive**, because the #ai-tool-safety floor requires a destructive or irreversible action to be confirmed regardless of interaction mode -- absence of a TTY is not durable authorization, an explicit `--yes` is.
 
-| Condition | Behavior |
-| --- | --- |
-| `--dry-run` | print plan, exit `0`, write nothing |
-| `--yes` | print plan, apply without prompting |
-| stdin is a TTY, no `--yes` | print plan, prompt `y/N`; apply only on `y` |
-| stdin is not a TTY, no `--yes` | print plan, apply (preserves the zero-friction `npx` one-liner and CI) |
+- **Non-destructive** = `install` without `--clean` (writes and overwrites owned paths; the manifest orphan-prune only removes paths a prior agentsmith run recorded).
+- **Destructive** = `uninstall` and `install --clean` (delete files the user may not expect, un-merge settings, remove the import).
 
-Confirmation is a safety-floor gate that does not depend on interaction mode (#ai-tool-safety).
+| Command class | `--dry-run` | `--yes` | TTY, no `--yes` | non-TTY, no `--yes` |
+| --- | --- | --- | --- | --- |
+| non-destructive | print, exit `0` | print, apply | print, prompt `y/N` | print, apply (preserves the zero-friction `npx` one-liner and CI) |
+| destructive | print, exit `0` | print, apply | print, prompt `y/N` | print, **abort** non-zero: `error: refusing to <verb> without confirmation -- pass --yes` |
+
+So a destructive run off a TTY never proceeds silently: it requires the explicit, durable `--yes`.
+This is a safety-floor gate independent of the #ai-preflight interaction mode (#ai-tool-safety).
 
 ### Interactive wizard
 
 Bare `agentsmith` on a TTY runs the full wizard: verb (install / uninstall) -> scope (project / user / directory path) -> then, **only on the install path**, content mode (split / single) -> placement (root / nested) -> tool adapters (yes / no) -> dev adapters (yes / no); the uninstall path skips the four install-only prompts and goes straight from scope to the plan -> print the resulting plan -> confirm.
 The wizard produces the same `{ command, scope, flags }` a parsed command line would, then flows through the identical plan/confirm/execute path -- the wizard is an input source, not a second code path.
+Every prompt shows its default and the wizard can be aborted at any point (Ctrl-C, or an empty answer at the verb prompt), leaving the disk untouched.
+
+### Help and version
+
+`--help` / `-h` prints, to stdout, exit `0`: a one-line usage synopsis, the subcommand list (`install`, `uninstall`, `spec-index`) with a one-line description each, the flags grouped under the subcommand they belong to with a one-line description each, and two or three examples (`agentsmith install`, `agentsmith install --scope user`, `agentsmith uninstall --scope user --yes`).
+Per-verb help (`agentsmith install --help`) prints just that verb's flags and examples.
+`--version` prints the resolved package version (the same value the revision-stamp fallback uses) and exits `0`.
+Help and version are queries: they never build or apply a plan.
 
 ### Bug fixes folded in
 
@@ -171,9 +207,12 @@ The wizard produces the same `{ command, scope, flags }` a parsed command line w
 
 - `package.json` `build` script: `node bin/cli.js` -> `node bin/cli.js install`; `build -- --stdout` stays valid (`--stdout` remains verb-free).
 - `test/cli.test.js`: bare-install and `--user` / `--dev` / `--no-tools` runs migrate to `install [--scope ...]`; new tests added below.
-- `README.md` Usage: rewrite for subcommands; the documented one-liner becomes `npx github:viniciussegura/agentsmith install`.
+- `tools/claude/commands/agentsmith-init.md`: **shipped command adapter** -- its local-clone fallback `node bin/cli.js` (project) / `node bin/cli.js --user` migrates to `node bin/cli.js install` / `node bin/cli.js install --scope user`. User-facing surface; must be correct at ship.
+- `devtools/claude/commands/instruction-apply.md` and `devtools/claude/skills/instruction-review-board/SKILL.md`: their regenerate step `node bin/cli.js` (bare) -> `node bin/cli.js install`.
+- `README.md` Usage: rewrite for subcommands; the documented one-liner becomes `npx github:viniciussegura/agentsmith install`. The rewrite documents **every** new subcommand and flag (`install`/`uninstall`/`--clean`/`--scope`/`--mode`/`--placement`/`--dry-run`/`--yes`/`--help`/`--version`) with at least one example each, and deletes the removed-flag lines (`--out`/`--full`/`--inline`/`--root`/`--user`) (#swe-public-surface-docs, #swe-docs-drift).
 - `CONTRIBUTING.md`: `node bin/cli.js --dev` -> `node bin/cli.js install --dev`.
-- `docs/technical-debts/2026-06-02-stale-user-import.md`: revisit -- uninstall now removes its own marked import via `userUnimport`, which narrows or closes that debt.
+- `docs/technical-debts/2026-06-02-stale-user-import.md`: uninstall's `userUnimport` removes only agentsmith's own marked import block, which is exactly the debt's scope -- so this **closes** the debt. Per #swe-technical-debts, the file is **deleted** in this PR (git history preserves it). If implementation reveals a residual (e.g. a hand-edited import the marker no longer matches), the file is instead narrowed to that residual rather than deleted.
+- Frozen `docs/working-specs/*` specs that mention `node bin/cli.js` are point-in-time history (append-only, #ai-plan) and are **not** edited.
 
 ## Testing
 
@@ -184,17 +223,22 @@ Unit tests (single documented harness, `node --test`):
 - `src/userimport.js`: `userUnimport` removes exactly the marked block and is a no-op when absent; round-trips with `userImport`.
 - `settings.js`: `mergeSettings(existing, {})` drops owned entries and preserves user entries (the un-merge path).
 - `sourceRevision()`: falls back to `package.json` version when git is unavailable.
-- Confirmation gating: injected `isTTY` + prompt seam -- no real stdin; assert apply/skip per the table.
+- Confirmation gating: via the injected `{ isTTY, ask }` seam (no real stdin) -- assert apply/prompt per both rows of the table, including that a destructive command off a TTY without `--yes` aborts non-zero.
+- Wizard: drive `prompt.js` through the same seam with scripted `ask` answers; assert the produced `{ command, scope, flags }` matches the equivalent command line, and that an abort leaves no plan applied.
+
+Integration test (`install --clean` drift recovery): install, then stale the manifest (remove or truncate it) and drop an orphan file the current sources do not produce; run `install --clean`; assert the orphan is gone and the tree matches a fresh install.
 
 Every bug fix starts with a failing test that reproduces it (#swe-testing): the `----no-tools`-style unknown flag exiting `0`, and the stale hook entry after a `--no-tools` run.
 
 ## Docs drift
 
-- `README.md` -- CLI Usage section (subcommands, axes, new one-liner).
-- `CONTRIBUTING.md` -- `--dev` invocation.
-- `docs/technical-debts/2026-06-02-stale-user-import.md` -- narrowed/closed by `userUnimport`.
+The call-site and command-doc migrations are enumerated in **In-repo consumers to update** above (README, CONTRIBUTING, `agentsmith-init.md`, `instruction-apply.md`, the instruction-review SKILL, the technical-debt file); that list is the authoritative set.
+Beyond it, this change also touches:
+
 - `docs/working-specs/INDEX.md` -- regenerated (`agentsmith spec-index`).
 - No `docs/reference-spec/` or `docs/design-decisions/` file currently documents the CLI; none needs editing.
+
+The `docs/technical-debts/2026-06-02-stale-user-import.md` debt is **closed** (file deleted) as stated in the consumers list, not merely narrowed, unless implementation surfaces a residual.
 
 ## Risks and open questions
 
