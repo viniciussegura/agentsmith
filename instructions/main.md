@@ -13,6 +13,8 @@ This set's own process vocabulary, fixed at three altitudes:
 | `unit of work` | one working spec, or a request landed without one (#ai-plan, #ai-multiple-requests) |
 | `plan step` | an execution chunk inside a unit of work -- a step, a workstream, a commit |
 
+Two verbs name the transitions between those altitudes:
+
 | term | what it names |
 | --- | --- |
 | `ship` | a branch squash-merges to the default branch -- the `deliverable` is delivered |

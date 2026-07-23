@@ -81,7 +81,7 @@ The shippable Claude tools are also packaged as a Claude Code **plugin** — an
 `agentsmith:` namespace, enable/disable/uninstall, and a version-aware update
 channel, as an alternative to the raw `npx` adapter install:
 
-```
+```text
 /plugin marketplace add viniciussegura/agentsmith
 /plugin install agentsmith
 ```
