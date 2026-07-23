@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -11,27 +10,12 @@ import { userImport } from '../src/userimport.js';
 import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
 import { runSpecIndex } from '../src/specindex.js';
 import { readManifest, orphanPaths, pruneOrphans, writeManifest } from '../src/manifest.js';
+import { sourceRevision } from '../src/revision.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(join(pkgRoot, 'manifest.json'), 'utf8'));
 const read = (rel) => readFileSync(join(pkgRoot, rel), 'utf8');
-
-// Stamp the header with the source revision. Describes the instruction repo
-// (pkgRoot), not the consumer's project. Silently skipped outside a git repo.
-function sourceRevision() {
-  // Ignore stderr so a missing .git (e.g. installed via npx, no repo) stays silent.
-  const git = (args) =>
-    execFileSync('git', args, { cwd: pkgRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-  try {
-    const commit = git(['rev-parse', '--short', 'HEAD']);
-    const date = git(['log', '-1', '--format=%cd', '--date=short']);
-    const dirty = git(['status', '--porcelain']) !== '';
-    return { commit: dirty ? `${commit}-dirty` : commit, date };
-  } catch {
-    return {};
-  }
-}
 
 const args = process.argv.slice(2);
 const has = (flag) => args.includes(flag);
@@ -123,7 +107,10 @@ for (const b of bundles) {
   }
 }
 
-const { commit, date } = sourceRevision();
+const { commit, date } = sourceRevision({
+  pkgRoot,
+  pkgVersion: JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8')).version,
+});
 const built = buildOutputs({
   preamble: read(manifest.preamble),
   modules: coreModules.map(({ path, demote }) => ({ text: read(path), demote })),
