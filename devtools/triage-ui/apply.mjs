@@ -72,7 +72,7 @@ function ensureDecisionLine(decisionsPath, verdict, e) {
 
 /** Default gate: regenerate, then run the full suite. Throws on failure. */
 function defaultGate(root, testTimeoutMs) {
-  execFileSync('node', ['bin/cli.js'], { cwd: root, stdio: 'pipe' });
+  execFileSync('node', ['bin/cli.js', 'install'], { cwd: root, stdio: 'pipe' });
   execFileSync('node', ['--test'], { cwd: root, stdio: 'pipe', timeout: testTimeoutMs });
 }
 

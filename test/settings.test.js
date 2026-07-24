@@ -1,14 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
+import { mergeSettings, agentsmithHooks, hasOwnedHooks, HOOK_REL } from '../src/settings.js';
 
 const owned = agentsmithHooks(HOOK_REL);
-const command = `node ${HOOK_REL}`;
+const command = `node "${HOOK_REL}"`;
 
 test('agentsmithHooks normalizes backslashes and matches the Agent tool', () => {
   const h = agentsmithHooks('.claude\\hooks\\agentsmith\\require-explicit-model.mjs');
   assert.equal(h.PreToolUse[0].matcher, 'Agent');
-  assert.equal(h.PreToolUse[0].hooks[0].command, 'node .claude/hooks/agentsmith/require-explicit-model.mjs');
+  assert.equal(h.PreToolUse[0].hooks[0].command, 'node ".claude/hooks/agentsmith/require-explicit-model.mjs"');
+});
+
+test('quotes the hook path so a base dir with a space survives shell splitting', () => {
+  const h = agentsmithHooks('C:\\Users\\John Doe\\.claude\\hooks\\agentsmith\\require-explicit-model.mjs');
+  assert.equal(
+    h.PreToolUse[0].hooks[0].command,
+    'node "C:/Users/John Doe/.claude/hooks/agentsmith/require-explicit-model.mjs"',
+  );
 });
 
 test('injects the hook into empty/absent settings', () => {
@@ -68,4 +76,23 @@ test('deprecation: removes an event entirely when only an owned entry remains', 
 test('tolerates a malformed hooks value', () => {
   const next = mergeSettings({ hooks: 'oops' }, owned);
   assert.deepEqual(next.hooks.PreToolUse, owned.PreToolUse);
+});
+
+test('hasOwnedHooks detects our entry, ignores absent/user-only/malformed settings', () => {
+  assert.equal(hasOwnedHooks(null), false);
+  assert.equal(hasOwnedHooks({}), false);
+  assert.equal(hasOwnedHooks({ hooks: 'oops' }), false);
+  assert.equal(hasOwnedHooks({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node user.mjs' }] }] } }), false);
+  assert.equal(hasOwnedHooks(mergeSettings(null, owned)), true);
+});
+
+test('mergeSettings(existing, {}) removes agentsmith hooks, keeps user hooks', () => {
+  const withOurs = mergeSettings(
+    { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'user-thing' }] }] } },
+    agentsmithHooks('.claude/hooks/agentsmith/require-explicit-model.mjs'),
+  );
+  const unmerged = mergeSettings(withOurs, {});
+  const entries = unmerged.hooks.PreToolUse || [];
+  assert.ok(entries.some((e) => e.matcher === 'Bash'), 'user hook preserved');
+  assert.ok(!entries.some((e) => e.hooks?.some((h) => h.command.includes('/hooks/agentsmith/'))), 'agentsmith hook removed');
 });

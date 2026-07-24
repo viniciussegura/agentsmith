@@ -20,7 +20,7 @@ Do not stop after step 1. A run that skips steps 2--4 silently drops the human's
 
 - **Validate** -- `validateFile` + `validateCrossRefs` from `devtools/triage-ui/schema.mjs`; malformed entries are reported and skipped, never half-applied. `adopt` additionally requires `status.state === 'ready'`. The live instruction text is read from disk (no stored `current` in the schema).
 - **Process each entry by verdict:**
-  - `adopt` -- write or create the tag's rule file under its group dir in `instructions/` (whole-file, not a section splice) and ensure the `ownership.yaml` row; then regenerate (`node bin/cli.js`) and gate on `node --test` (#swe-done); per-entry snapshot recovery on failure (re-park + `applyLog` push).
+  - `adopt` -- write or create the tag's rule file under its group dir in `instructions/` (whole-file, not a section splice) and ensure the `ownership.yaml` row; then regenerate (`node bin/cli.js install`) and gate on `node --test` (#swe-done); per-entry snapshot recovery on failure (re-park + `applyLog` push).
   - `reject` / `fold` / `defer` -- append one canonical line to `docs/instruction-rules-decisions.md` (backtick-wrapped tag; defer hint uses `basename(targetFile)` and `role`); one line per tag, idempotent.
   - `refine` -- write nothing; leave the entry.
   - `park` (default) -- leave the entry.

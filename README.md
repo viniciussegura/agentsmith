@@ -22,30 +22,58 @@ anyway — so this trades nothing for portability.
 Run in the target project:
 
 ```bash
-npx github:viniciussegura/agentsmith          # latest
-npx github:viniciussegura/agentsmith#v0.1.0   # pinned, reproducible
+npx github:viniciussegura/agentsmith install          # latest
+npx github:viniciussegura/agentsmith#v0.1.0 install    # pinned, reproducible
 ```
 
-By default it writes a lean core to `.agentsmith/AGENTS.md`, one file per
-on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at
-the core (an existing stub is left untouched), and installs the tool adapters
-(e.g. `tools/claude/` into `.claude/`). Whether you commit the generated
-`AGENTS.md` is your call — agentsmith only produces the file.
+agentsmith is a verb-first CLI: `install`, `uninstall`, and `spec-index` are subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
+Bare `agentsmith` (no verb) opens an interactive wizard on a TTY, or errors off one.
+Full flag reference, the confirmation gate, and plugin-coexistence detail live in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md); this section is a summary.
 
-Flags:
+By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
+Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
+Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
 
-- `--full` — inline every bundle into one file instead of the lean core plus on-demand split.
-- `--root` — write the core to the project root instead of under `.agentsmith/`.
-- `--out <path>` — write the core to a specific path.
-- `--no-tools` — skip installing the tool adapters.
-- `--user` — set up agentsmith for all projects: write instructions to `~/.agentsmith/AGENTS.md`, install adapters into `~/.<ai>/`, and `@`-import the home instructions from `~/.claude/CLAUDE.md` (appended only if absent).
-- `--stdout` — print the core to stdout instead of writing files.
+```bash
+agentsmith install                    # project scope, default mode/placement
+agentsmith install --scope user       # ~/.agentsmith/AGENTS.md + ~/.<ai>/ adapters
+agentsmith install --mode single      # one inlined file instead of lean core + bundles
+agentsmith install --placement root   # core at ./AGENTS.md instead of nested
+agentsmith install --no-tools         # instructions only, skip tool adapters
+agentsmith install --clean --yes      # uninstall then reinstall this scope, no prompt
+```
+
+`agentsmith uninstall` reverses an `install` of the same scope: it deletes
+every path agentsmith wrote (from its install manifest), un-merges the hook
+entry from `settings.json`, and removes the marked `CLAUDE.md` import
+(`--scope user`). `uninstall` and `install --clean` are **destructive**: off a
+TTY they refuse to run without `--yes`.
+
+```bash
+agentsmith uninstall
+agentsmith uninstall --scope user --yes
+```
+
+`agentsmith --stdout` generates the core content and prints it — it writes
+nothing and takes no scope or disk flags:
+
+```bash
+agentsmith --stdout
+agentsmith --stdout --mode single
+```
 
 The adapter install is non-destructive: it writes only the adapter's own files
 (e.g. `.claude/skills/spec-review-board/`) and never touches the rest of your
 `.claude/`.
 
 **Coexisting with a project instruction file.** A project may ship its own instruction file alongside the generated set; on conflict the project file wins (except the safety baseline). When a project file restates a rule the generated set already owns, reference its `#tag` rather than paraphrasing it -- a paraphrase silently goes stale when the canonical rule is edited.
+
+**Coexisting with the Claude Code plugin.** Running the CLI install alongside
+`/plugin install agentsmith` (below) duplicates every skill/agent/command under
+`.claude/`. Install with `agentsmith install --no-tools` (instructions only) to
+run the CLI beside the plugin without that duplication — see
+[`docs/reference-spec/cli.md`](docs/reference-spec/cli.md#plugin-coexistence)
+for the full guarantee.
 
 ## Bundled Claude Code tools
 

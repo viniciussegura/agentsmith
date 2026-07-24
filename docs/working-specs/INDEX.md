@@ -4,6 +4,7 @@
 
 | Date | Unit | Status |
 |---|---|---|
+| 2026-07-23 | [Spec: `agentsmith` CLI subcommand redesign](2026-07-23-cli-subcommands-redesign/spec.md) | Approved |
 | 2026-07-22 | [Instruction-set terminology audit: default branch, ship/land, actor noun](2026-07-22-instruction-terminology-audit/spec.md) | Implemented |
 | 2026-06-26 | [Board unification: one round choreography, two drivers, three boards](2026-06-26-board-unification/spec.md) | Implemented |
 | 2026-06-26 | [Installer prune: remove orphaned generated files](2026-06-26-installer-prune/spec.md) | Implemented |

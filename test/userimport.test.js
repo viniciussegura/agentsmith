@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { userImport } from '../src/userimport.js';
+import { userImport, userUnimport } from '../src/userimport.js';
 
 const TARGET = 'C:/Users/you/.agentsmith/AGENTS.md';
 const LINE = `@${TARGET}`;
@@ -49,4 +49,28 @@ test('superstring path does not match -> appends', () => {
 
 test('relative @-import does not match -> appends', () => {
   assert.notEqual(userImport('@../.agentsmith/AGENTS.md\n', TARGET), null);
+});
+
+test('userUnimport removes exactly the marked block, preserving user content', () => {
+  const withImport = userImport('# my rules\n', TARGET);        // appends the block
+  const back = userUnimport(withImport, TARGET);
+  assert.equal(back, '# my rules\n', 'user content restored, block gone');
+});
+
+test('userUnimport is a no-op (null) when no agentsmith block is present', () => {
+  assert.equal(userUnimport('# my rules\n', TARGET), null);
+  assert.equal(userUnimport(null, TARGET), null);
+});
+
+test('userImport then userUnimport round-trips', () => {
+  const original = '# a\n\n# b\n';
+  const round = userUnimport(userImport(original, TARGET), TARGET);
+  assert.equal(round, original);
+});
+
+test('userUnimport does not collapse unrelated blank runs elsewhere in the file', () => {
+  // A user file whose own content has a 3+ blank-line run (e.g. inside fenced code).
+  const original = '# mine\n\n```\nline1\n\n\n\nline2\n```\n';
+  const withBlock = userImport(original, TARGET);
+  assert.equal(userUnimport(withBlock, TARGET), original, 'only the agentsmith seam is touched');
 });

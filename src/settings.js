@@ -4,6 +4,12 @@ const norm = (p) => p.replace(/\\/g, '/');
 // tool adapter under tools/claude/hooks/agentsmith/ -> .claude/hooks/agentsmith/.
 export const HOOK_REL = '.claude/hooks/agentsmith/require-explicit-model.mjs';
 
+// Base-relative locations of the two adapter files agentsmith edits (rather than
+// owns): the settings.json it merges its hook into, and the CLAUDE.md it wires a
+// user-scope import into. Centralized so a rename lands in one place (#code-style).
+export const SETTINGS_REL = '.claude/settings.json';
+export const CLAUDE_MD_REL = '.claude/CLAUDE.md';
+
 // Ownership marker. Every hook command agentsmith injects points at a script under
 // this path segment, so on reinstall we identify our own prior entries by the path
 // alone -- no separate manifest to keep in sync. The path *is* the provenance.
@@ -31,7 +37,10 @@ export function agentsmithHooks(commandPath) {
     PreToolUse: [
       {
         matcher: 'Agent',
-        hooks: [{ type: 'command', command: `node ${norm(commandPath)}` }],
+        // Quote the path: a user-scope install writes an absolute path, and a home
+        // dir with a space (`C:\Users\John Doe\...`, OneDrive-redirected paths) would
+        // otherwise split at the shell and the hook silently never fires.
+        hooks: [{ type: 'command', command: `node "${norm(commandPath)}"` }],
       },
     ],
   };
@@ -42,6 +51,20 @@ const isOwned = (entry) =>
   entry.hooks.some(
     (h) => typeof h?.command === 'string' && norm(h.command).includes(OWNED_MARKER),
   );
+
+/**
+ * True when a parsed settings object carries at least one agentsmith-owned hook.
+ * Lets the caller skip a no-op un-merge (which would re-serialize settings.json and
+ * print a misleading "remove agentsmith hook" line) when nothing of ours is present.
+ *
+ * @param {object|null} existing  Parsed settings.json, or null when absent.
+ * @returns {boolean}
+ */
+export function hasOwnedHooks(existing) {
+  const hooks = existing && typeof existing === 'object' ? existing.hooks : null;
+  if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)) return false;
+  return Object.values(hooks).some((entries) => Array.isArray(entries) && entries.some(isOwned));
+}
 
 /**
  * Merge agentsmith's owned hooks into an existing settings object. Pure: no disk access.

@@ -1,37 +1,25 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { readFileSync, existsSync, readdirSync, statSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
 import { resolveSections, demoteForBasename } from '../src/sections.js';
 import { planToolInstall } from '../src/tools.js';
-import { userImport } from '../src/userimport.js';
-import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
 import { runSpecIndex } from '../src/specindex.js';
-import { readManifest, orphanPaths, pruneOrphans, writeManifest } from '../src/manifest.js';
+import { readManifest, writeManifest } from '../src/manifest.js';
+import { sourceRevision } from '../src/revision.js';
+import { parseArgs } from '../src/args.js';
+import { buildInstallPlan, buildUninstallPlan, renderPlan } from '../src/plan.js';
+import { applyPlan } from '../src/execute.js';
+import { confirm, runWizard, makeSeam } from '../src/prompt.js';
+import { SETTINGS_REL, CLAUDE_MD_REL, hasOwnedHooks } from '../src/settings.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(join(pkgRoot, 'manifest.json'), 'utf8'));
 const read = (rel) => readFileSync(join(pkgRoot, rel), 'utf8');
-
-// Stamp the header with the source revision. Describes the instruction repo
-// (pkgRoot), not the consumer's project. Silently skipped outside a git repo.
-function sourceRevision() {
-  // Ignore stderr so a missing .git (e.g. installed via npx, no repo) stays silent.
-  const git = (args) =>
-    execFileSync('git', args, { cwd: pkgRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-  try {
-    const commit = git(['rev-parse', '--short', 'HEAD']);
-    const date = git(['log', '-1', '--format=%cd', '--date=short']);
-    const dirty = git(['status', '--porcelain']) !== '';
-    return { commit: dirty ? `${commit}-dirty` : commit, date };
-  } catch {
-    return {};
-  }
-}
+const pkgVersion = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8')).version;
 
 const args = process.argv.slice(2);
 const has = (flag) => args.includes(flag);
@@ -40,6 +28,12 @@ const has = (flag) => args.includes(flag);
 // working-specs index for the project in CWD (#ai-plan). Delegated here so npx
 // consumers reach it through the one `agentsmith` bin -- no second entrypoint.
 if (args[0] === 'spec-index') {
+  // Same fail-loud contract as the verb parser: reject anything but --check.
+  const unknown = args.slice(1).filter((a) => a !== '--check');
+  if (unknown.length) {
+    process.stderr.write(`agentsmith: error -- unknown flag(s) for spec-index: ${unknown.join(', ')}\n`);
+    process.exit(1);
+  }
   const r = runSpecIndex({ cwd: process.cwd(), check: has('--check') });
   if (r.missing) {
     process.stderr.write(`agentsmith: no docs/working-specs/ in ${process.cwd()} -- nothing to index\n`);
@@ -57,11 +51,57 @@ if (args[0] === 'spec-index') {
   process.exit(0);
 }
 
-const layout = has('--full') || has('--inline') ? 'full' : 'lean';
-const placement = has('--root') ? 'root' : 'nested';
-const installTools = !has('--no-tools');
-const userScope = has('--user');
-const dev = has('--dev');
+const HELP = `agentsmith -- forge AGENTS.md for any project
+
+Usage:
+  agentsmith install   [--scope <user|project|PATH>] [--mode <single|split>] [--placement <root|nested>] [--no-tools] [--dev] [--clean] [--yes] [--dry-run]
+  agentsmith uninstall [--scope <user|project|PATH>] [--yes] [--dry-run]
+  agentsmith spec-index [--check]
+  agentsmith --stdout  [--mode <single|split>]
+  agentsmith                       (bare: interactive wizard)
+
+Scope: 'project' (cwd, default), 'user' (home), or a directory path.
+       A directory literally named user/project is reached as ./user.
+Examples:
+  agentsmith install
+  agentsmith install --scope user
+  agentsmith uninstall --scope user --yes`;
+
+// Per-verb help: the verb's synopsis, its own flags, and one example. Reached via
+// `agentsmith install --help` / `uninstall --help` (parseArgs sets cmd.helpVerb).
+const VERB_HELP = {
+  install: `agentsmith install -- generate instructions (and tool adapters) under a scope
+
+Usage:
+  agentsmith install [--scope <user|project|PATH>] [--mode <single|split>] [--placement <root|nested>] [--no-tools] [--dev] [--clean] [--yes] [--dry-run]
+
+Flags:
+  --scope <user|project|PATH>  base directory the install tree roots at (default project)
+  --mode <single|split>        one inlined file vs. lean core + one file per bundle (default split)
+  --placement <root|nested>    core at base root vs. nested under .agentsmith/ with a stub (default nested)
+  --no-tools                   skip the tool adapters; write instructions only
+  --dev                        also install the authoring-only devtools adapter
+  --clean                      uninstall then reinstall this scope in one run (destructive)
+  --yes                        skip the confirmation prompt (durable authorization)
+  --dry-run                    print the plan and exit 0 without writing
+
+Example:
+  agentsmith install --scope user`,
+  uninstall: `agentsmith uninstall -- reverse an install of the same scope
+
+Usage:
+  agentsmith uninstall [--scope <user|project|PATH>] [--yes] [--dry-run]
+
+Flags:
+  --scope <user|project|PATH>  base directory to uninstall from (default project)
+  --yes                        skip the confirmation prompt (durable authorization)
+  --dry-run                    print the plan and exit 0 without writing
+
+Example:
+  agentsmith uninstall --scope user --yes`,
+};
+
+const helpFor = (verb) => VERB_HELP[verb] ?? HELP;
 
 // Every *.md (and any file) under tools/, relative to pkgRoot, recursively.
 function listToolSources(absDir, relBase) {
@@ -74,12 +114,6 @@ function listToolSources(absDir, relBase) {
     else out.push(rel);
   }
   return out;
-}
-const outIdx = args.indexOf('--out');
-const out = outIdx !== -1 ? args[outIdx + 1] : undefined;
-if (outIdx !== -1 && (out === undefined || out.startsWith('--'))) {
-  process.stderr.write('agentsmith: error -- --out requires a path argument\n');
-  process.exit(1);
 }
 
 // Recursive module lister: ordered { path, demote } for a section's subtree.
@@ -123,140 +157,136 @@ for (const b of bundles) {
   }
 }
 
-const { commit, date } = sourceRevision();
-const built = buildOutputs({
-  preamble: read(manifest.preamble),
-  modules: coreModules.map(({ path, demote }) => ({ text: read(path), demote })),
-  bundles: bundles.map((b) => ({
-    name: b.name,
-    title: b.title,
-    when: b.when,
-    modules: b.modules.map(({ path, demote }) => ({ text: read(path), demote })),
-  })),
-  source: manifest.source,
-  commit,
-  date,
-  layout,
-  placement,
-  output: manifest.output,
-  out,
-});
+const { commit, date } = sourceRevision({ pkgRoot, pkgVersion });
 
-if (built.dangling.length) {
-  process.stderr.write(
-    `agentsmith: warning -- unresolved #tag references: ${built.dangling.join(', ')}\n`,
-  );
-}
-
-if (built.crossBoundary.length) {
-  const list = built.crossBoundary
-    .map((c) => `#${c.from || '(core preamble)'} -> bundle-only #${c.tag}`)
-    .join(', ');
-  process.stderr.write(
-    `agentsmith: warning -- core rule references a bundle-only #tag: ${list}\n`,
-  );
-}
-
-const writeAbs = (dest, content) => {
-  mkdirSync(dirname(dest), { recursive: true });
-  writeFileSync(dest, content);
-  process.stderr.write(`agentsmith: wrote ${dest}\n`);
-};
-
-// Merge agentsmith's owned hooks into <base>/.claude/settings.json without clobbering
-// the consumer's own settings. Project installs use a project-relative command (hooks
-// run from the project root); user installs need the absolute home path (a user hook's
-// cwd is the active project, not home). Idempotent across reinstalls.
-const installSettings = (base, { absolute }) => {
-  const dest = resolve(base, '.claude/settings.json');
-  let existing = null;
-  if (existsSync(dest)) {
-    try {
-      existing = JSON.parse(readFileSync(dest, 'utf8'));
-    } catch {
-      process.stderr.write(`agentsmith: warning -- ${dest} is not valid JSON; left untouched\n`);
-      return;
-    }
-  }
-  const commandPath = absolute ? resolve(base, HOOK_REL) : HOOK_REL;
-  const next = mergeSettings(existing, agentsmithHooks(commandPath));
-  writeAbs(dest, `${JSON.stringify(next, null, 2)}\n`);
-};
-
-// Plan the adapter install (pure: no disk writes). tools/<ai>/** always; the
-// authoring devtools/claude/** only under --dev. Returns planToolInstall's
-// { src, dest }[].
-const adapterPlan = () => {
-  if (!installTools) return [];
+// computeAdapterPlan wraps listToolSources + planToolInstall (dev adds devtools/claude).
+function computeAdapterPlan(dev) {
   const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
   if (dev) sources.push(...listToolSources(join(pkgRoot, 'devtools', 'claude'), 'devtools/claude'));
   return planToolInstall(sources);
-};
+}
 
-// Write the planned adapter files, then wire settings (after the hook script is
-// on disk). settings.json is a MERGE target — deliberately NOT a manifest path.
-const writeAdapters = (base, plan, { absolute }) => {
-  for (const { src, dest } of plan) {
-    writeAbs(resolve(base, dest), readFileSync(join(pkgRoot, src)));
+async function main() {
+  let cmd = parseArgs(process.argv.slice(2));
+  const seam = makeSeam();
+
+  if (cmd.kind === 'wizard') {
+    if (!seam.isTTY) { process.stderr.write(`agentsmith: error -- no subcommand -- run 'agentsmith install' or 'agentsmith --help'\n`); process.exit(1); }
+    cmd = await runWizard(seam);
   }
-  installSettings(base, { absolute });
-};
+  if (cmd.kind === 'aborted') { process.stderr.write(`agentsmith: aborted -- no recognized answer\n`); process.exit(0); }
+  if (cmd.kind === 'error') { process.stderr.write(`${cmd.error}\n`); process.exit(1); }
+  if (cmd.kind === 'help') { process.stdout.write(`${cmd.helpVerb ? helpFor(cmd.helpVerb) : HELP}\n`); process.exit(0); }
+  if (cmd.kind === 'version') { process.stdout.write(`${pkgVersion}\n`); process.exit(0); }
 
-if (has('--stdout')) {
-  process.stdout.write(built.coreContent);
-} else if (userScope) {
-  // User scope: write the generated instructions under the home directory, wire
-  // ~/.claude/CLAUDE.md to import them, and install adapters for all projects.
-  const base = homedir();
-  const plan = adapterPlan();
-  const currentPaths = [
-    built.corePath,
-    ...built.bundles.map((b) => b.path),
-    ...plan.map((p) => p.dest),
-  ];
-  const prev = readManifest(base);
-  const pruned = pruneOrphans(base, orphanPaths(prev.paths, currentPaths));
-  if (pruned.length) process.stderr.write(`agentsmith: pruned ${pruned.length} orphaned file(s)\n`);
+  // Build outputs from the parsed flags. --mode drives layout; --placement the
+  // core location (absent on uninstall/stdout -> nested default).
+  const layout = cmd.flags.mode === 'single' ? 'full' : 'lean';
+  const placement = cmd.flags.placement ?? 'nested';
+  const built = buildOutputs({
+    preamble: read(manifest.preamble),
+    modules: coreModules.map(({ path, demote }) => ({ text: read(path), demote })),
+    bundles: bundles.map((b) => ({
+      name: b.name,
+      title: b.title,
+      when: b.when,
+      modules: b.modules.map(({ path, demote }) => ({ text: read(path), demote })),
+    })),
+    source: manifest.source,
+    commit,
+    date,
+    layout,
+    placement,
+    output: manifest.output,
+  });
 
-  writeAbs(resolve(base, built.corePath), built.coreContent);
-  for (const bundle of built.bundles) writeAbs(resolve(base, bundle.path), bundle.content);
+  if (built.dangling.length) {
+    process.stderr.write(
+      `agentsmith: warning -- unresolved #tag references: ${built.dangling.join(', ')}\n`,
+    );
+  }
+  if (built.crossBoundary.length) {
+    const list = built.crossBoundary
+      .map((c) => `#${c.from || '(core preamble)'} -> bundle-only #${c.tag}`)
+      .join(', ');
+    process.stderr.write(
+      `agentsmith: warning -- core rule references a bundle-only #tag: ${list}\n`,
+    );
+  }
 
-  // Wire the CLAUDE.md import before installing adapters (unchanged), then:
-  const claudeMd = resolve(base, '.claude/CLAUDE.md');
-  const target = resolve(base, built.corePath).replace(/\\/g, '/');
-  const existing = existsSync(claudeMd) ? readFileSync(claudeMd, 'utf8') : null;
-  const next = userImport(existing, target);
-  if (next !== null) writeAbs(claudeMd, next);
-  else process.stderr.write(`agentsmith: kept existing import in ${claudeMd}\n`);
+  if (cmd.kind === 'stdout') { process.stdout.write(built.coreContent); process.exit(0); }
 
-  writeAdapters(base, plan, { absolute: true });
-  writeManifest(base, currentPaths, new Date().toISOString());
-} else {
-  const cwd = process.cwd();
-  const plan = adapterPlan();
-  // Files agentsmith fully owns this run: core + bundles + adapter files.
-  // EXCLUDES the root stub (write-once) and settings.json (merged).
-  const currentPaths = [
-    built.corePath,
-    ...built.bundles.map((b) => b.path),
-    ...plan.map((p) => p.dest),
-  ];
-  const prev = readManifest(cwd);
-  const pruned = pruneOrphans(cwd, orphanPaths(prev.paths, currentPaths));
-  if (pruned.length) process.stderr.write(`agentsmith: pruned ${pruned.length} orphaned file(s)\n`);
+  // Resolve scope -> base + absolute.
+  const isUser = cmd.scope.kind === 'user';
+  const base = isUser ? homedir() : cmd.scope.kind === 'path' ? resolve(process.cwd(), cmd.scope.path) : process.cwd();
+  const absolute = isUser || cmd.scope.kind === 'path';
+  if (cmd.scope.kind === 'path' && existsSync(base) && !statSync(base).isDirectory()) {
+    process.stderr.write(`agentsmith: error -- --scope path is not a directory: ${base}\n`); process.exit(1);
+  }
 
-  writeAbs(resolve(cwd, built.corePath), built.coreContent);
-  for (const bundle of built.bundles) writeAbs(resolve(cwd, bundle.path), bundle.content);
+  // Whether settings.json already carries an agentsmith-owned hook, so the plan
+  // emits an un-merge only when there is something of ours to remove.
+  const settingsPath = resolve(base, SETTINGS_REL);
+  let settingsHasOwned = false;
+  if (existsSync(settingsPath)) {
+    try { settingsHasOwned = hasOwnedHooks(JSON.parse(readFileSync(settingsPath, 'utf8'))); } catch { /* malformed -> treat as none */ }
+  }
 
-  if (built.stub) {
-    const stubDest = resolve(cwd, built.stub.path);
-    if (existsSync(stubDest)) {
-      process.stderr.write(`agentsmith: kept existing ${stubDest}\n`);
-    } else {
-      writeAbs(stubDest, built.stub.content);
+  if (cmd.kind === 'uninstall' || (cmd.kind === 'install' && cmd.flags.clean)) {
+    const prev = readManifest(base);
+    const stubDest = resolve(base, 'AGENTS.md');
+    // Derive the prior install's core path from what the manifest recorded, not
+    // from this run's flags: uninstall has no --placement flag, so a bare
+    // uninstall would otherwise always assume the nested default and miss a
+    // --placement root import (correctness-3). AGENTS.md at the root => root core.
+    const prevCorePath = prev.paths.includes('AGENTS.md') ? 'AGENTS.md' : '.agentsmith/AGENTS.md';
+    const plan = buildUninstallPlan({
+      base, absolute, manifestPaths: prev.paths, corePath: prevCorePath,
+      stubContent: built.stub ? built.stub.content : null,
+      stubOnDiskContent: existsSync(stubDest) ? readFileSync(stubDest, 'utf8') : null,
+      settingsHasOwned,
+      hasClaudeMd: existsSync(resolve(base, CLAUDE_MD_REL)),
+      isUser,
+    });
+    if (cmd.kind === 'uninstall') {
+      const decision = await confirm({ plan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: true, render: renderPlan });
+      if (decision === 'abort') { process.stderr.write(`agentsmith: error -- refusing to uninstall without confirmation -- pass --yes\n`); process.exit(1); }
+      if (decision === 'skip') process.exit(0);
+      applyPlan(plan, { pkgRoot });
+      process.exit(0);
+    }
+    // install --clean: apply uninstall first (confirmed as destructive), then fall through to install.
+    const decision = await confirm({ plan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: true, render: renderPlan });
+    if (decision === 'abort') { process.stderr.write(`agentsmith: error -- refusing to clean-install without confirmation -- pass --yes\n`); process.exit(1); }
+    // A dry-run clean previews BOTH halves: skip the uninstall apply/early-exit and
+    // fall through so the install block below builds, prints, and (being dry-run)
+    // exits 0 without writing. A real skip (TTY 'n') still exits here.
+    if (!cmd.flags.dryRun) {
+      if (decision === 'skip') process.exit(0);
+      applyPlan(plan, { pkgRoot });
     }
   }
 
-  writeAdapters(cwd, plan, { absolute: false });
-  writeManifest(cwd, currentPaths, new Date().toISOString());
+  // install (fresh, or the install half of --clean).
+  const adapterPlan = cmd.flags.tools ? computeAdapterPlan(cmd.flags.dev) : [];
+  const installPlan = buildInstallPlan({
+    base, absolute, built, adapterPlan, scope: cmd.scope, flags: cmd.flags,
+    prevManifestPaths: readManifest(base).paths, stubExists: existsSync(resolve(base, 'AGENTS.md')),
+    settingsHasOwned,
+  });
+  const decision = await confirm({ plan: installPlan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: false, render: renderPlan });
+  if (decision === 'skip') process.exit(0);
+  applyPlan(installPlan, { pkgRoot });
+  writeManifest(base, installPlan.manifestPaths, new Date().toISOString());
+}
+
+// Run the pipeline only when invoked as the CLI, not when a module (e.g. a test)
+// imports makeListModules from this file. Resolve process.argv[1] through realpath:
+// npm installs the bin as a `.bin/agentsmith` symlink, and Node's ESM loader
+// canonicalizes import.meta.url through realpath, so on the npx / global-symlink
+// launch (the primary advertised entry) the raw paths differ and main() would be
+// skipped -- a silent exit 0. realpathSync collapses the symlink so they match.
+const entry = process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href;
+if (import.meta.url === entry) {
+  main().catch((e) => { process.stderr.write(`agentsmith: ${e.message}\n`); process.exit(1); });
 }

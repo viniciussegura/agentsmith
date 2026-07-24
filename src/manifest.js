@@ -5,7 +5,7 @@
 import {
   readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync,
 } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 
 export const MANIFEST_REL = '.agentsmith/.install-manifest.json';
 
@@ -40,6 +40,10 @@ export function pruneOrphans(base, orphans) {
   const deleted = [];
   for (const rel of orphans) {
     const abs = resolve(base, rel);
+    // Containment guard: never delete base itself, nor a path that resolves
+    // outside base -- a drifted/tampered manifest could name `.`, a `..`-relative,
+    // or an absolute entry.
+    if (abs === root || !abs.startsWith(root + sep)) continue;
     if (!existsSync(abs)) continue;
     rmSync(abs, { force: true });
     deleted.push(rel);

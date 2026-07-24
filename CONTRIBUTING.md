@@ -28,7 +28,7 @@ src/sections.js    pure: splits manifest sections into core vs on-demand bundles
 src/bundles.js     on-demand index + #tag reference-integrity + ownership coverage lint
 src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** install paths
 src/specindex.js   pure: renders docs/working-specs/INDEX.md
-bin/cli.js         reads sources, writes the files
+bin/cli.js         verb-first CLI: install / uninstall / spec-index, plus the --stdout query
 bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
 bin/spec-index.js  regenerate / --check the working-specs index
 test/              tests for the generator
@@ -61,7 +61,7 @@ generated file's header.
 The instruction-review / -apply engine and its meta-agents live under
 `devtools/claude/` and install only with `--dev` — they audit and edit *this
 repo's* instruction source and cannot run in a consumer project. Dogfood install:
-`node bin/cli.js --dev`. The triage UI (`npm run triage`) drives the worksheet.
+`node bin/cli.js install --dev`. The triage UI (`npm run triage`) drives the worksheet.
 
 ## Records and history
 
@@ -78,7 +78,7 @@ npm test                     # node --test
 npm run build -- --stdout    # preview the forged AGENTS.md
 npm run build:plugin         # regenerate plugin.json + marketplace.json
 npm run build:index          # regenerate docs/working-specs/INDEX.md
-node bin/cli.js --dev        # dogfood install, including the authoring tools
+node bin/cli.js install --dev  # dogfood install, including the authoring tools
 ```
 
 This repo's own project-scoped rules live in the committed root

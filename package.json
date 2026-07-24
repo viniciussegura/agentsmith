@@ -1,6 +1,6 @@
 {
   "name": "agentsmith",
-  "version": "1.0.0-rc.17",
+  "version": "1.0.0-rc.18",
   "description": "Canonical agent instructions and a generator that forges AGENTS.md for any project.",
   "type": "module",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "build": "node bin/cli.js",
+    "build": "node bin/cli.js install",
     "build:plugin": "node bin/build-plugin.js",
     "build:board-round": "node bin/build-board-round.js",
     "build:index": "node bin/spec-index.js",

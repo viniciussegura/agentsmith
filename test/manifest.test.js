@@ -88,3 +88,33 @@ test('pruneOrphans is a no-op for a path that no longer exists', () => {
     assert.deepEqual(pruneOrphans(base, ['.claude/commands/gone.md']), []);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
+
+test('pruneOrphans refuses to delete an orphan that escapes base, deletes an in-base one', () => {
+  const parent = tmp();
+  try {
+    const base = join(parent, 'inner');
+    mkdirSync(base, { recursive: true });
+    // a file OUTSIDE base a drifted/tampered manifest could name via `..`
+    const outsider = join(parent, 'outside.md');
+    writeFileSync(outsider, 'DO NOT DELETE');
+    // a legitimate in-base orphan
+    writeFileSync(join(base, 'in-base.md'), 'prune me');
+
+    const deleted = pruneOrphans(base, ['../outside.md', 'in-base.md']);
+    assert.deepEqual(deleted, ['in-base.md'], 'only the in-base orphan is reported deleted');
+    assert.equal(existsSync(outsider), true, 'escaping path is NOT deleted');
+    assert.equal(existsSync(join(base, 'in-base.md')), false, 'in-base orphan IS deleted');
+  } finally { rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('pruneOrphans never deletes base itself for a `.`/`` manifest entry, and does not throw', () => {
+  const base = tmp();
+  try {
+    writeFileSync(join(base, 'keep.md'), 'keep');
+    let deleted;
+    assert.doesNotThrow(() => { deleted = pruneOrphans(base, ['.', '']); });
+    assert.deepEqual(deleted, [], 'base-resolving entries are skipped, nothing deleted');
+    assert.equal(existsSync(base), true, 'base directory survives');
+    assert.equal(existsSync(join(base, 'keep.md')), true, 'base contents survive');
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
