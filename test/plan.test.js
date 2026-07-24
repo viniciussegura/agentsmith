@@ -38,6 +38,18 @@ test('install keeps an existing stub rather than overwriting', () => {
   assert.ok(!p.ops.some((o) => o.kind === 'write' && o.path === 'AGENTS.md'));
 });
 
+test('placement flip root->nested rewrites the stub instead of keeping a pruned file', () => {
+  // Prior install was --placement root: AGENTS.md held the real core and is in the
+  // manifest. Reinstalling nested makes AGENTS.md an orphan (pruned); the stub must
+  // be written fresh, not kept against the file the prune deletes.
+  const p = buildInstallPlan({ base: '/b', absolute: false, built, adapterPlan, scope: { kind: 'project' },
+    flags: { mode: 'split', placement: 'nested', tools: true, dev: false, clean: false, yes: false, dryRun: false },
+    prevManifestPaths: ['AGENTS.md'], stubExists: true });
+  assert.ok(p.ops.some((o) => o.kind === 'prune' && o.paths.includes('AGENTS.md')), 'old root core pruned');
+  assert.ok(p.ops.some((o) => o.kind === 'write' && o.path === 'AGENTS.md'), 'stub written fresh');
+  assert.ok(!p.ops.some((o) => o.kind === 'keepStub'), 'no keepStub against a pruned path');
+});
+
 test('install prunes recorded orphans no longer produced', () => {
   const p = buildInstallPlan({ base: '/b', absolute: false, built, adapterPlan, scope: { kind: 'project' },
     flags: { mode: 'split', placement: 'nested', tools: true, dev: false, clean: false, yes: false, dryRun: false },
@@ -92,4 +104,11 @@ test('renderPlan marks deletes distinctly from writes', () => {
   assert.match(out, /delete/i);
   assert.match(out, /write/i);
   assert.doesNotMatch(out, /unmergeSettings/);       // internal enum never printed verbatim
+});
+
+test('renderPlan lists every delete (no truncation) so a destructive confirm hides nothing', () => {
+  const paths = ['a.md', 'b.md', 'c.md', 'd.md', 'e.md'];
+  const out = renderPlan({ base: '/b', absolute: false, manifestPaths: [], ops: [{ kind: 'prune', paths }] });
+  for (const f of paths) assert.match(out, new RegExp(f), `${f} listed`);
+  assert.doesNotMatch(out, /\.\.\./, 'no truncation ellipsis on the delete line');
 });

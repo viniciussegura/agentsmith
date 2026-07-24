@@ -3,12 +3,20 @@ import assert from 'node:assert/strict';
 import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
 
 const owned = agentsmithHooks(HOOK_REL);
-const command = `node ${HOOK_REL}`;
+const command = `node "${HOOK_REL}"`;
 
 test('agentsmithHooks normalizes backslashes and matches the Agent tool', () => {
   const h = agentsmithHooks('.claude\\hooks\\agentsmith\\require-explicit-model.mjs');
   assert.equal(h.PreToolUse[0].matcher, 'Agent');
-  assert.equal(h.PreToolUse[0].hooks[0].command, 'node .claude/hooks/agentsmith/require-explicit-model.mjs');
+  assert.equal(h.PreToolUse[0].hooks[0].command, 'node ".claude/hooks/agentsmith/require-explicit-model.mjs"');
+});
+
+test('quotes the hook path so a base dir with a space survives shell splitting', () => {
+  const h = agentsmithHooks('C:\\Users\\John Doe\\.claude\\hooks\\agentsmith\\require-explicit-model.mjs');
+  assert.equal(
+    h.PreToolUse[0].hooks[0].command,
+    'node "C:/Users/John Doe/.claude/hooks/agentsmith/require-explicit-model.mjs"',
+  );
 });
 
 test('injects the hook into empty/absent settings', () => {

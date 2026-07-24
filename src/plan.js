@@ -16,9 +16,15 @@ export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, fl
   ops.push({ kind: 'write', path: built.corePath, content: built.coreContent });
   for (const b of built.bundles) ops.push({ kind: 'write', path: b.path, content: b.content });
 
-  // Root stub: write-once (project + nested only). Kept if present.
+  // Root stub: write-once (project + nested only). Kept if present -- UNLESS the
+  // same path is being pruned this run (a --placement root -> nested flip: the old
+  // root core at AGENTS.md is an orphan). keepStub would no-op against the file the
+  // prune just deleted, so write the stub fresh when its path is a pending orphan.
   if (built.stub) {
-    ops.push(stubExists ? { kind: 'keepStub', path: built.stub.path } : { kind: 'write', path: built.stub.path, content: built.stub.content });
+    const stubBeingPruned = orphans.includes(built.stub.path);
+    ops.push(stubExists && !stubBeingPruned
+      ? { kind: 'keepStub', path: built.stub.path }
+      : { kind: 'write', path: built.stub.path, content: built.stub.content });
   }
 
   // Adapter files.
@@ -72,7 +78,9 @@ export function renderPlan(plan) {
   const lines = ['agentsmith plan:'];
   if (writes.length) lines.push(`  write   ${writes.length} file(s): ${writes.slice(0, 3).join(', ')}${writes.length > 3 ? ', ...' : ''}`);
   for (const u of updates) lines.push(`  update  ${u}`);
-  if (deletes.length) lines.push(`  DELETE  ${deletes.length} file(s): ${deletes.slice(0, 3).join(', ')}${deletes.length > 3 ? ', ...' : ''}`);
+  // Deletes are the dangerous class -- list every one so a destructive confirmation
+  // never hides a file behind a truncating '...'. Writes stay capped (safe, additive).
+  if (deletes.length) lines.push(`  DELETE  ${deletes.length} file(s): ${deletes.join(', ')}`);
   for (const k of keeps) lines.push(`  keep    ${k} (unchanged)`);
   return lines.join('\n');
 }

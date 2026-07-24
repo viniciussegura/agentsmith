@@ -37,7 +37,10 @@ export function agentsmithHooks(commandPath) {
     PreToolUse: [
       {
         matcher: 'Agent',
-        hooks: [{ type: 'command', command: `node ${norm(commandPath)}` }],
+        // Quote the path: a user-scope install writes an absolute path, and a home
+        // dir with a space (`C:\Users\John Doe\...`, OneDrive-redirected paths) would
+        // otherwise split at the shell and the hook silently never fires.
+        hooks: [{ type: 'command', command: `node "${norm(commandPath)}"` }],
       },
     ],
   };
