@@ -21,13 +21,22 @@ test('install plan writes core+bundles+adapters and merges settings when tools o
   assert.ok(p.manifestPaths.includes('.claude/skills/x/SKILL.md'));
 });
 
-test('install --no-tools un-merges the hook instead of merging (bug-2 fix)', () => {
+test('install --no-tools un-merges the hook when an owned entry is present (bug-2 fix)', () => {
   const p = buildInstallPlan({ base: '/b', absolute: false, built, adapterPlan: [], scope: { kind: 'project' },
     flags: { mode: 'split', placement: 'nested', tools: false, dev: false, clean: false, yes: false, dryRun: false },
-    prevManifestPaths: [], stubExists: false });
+    prevManifestPaths: [], stubExists: false, settingsHasOwned: true });
   const kinds = p.ops.map((o) => o.kind);
-  assert.ok(kinds.includes('unmergeSettings'), 'tools-off un-merges');
+  assert.ok(kinds.includes('unmergeSettings'), 'tools-off un-merges when ours is present');
   assert.ok(!kinds.includes('mergeSettings'), 'tools-off never merges');
+});
+
+test('install --no-tools emits no settings op when nothing agentsmith-owned is present', () => {
+  const p = buildInstallPlan({ base: '/b', absolute: false, built, adapterPlan: [], scope: { kind: 'project' },
+    flags: { mode: 'split', placement: 'nested', tools: false, dev: false, clean: false, yes: false, dryRun: false },
+    prevManifestPaths: [], stubExists: false, settingsHasOwned: false });
+  const kinds = p.ops.map((o) => o.kind);
+  assert.ok(!kinds.includes('unmergeSettings'), 'no phantom un-merge on a settings.json without our hook');
+  assert.ok(!kinds.includes('mergeSettings'));
 });
 
 test('install keeps an existing stub rather than overwriting', () => {
@@ -61,7 +70,7 @@ test('install prunes recorded orphans no longer produced', () => {
 test('uninstall plan prunes all manifest paths, un-merges, removes import (user)', () => {
   const p = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: ['.agentsmith/AGENTS.md', '.claude/skills/x/SKILL.md'],
     corePath: '.agentsmith/AGENTS.md',
-    stubContent: 'STUB', stubOnDiskContent: 'STUB', hasSettings: true, hasClaudeMd: true, isUser: true });
+    stubContent: 'STUB', stubOnDiskContent: 'STUB', settingsHasOwned: true, hasClaudeMd: true, isUser: true });
   const kinds = p.ops.map((o) => o.kind);
   assert.ok(kinds.includes('prune'));
   assert.ok(kinds.includes('unmergeSettings'));
@@ -73,25 +82,25 @@ test('uninstall plan prunes all manifest paths, un-merges, removes import (user)
 test('removeImport carries the actual core target, so a root-placement import is matchable', () => {
   const nested = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: ['.agentsmith/AGENTS.md'],
     corePath: '.agentsmith/AGENTS.md',
-    stubContent: 'STUB', stubOnDiskContent: null, hasSettings: false, hasClaudeMd: true, isUser: true });
+    stubContent: 'STUB', stubOnDiskContent: null, settingsHasOwned: false, hasClaudeMd: true, isUser: true });
   assert.equal(nested.ops.find((o) => o.kind === 'removeImport').target, '.agentsmith/AGENTS.md');
 
   const root = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: ['AGENTS.md'],
     corePath: 'AGENTS.md',
-    stubContent: 'STUB', stubOnDiskContent: null, hasSettings: false, hasClaudeMd: true, isUser: true });
+    stubContent: 'STUB', stubOnDiskContent: null, settingsHasOwned: false, hasClaudeMd: true, isUser: true });
   assert.equal(root.ops.find((o) => o.kind === 'removeImport').target, 'AGENTS.md');
 });
 
 test('uninstall skips the stub branch when AGENTS.md is a manifest path (--placement root)', () => {
   const p = buildUninstallPlan({ base: '/b', absolute: false, manifestPaths: ['AGENTS.md'],
-    stubContent: 'STUB', stubOnDiskContent: 'FULL CORE', hasSettings: false, hasClaudeMd: false, isUser: false });
+    stubContent: 'STUB', stubOnDiskContent: 'FULL CORE', settingsHasOwned: false, hasClaudeMd: false, isUser: false });
   assert.ok(!p.ops.some((o) => o.kind === 'keepStub'), 'no spurious keepStub for a pruned root core');
   assert.ok(p.ops.some((o) => o.kind === 'prune' && o.paths.includes('AGENTS.md')), 'root core still pruned');
 });
 
 test('uninstall keeps an edited stub', () => {
   const p = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: [],
-    stubContent: 'STUB', stubOnDiskContent: 'EDITED BY USER', hasSettings: false, hasClaudeMd: false, isUser: false });
+    stubContent: 'STUB', stubOnDiskContent: 'EDITED BY USER', settingsHasOwned: false, hasClaudeMd: false, isUser: false });
   assert.ok(p.ops.some((o) => o.kind === 'keepStub'));
 });
 

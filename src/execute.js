@@ -57,7 +57,6 @@ export function applyPlan(plan, { pkgRoot, log = (m) => process.stderr.write(`${
         editImport(resolve(base, op.path), resolve(base, op.target).replace(/\\/g, '/'), true, log);
         break;
       case 'keepStub':
-      case 'keepImport':
         log(`agentsmith: kept existing ${resolve(base, op.path)}`);
         break;
     }

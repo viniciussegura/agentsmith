@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -13,7 +13,7 @@ import { parseArgs } from '../src/args.js';
 import { buildInstallPlan, buildUninstallPlan, renderPlan } from '../src/plan.js';
 import { applyPlan } from '../src/execute.js';
 import { confirm, runWizard, makeSeam } from '../src/prompt.js';
-import { SETTINGS_REL, CLAUDE_MD_REL } from '../src/settings.js';
+import { SETTINGS_REL, CLAUDE_MD_REL, hasOwnedHooks } from '../src/settings.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -224,6 +224,14 @@ async function main() {
     process.stderr.write(`agentsmith: error -- --scope path is not a directory: ${base}\n`); process.exit(1);
   }
 
+  // Whether settings.json already carries an agentsmith-owned hook, so the plan
+  // emits an un-merge only when there is something of ours to remove.
+  const settingsPath = resolve(base, SETTINGS_REL);
+  let settingsHasOwned = false;
+  if (existsSync(settingsPath)) {
+    try { settingsHasOwned = hasOwnedHooks(JSON.parse(readFileSync(settingsPath, 'utf8'))); } catch { /* malformed -> treat as none */ }
+  }
+
   if (cmd.kind === 'uninstall' || (cmd.kind === 'install' && cmd.flags.clean)) {
     const prev = readManifest(base);
     const stubDest = resolve(base, 'AGENTS.md');
@@ -236,7 +244,7 @@ async function main() {
       base, absolute, manifestPaths: prev.paths, corePath: prevCorePath,
       stubContent: built.stub ? built.stub.content : null,
       stubOnDiskContent: existsSync(stubDest) ? readFileSync(stubDest, 'utf8') : null,
-      hasSettings: existsSync(resolve(base, SETTINGS_REL)),
+      settingsHasOwned,
       hasClaudeMd: existsSync(resolve(base, CLAUDE_MD_REL)),
       isUser,
     });
@@ -264,6 +272,7 @@ async function main() {
   const installPlan = buildInstallPlan({
     base, absolute, built, adapterPlan, scope: cmd.scope, flags: cmd.flags,
     prevManifestPaths: readManifest(base).paths, stubExists: existsSync(resolve(base, 'AGENTS.md')),
+    settingsHasOwned,
   });
   const decision = await confirm({ plan: installPlan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: false, render: renderPlan });
   if (decision === 'skip') process.exit(0);
@@ -272,7 +281,12 @@ async function main() {
 }
 
 // Run the pipeline only when invoked as the CLI, not when a module (e.g. a test)
-// imports makeListModules from this file.
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// imports makeListModules from this file. Resolve process.argv[1] through realpath:
+// npm installs the bin as a `.bin/agentsmith` symlink, and Node's ESM loader
+// canonicalizes import.meta.url through realpath, so on the npx / global-symlink
+// launch (the primary advertised entry) the raw paths differ and main() would be
+// skipped -- a silent exit 0. realpathSync collapses the symlink so they match.
+const entry = process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href;
+if (import.meta.url === entry) {
   main().catch((e) => { process.stderr.write(`agentsmith: ${e.message}\n`); process.exit(1); });
 }

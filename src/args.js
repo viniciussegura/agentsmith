@@ -39,6 +39,9 @@ function collect(tokens, known) {
 /** Parse argv (process.argv.slice(2)) into a Command. Pure. */
 export function parseArgs(argv) {
   if (argv.length === 0) return { kind: 'wizard' };
+  // `-h` is the top-level short alias only; per-verb help is `--help` (e.g.
+  // `install --help`), so `install -h` is intentionally an unknown-flag error --
+  // one short alias at the front, long form everywhere else.
   if (argv[0] === '--help' || argv[0] === '-h') return { kind: 'help' };
   if (argv[0] === '--version') return { kind: 'version' };
 

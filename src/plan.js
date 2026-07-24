@@ -2,7 +2,7 @@ import { orphanPaths } from './manifest.js';
 import { SETTINGS_REL, CLAUDE_MD_REL } from './settings.js';
 
 // buildInstallPlan: assemble the ordered op list for an install (pure).
-export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, flags, prevManifestPaths, stubExists }) {
+export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, flags, prevManifestPaths, stubExists, settingsHasOwned }) {
   const ops = [];
   const manifestPaths = [
     built.corePath,
@@ -33,20 +33,23 @@ export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, fl
   // User-scope import wiring.
   if (scope.kind === 'user') ops.push({ kind: 'writeImport', path: CLAUDE_MD_REL, target: built.corePath });
 
-  // settings.json: merge our hook when tools installed, else un-merge any stale entry (bug-2 fix).
-  // execute.js resolves the hook command path from plan.absolute; nothing here to precompute.
-  ops.push(flags.tools
-    ? { kind: 'mergeSettings', path: SETTINGS_REL }
-    : { kind: 'unmergeSettings', path: SETTINGS_REL });
+  // settings.json: merge our hook when tools installed, else un-merge -- but only
+  // when an owned entry is actually present, so a --no-tools install that never
+  // wrote a hook does not re-serialize the file or print a phantom "remove" line.
+  // execute.js resolves the hook command path from plan.absolute; nothing to precompute.
+  if (flags.tools) ops.push({ kind: 'mergeSettings', path: SETTINGS_REL });
+  else if (settingsHasOwned) ops.push({ kind: 'unmergeSettings', path: SETTINGS_REL });
 
   return { base, absolute, ops, manifestPaths };
 }
 
 // buildUninstallPlan: reverse an install of the same scope (pure).
-export function buildUninstallPlan({ base, absolute, manifestPaths, corePath, stubContent, stubOnDiskContent, hasSettings, hasClaudeMd, isUser }) {
+export function buildUninstallPlan({ base, absolute, manifestPaths, corePath, stubContent, stubOnDiskContent, settingsHasOwned, hasClaudeMd, isUser }) {
   const ops = [];
   if (manifestPaths.length) ops.push({ kind: 'prune', paths: manifestPaths });
-  if (hasSettings) ops.push({ kind: 'unmergeSettings', path: SETTINGS_REL });
+  // Un-merge only when an owned hook is actually present: a --no-tools install
+  // wrote none, and re-serializing settings.json for nothing overstates the plan.
+  if (settingsHasOwned) ops.push({ kind: 'unmergeSettings', path: SETTINGS_REL });
   if (isUser && hasClaudeMd) ops.push({ kind: 'removeImport', path: CLAUDE_MD_REL, target: corePath });
   // Root stub: delete only if unmodified; else keep. Skipped when AGENTS.md is
   // already a manifest path (a --placement root install owns the real core there,
@@ -73,7 +76,7 @@ export function renderPlan(plan) {
     else if (op.kind === 'unmergeSettings') updates.push(`${REL(op.path)} (remove agentsmith hook)`);
     else if (op.kind === 'writeImport') updates.push(`${REL(op.path)} (add agentsmith import)`);
     else if (op.kind === 'removeImport') updates.push(`${REL(op.path)} (remove agentsmith import)`);
-    else if (op.kind === 'keepStub' || op.kind === 'keepImport') keeps.push(REL(op.path));
+    else if (op.kind === 'keepStub') keeps.push(REL(op.path));
   }
   const lines = ['agentsmith plan:'];
   if (writes.length) lines.push(`  write   ${writes.length} file(s): ${writes.slice(0, 3).join(', ')}${writes.length > 3 ? ', ...' : ''}`);

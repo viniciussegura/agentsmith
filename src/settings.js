@@ -53,6 +53,20 @@ const isOwned = (entry) =>
   );
 
 /**
+ * True when a parsed settings object carries at least one agentsmith-owned hook.
+ * Lets the caller skip a no-op un-merge (which would re-serialize settings.json and
+ * print a misleading "remove agentsmith hook" line) when nothing of ours is present.
+ *
+ * @param {object|null} existing  Parsed settings.json, or null when absent.
+ * @returns {boolean}
+ */
+export function hasOwnedHooks(existing) {
+  const hooks = existing && typeof existing === 'object' ? existing.hooks : null;
+  if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)) return false;
+  return Object.values(hooks).some((entries) => Array.isArray(entries) && entries.some(isOwned));
+}
+
+/**
  * Merge agentsmith's owned hooks into an existing settings object. Pure: no disk access.
  *
  * Idempotent and self-deprecating: strips every prior agentsmith-owned entry (matched

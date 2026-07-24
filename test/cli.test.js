@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, writeFileSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, existsSync, writeFileSync, readFileSync, rmSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,21 @@ const cli = resolve(fileURLToPath(import.meta.url), '../../bin/cli.js');
 function run(cwd, args = []) {
   execFileSync('node', [cli, 'install', ...args], { cwd });
 }
+
+test('bin runs when launched through a .bin-style symlink (npx/global entry guard)', (t) => {
+  // npm installs the bin as a symlink and Node realpaths import.meta.url; the entry
+  // guard must realpath process.argv[1] too or main() silently never runs (exit 0).
+  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-link-'));
+  const link = join(dir, 'agentsmith');
+  try {
+    try { symlinkSync(cli, link); }
+    catch { t.skip('symlink creation unavailable (needs privilege on this platform)'); return; }
+    const out = execFileSync('node', [link, '--version'], { encoding: 'utf8' });
+    assert.match(out, /\d+\.\d+\.\d+/, 'main() ran through the symlink -- version printed, not a silent exit 0');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('default run emits lean core, bundle, and a root stub', () => {
   const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));

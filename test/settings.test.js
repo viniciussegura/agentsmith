@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeSettings, agentsmithHooks, HOOK_REL } from '../src/settings.js';
+import { mergeSettings, agentsmithHooks, hasOwnedHooks, HOOK_REL } from '../src/settings.js';
 
 const owned = agentsmithHooks(HOOK_REL);
 const command = `node "${HOOK_REL}"`;
@@ -76,6 +76,14 @@ test('deprecation: removes an event entirely when only an owned entry remains', 
 test('tolerates a malformed hooks value', () => {
   const next = mergeSettings({ hooks: 'oops' }, owned);
   assert.deepEqual(next.hooks.PreToolUse, owned.PreToolUse);
+});
+
+test('hasOwnedHooks detects our entry, ignores absent/user-only/malformed settings', () => {
+  assert.equal(hasOwnedHooks(null), false);
+  assert.equal(hasOwnedHooks({}), false);
+  assert.equal(hasOwnedHooks({ hooks: 'oops' }), false);
+  assert.equal(hasOwnedHooks({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node user.mjs' }] }] } }), false);
+  assert.equal(hasOwnedHooks(mergeSettings(null, owned)), true);
 });
 
 test('mergeSettings(existing, {}) removes agentsmith hooks, keeps user hooks', () => {
