@@ -4,12 +4,12 @@ description: Lay down (or refresh) the agentsmith instruction set in this projec
 
 Run the agentsmith generator to write this project's instruction files.
 
-**Requires** Node + `npx` on PATH and npm-registry reachability (or a local clone of the agentsmith repo). If `npx` is unavailable or the registry is unreachable, STOP and report this exact requirement plus the manual alternative below — do not partially write.
+**Requires** Node + `npx` on PATH and GitHub reachability (agentsmith ships from GitHub, not the npm registry), or a local clone of the agentsmith repo. If `npx` is unavailable or GitHub is unreachable, STOP and report this exact requirement plus the manual alternative below — do not partially write.
 
 1. Ask the user: project scope (this repo) or `--scope user` (home-global)?
 2. Run the generator:
-   - project: `npx agentsmith install`
-   - user-global: `npx agentsmith install --scope user`
+   - project: `npx -y github:viniciussegura/agentsmith install`
+   - user-global: `npx -y github:viniciussegura/agentsmith install --scope user`
 
    Local-clone fallback when `npx` is unavailable: from a checkout of the agentsmith repo, `node bin/cli.js install` (project) or `node bin/cli.js install --scope user`.
 3. Report what was written (the generated `AGENTS.md` + on-demand bundles, and for `--scope user` the `~/.claude/CLAUDE.md` import block).
