@@ -119,11 +119,34 @@ Commands then surface as `/agentsmith:code-review-board`,
 
 - **Instructions are not part of the plugin** (they are AI-neutral and
   project-tailored, not Claude-only static text). A plugin user lays them down by
-  running `/agentsmith:agentsmith-init`, which invokes the generator — so that
-  command needs Node + `npx` (or a local checkout).
-- **Pick one path for tooling.** Installing via *both* `npx` and the plugin
-  double-wires the `Agent` model-enforcement hook (harmless — it is idempotent —
-  but redundant). Use the plugin **or** the `npx` adapter install, not both.
+  running **`/agentsmith:update-instructions`**, which invokes the generator with
+  `--no-tools` (instructions only — the plugin already provides the tools) — so
+  that command needs Node + `npx` (or a local checkout). Its counterpart
+  **`/agentsmith:remove-instructions`** clears the generated instructions again;
+  run it before disabling the plugin if you want the project left clean (the
+  plugin cannot clean the instructions up itself). Both are plugin-only — the CLI
+  never installs them.
+- **Pick one path for tooling.** Installing via *both* `npx` (full) and the
+  plugin double-wires the `Agent` model-enforcement hook (harmless — it is
+  idempotent — but redundant) and lands two copies of every command. Use the
+  plugin **or** the `npx` adapter install, not both, for tooling.
+
+### Choosing an install path
+
+| | Claude Code plugin | `npx` CLI |
+| --- | --- | --- |
+| Instructions (`AGENTS.md` + bundles) | ✗ — run `/agentsmith:update-instructions` | ✓ (`install`) |
+| Tools (commands / agents / skills) | ✓ `/agentsmith:<name>` | ✓ `/agentsmith-<name>` (`install`, tools on) |
+| Model-enforcement hook | ✓ via `plugin.json` | ✓ via `settings.json` |
+| Update | `/plugin` (version-aware) | re-run `npx … install` |
+| Teardown | disable/remove in `/plugin` (+ `/agentsmith:remove-instructions` for instructions) | `npx … uninstall` |
+
+Two coherent paths:
+
+- **Plugin path:** the plugin for tools, `/agentsmith:update-instructions` (`--no-tools` under the hood) for instructions. No duplication, single hook.
+- **`npx`-only path:** `npx … install` does both tools and instructions; no plugin. Use `--no-tools` only if you want instructions without adapters.
+
+Mixing a *full* `npx install` with the plugin is the case to avoid — it is the double-tools / double-hook redundancy above.
 
 ## Contributing
 

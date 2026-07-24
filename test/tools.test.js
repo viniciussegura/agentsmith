@@ -53,18 +53,33 @@ test('maps a mixed tools/ + devtools/claude list, only those (commands prefixed)
 test('claude commands get an agentsmith- prefix; skills and agents do not', () => {
   const plan = planToolInstall([
     'tools/claude/commands/spec-review-board.md',
-    'tools/claude/commands/agentsmith-init.md',
+    'tools/claude/commands/agentsmith-legacy.md',
     'tools/claude/skills/code-review-board/lint.mjs',
     'tools/claude/agents/review-swe.md',
     'tools/gemini/commands/x.md',
   ]);
   const dest = Object.fromEntries(plan.map((p) => [p.src, p.dest]));
   assert.equal(dest['tools/claude/commands/spec-review-board.md'], '.claude/commands/agentsmith-spec-review-board.md');
-  // a name already starting with agentsmith is not doubled
-  assert.equal(dest['tools/claude/commands/agentsmith-init.md'], '.claude/commands/agentsmith-init.md');
+  // a name already starting with agentsmith is not doubled (defensive guard)
+  assert.equal(dest['tools/claude/commands/agentsmith-legacy.md'], '.claude/commands/agentsmith-legacy.md');
   // skills keep canonical names (internal script paths) and agents stay bare (dispatch names)
   assert.equal(dest['tools/claude/skills/code-review-board/lint.mjs'], '.claude/skills/code-review-board/lint.mjs');
   assert.equal(dest['tools/claude/agents/review-swe.md'], '.claude/agents/review-swe.md');
   // only the claude adapter is namespaced; other ai adapters stay bare
   assert.equal(dest['tools/gemini/commands/x.md'], '.gemini/commands/x.md');
+});
+
+test('plugin-only lifecycle commands are excluded from the CLI adapter install', () => {
+  const plan = planToolInstall([
+    'tools/claude/commands/update-instructions.md',
+    'tools/claude/commands/remove-instructions.md',
+    'tools/claude/commands/spec-index.md',
+    'tools/claude/agents/review-swe.md',
+  ]);
+  // update/remove-instructions drive the generator and are meaningful only to a
+  // plugin user -- the CLI never ships them (the plugin auto-discovers them).
+  assert.deepEqual(plan.map((p) => p.dest), [
+    '.claude/commands/agentsmith-spec-index.md',
+    '.claude/agents/review-swe.md',
+  ]);
 });
