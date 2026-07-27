@@ -86,6 +86,10 @@ test('default run installs the claude adapter into .claude', () => {
     assert.ok(existsSync(join(dir, '.claude/skills/code-review-board/reviewer-common.md')), 'shared reviewer protocol installed');
     assert.ok(existsSync(join(dir, '.claude/commands/agentsmith-code-review-board.md')), 'review-board command installed');
     assert.ok(existsSync(join(dir, '.claude/commands/agentsmith-review-promote.md')), 'review-promote command installed');
+    // plugin-only lifecycle commands are NOT written by the CLI (they would prune
+    // their own adapters; the plugin ships them instead).
+    assert.ok(!existsSync(join(dir, '.claude/commands/agentsmith-update-instructions.md')), 'update-instructions not CLI-installed');
+    assert.ok(!existsSync(join(dir, '.claude/commands/agentsmith-remove-instructions.md')), 'remove-instructions not CLI-installed');
     // the instruction-review adapter is authoring-only (--dev); see the dedicated
     // default-excludes / --dev-includes tests below.
   } finally {

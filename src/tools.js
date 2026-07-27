@@ -17,10 +17,26 @@ export function planToolInstall(sourceRelPaths) {
     const m = rel.match(/^(?:tools\/([^/]+)|devtools\/(claude))\/(.+)$/);
     if (!m) continue;
     const ai = m[1] ?? m[2];
+    if (isPluginOnly(ai, m[3])) continue;
     const rest = namespaceRest(ai, m[3]);
     plan.push({ src: rel, dest: `.${ai}/${rest}` });
   }
   return plan;
+}
+
+// Plugin-only Claude commands: the instruction-set lifecycle commands. They drive
+// the CLI generator (`install --no-tools` / `uninstall`) and are meaningful ONLY to
+// a plugin user, whose tools come from the plugin and whose CLI manifest therefore
+// records no adapters. Shipping them in a full CLI install would be a footgun: their
+// `--no-tools` install would prune the very adapters that same install wrote. The
+// plugin still auto-discovers them from tools/claude/commands/; the CLI just skips
+// copying them. Keep this list in step with those command files.
+export const PLUGIN_ONLY_COMMANDS = new Set(['update-instructions', 'remove-instructions']);
+
+function isPluginOnly(ai, rest) {
+  if (ai !== 'claude') return false;
+  const m = rest.match(/^commands\/(.+)\.md$/);
+  return m ? PLUGIN_ONLY_COMMANDS.has(m[1]) : false;
 }
 
 // Project-level Claude commands install as BARE slash names, which can collide
@@ -29,8 +45,9 @@ export function planToolInstall(sourceRelPaths) {
 // `/agentsmith-<name>` -- deliberately the hyphen form, kept distinct from the
 // plugin's colon form (`/agentsmith:<name>`, set by plugin.json) so a project
 // that installs BOTH gets two non-colliding names rather than one ambiguous
-// `/agentsmith:<name>`. A name already starting with `agentsmith` is left alone,
-// so `agentsmith-init` does not become `agentsmith-agentsmith-init`.
+// `/agentsmith:<name>`. A name already starting with `agentsmith` is left alone
+// (defensive: avoids `/agentsmith-agentsmith-<name>` if a command is ever named
+// with that prefix), though no current command triggers it.
 //
 // SKILLS are intentionally NOT prefixed: a skill dir holds internal scripts
 // (board-round.mjs, guard.mjs, ...) referenced by `.claude/skills/<dir>/...` paths,
