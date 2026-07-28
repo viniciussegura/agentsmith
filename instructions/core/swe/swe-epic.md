@@ -2,6 +2,7 @@
 
 An epic organizes work too large to ship as a single squash-merge (#git-branch-workflow) -- a multi-deliverable initiative that needs sequencing and a roadmap before implementation begins.
 It is warranted when the work spans **more than one deliverable**: it cannot land in one squash-merge, so it must be broken down and sequenced.
+Distinct from the review board's *epic* (#ai-review-board), which clusters related issues in a triage report: a forward planning artifact here, an issue grouping there.
 
 Like the reference spec (#swe-reference-spec) and unlike a working spec (#ai-plan), an epic is **mutable and self-replacing**: every file is edited in place as understanding changes.
 It is **never** consulted for current truth -- it holds the current *plan*, not implemented fact.
