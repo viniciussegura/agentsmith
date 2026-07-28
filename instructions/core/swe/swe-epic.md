@@ -1,35 +1,38 @@
 # #swe-epic Epics
 
-An epic is warranted when the work spans **more than one deliverable**:
+An epic organizes work too large to ship as a single squash-merge (#git-branch-workflow) -- a multi-deliverable initiative that needs sequencing and a roadmap before implementation begins.
+It is warranted when the work spans **more than one deliverable**: it cannot land in one squash-merge, so it must be broken down and sequenced.
 
-- it cannot ship as a single squash-merge, so it needs sequencing;
-- it can be discussed and have a roadmap **before** implementation;
-- it is **NEVER** consulted for current truth: it represents the current understanding of the work, not an implemented fact (_i.e._ every file in an epic is mutable in-place).
+Like the reference spec (#swe-reference-spec) and unlike a working spec (#ai-plan), an epic is **mutable and self-replacing**: every file is edited in place as understanding changes.
+It is **never** consulted for current truth -- it holds the current *plan*, not implemented fact.
+It is topic-scoped, not point-in-time, so its directory carries no date prefix.
+It is deleted when its last unit of work ships or it is abandoned.
 
-It should be persisted in the following format:
+Persisted as:
 ```
 docs/epics/<slug>/
-  README.md                  // entry point to understanding the epic, introducing the main problem and how to read the remaining files.
-  decisions/<slug>.md        // provisional decisions.
-  roadmap.md                 // delivery plan organized in versions and milestones, with a clear version sequencing, and in each version, a clear milestones planning.
-  milestones/<id>-<slug>.md  // documentation of the milestone, detailing its work units and their plan.
-  work-units/<id>-<slug>.md  // individual work unit documentation, comprising a title and a description (basic Jira ticket / Github issue protocol), at least.
-  open-questions.md          // summary of negotiations / decisions / blockers, a brief summarizing what we need, options, recommendation, what unblocks. 
+  README.md                    // entry point: the problem, and how to read the rest.
+  roadmap.md                   // sequencing plan: version order, per-version milestone order, and cross-cutting dependencies.
+  decisions/<slug>.md          // provisional decisions (#swe-design-decisions), not yet standing.
+  milestones/<id>-<slug>.md    // a milestone: its units of work and their plan.
+  units-of-work/<id>-<slug>.md // one unit of work: title + description, at least (issue-ticket protocol).
+  open-questions.md            // open negotiations/blockers: need, options, recommendation, what unblocks.
 ```
 
-Related concepts:
+`<id>` is epic-local and author-chosen; it need only be unique within the epic.
 
-| Concept    | Description                         | Breakdown       | Github map           | 
-| ---------- | ----------------------------------- | --------------- | -------------------- | 
-| Version    | full feature release                | 1-n milestones  | Release              | 
-| Milestone  | themed work collection              | 1-n work units  | Milestone            |
-| Work unit  | fixes issues or introduces features | none            | Issue + Pull request |
+Structure:
 
-Versions are sequential in time, while milestones and work units may be executed in parallel (inside their parent scope).
+| Concept      | Description                         | Breakdown         | GitHub map           |
+| ------------ | ----------------------------------- | ----------------- | -------------------- |
+| Version      | full feature release                | 1-n milestones    | Release              |
+| Milestone    | themed work collection              | 1-n units of work | Milestone            |
+| Unit of work | fixes issues or introduces features | none              | Issue + pull request |
 
-A work unit that is picked up becomes a working spec (#ai-plan); its entry is reduced to a pointer; the working spec is the only copy.
-A provisional decision moves to the project's decision log (_e.g._ `adr`, `reference-spec`) when the first unit depending on it ships.
-A technical debt or deferred item surfaced while planning goes to its register immediately, not at graduation -- an epic is not a holding pen for findings actionable without it.
-The open questions are update as they are answered: their findings are recorded in the right place and the question itself is removed.
+The roadmap defines the **sequencing plan**: versions run sequentially in time, while milestones and units of work run in parallel within their parent scope unless a dependency orders them.
+Every milestone and unit of work declares its dependencies -- what must ship before it can start, and what it blocks -- so the executable order is explicit, not inferred from list position.
 
-The epic directory is deleted when its last unit ships or it's abandoned.
+A unit of work is planned in the epic and executed as a working spec (#ai-plan): when it is picked up it **becomes** a working spec, and its epic entry is reduced to a pointer -- the path to that working-spec directory -- which is then the only copy.
+A provisional decision graduates to the project's standing decision log (#swe-design-decisions or #swe-reference-spec) when the first unit depending on it ships.
+A technical debt (#swe-technical-debts) or deferred item (#swe-future-work) surfaced while planning goes to its register immediately, not at graduation -- an epic is not a holding pen for findings actionable without it.
+Open questions are updated as they are answered: each answer is recorded in its proper home and the question is removed.

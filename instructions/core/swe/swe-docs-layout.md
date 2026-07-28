@@ -7,4 +7,4 @@
 | `docs/working-specs/<YYYY-MM-DD>-<slug>/` | a unit of work, holding `spec.md` and/or `plan.md`, indexed by `docs/working-specs/INDEX.md` | #ai-plan |
 | `docs/technical-debts/<YYYY-MM-DD>-<slug>.md` | open accepted shortcuts or known limitations | #swe-technical-debts |
 | `docs/future-work/<YYYY-MM-DD>-<slug>.md` | deferred or out-of-scope items | #swe-future-work |
-| `docs/epics/<slug>` |  | #swe-epic | 
+| `docs/epics/<slug>/` | a multi-deliverable initiative: roadmap, milestones, and units of work | #swe-epic |
