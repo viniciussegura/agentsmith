@@ -11,8 +11,11 @@ A member of the reference spec (`#swe-reference-spec`): it reflects the model as
 | Working plan | `docs/working-specs/<date>-<slug>/` | `plan.md` | frozen; prunable once `Implemented` | point-in-time | how this unit was executed |
 | Design decision | `docs/design-decisions/` | `<decision-slug>.md` | mutable, self-replacing | present-truth | **WHY the system is as it is, now** |
 | Reference spec | `docs/reference-spec/` | `<slug>.md` | mutable, self-replacing | present-truth | WHAT + HOW the system is, now |
+| Epic | `docs/epics/<slug>/` | `README.md` + tree | mutable; deleted when shipped | present-truth\* | the delivery **plan** for multi-deliverable work, now |
 | Future-work | `docs/future-work/` | `<date>-<slug>.md` | removed when done | point-in-time | what we deferred |
 | Technical-debt | `docs/technical-debts/` | `<date>-<slug>.md` | removed when paid | point-in-time | what we compromised |
+
+\* Epic is present-truth by mutability -- edited in place, never frozen -- but holds a provisional *plan* rather than shipped truth, and is deleted when its last unit of work ships (`#swe-epic`).
 
 The set of working specs is indexed at the generated [`docs/working-specs/INDEX.md`](../working-specs/INDEX.md)
 (`agentsmith spec-index`; a drift test is the backstop).
@@ -44,6 +47,6 @@ The set of working specs is indexed at the generated [`docs/working-specs/INDEX.
 - *What does decision X affect?* → grep its slug across `docs/` (one-way linking
   is deliberate; no reverse index is maintained — see Boundary 1).
 
-This model is governed by the `#ai-plan`, `#swe-reference-spec`, and
-`#swe-design-decisions` rules under [`instructions/`](../../instructions/), and its
+This model is governed by the `#ai-plan`, `#swe-reference-spec`,
+`#swe-design-decisions`, and `#swe-epic` rules under [`instructions/`](../../instructions/), and its
 rationale is recorded in [`docs/design-decisions/records-architecture.md`](../design-decisions/records-architecture.md).

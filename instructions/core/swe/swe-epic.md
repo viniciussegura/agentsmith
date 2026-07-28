@@ -8,9 +8,9 @@ It is **never** consulted for current truth -- it holds the current *plan*, not 
 It is topic-scoped, not point-in-time, so its directory carries no date prefix.
 It is deleted when its last unit of work ships or it is abandoned.
 
-Persisted as:
+Its location and naming live in the layout map (#swe-docs-layout); internally:
 ```
-docs/epics/<slug>/
+<epic-dir>/
   README.md                    // entry point: the problem, and how to read the rest.
   roadmap.md                   // sequencing plan: version order, per-version milestone order, and cross-cutting dependencies.
   decisions/<slug>.md          // provisional decisions (#swe-design-decisions), not yet standing.
