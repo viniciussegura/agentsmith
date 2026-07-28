@@ -30,6 +30,14 @@ agentsmith is a verb-first CLI: `install`, `uninstall`, and `spec-index` are sub
 Bare `agentsmith` (no verb) opens an interactive wizard on a TTY, or errors off one.
 Full flag reference, the confirmation gate, and plugin-coexistence detail live in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md); this section is a summary.
 
+To put the `agentsmith` binary on `PATH` -- so the examples below run without the `npx github:…` prefix and its per-call permission prompt -- install it globally once:
+
+```bash
+npm install -g github:viniciussegura/agentsmith
+```
+
+This is the recommended setup for repeated use, and for running `agentsmith spec-index --check` from an agent (a plugin-only install ships the `/agentsmith-spec-index` command but not the binary, so it otherwise falls back to `npx -y github:viniciussegura/agentsmith spec-index`).
+
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
 Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
