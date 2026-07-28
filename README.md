@@ -36,7 +36,8 @@ To put the `agentsmith` binary on `PATH` -- so the examples below run without th
 npm install -g github:viniciussegura/agentsmith
 ```
 
-This is the recommended setup for repeated use, and for running `agentsmith spec-index --check` from an agent (a plugin-only install ships the `/agentsmith-spec-index` command but not the binary, so it otherwise falls back to `npx -y github:viniciussegura/agentsmith spec-index`).
+This is the recommended setup for repeated use, and for running `agentsmith spec-index --check` from an agent.
+A plugin-only install ships the commands but not the binary; its `npx` fallback is documented in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md#spec-index).
 
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.

@@ -68,7 +68,8 @@ agentsmith spec-index --check
 ```
 
 The regenerated `INDEX.md` header names this command (`agentsmith spec-index`), not the internal `bin/spec-index.js`, so it is accurate in a consumer project that has no `bin/`.
-When the binary is not on `PATH` -- a plugin-only install ships the `/agentsmith-spec-index` command but not the CLI -- the fallback is `npx -y github:viniciussegura/agentsmith spec-index [--check]`; installing the CLI globally (`npm install -g github:viniciussegura/agentsmith`) removes that fallback and the permission prompt it triggers.
+When the binary is not on `PATH` -- a plugin-only install ships the command (`/agentsmith:spec-index`) but not the CLI -- the fallback is `npx -y github:viniciussegura/agentsmith spec-index [--check]`.
+Installing the CLI globally (`npm install -g github:viniciussegura/agentsmith`) removes that fallback and the permission prompt it triggers.
 
 ### `--stdout`
 

@@ -11,4 +11,5 @@ If the `agentsmith` CLI is not on `PATH` (e.g. a plugin-only install, which ship
 
 To skip `npx` entirely (and the per-call permission prompt it triggers), install the CLI globally once -- `npm install -g github:viniciussegura/agentsmith` -- then run `agentsmith spec-index [--check]` directly.
 
-If the regeneration command is denied by the permission layer (in auto/non-interactive mode it is refused with no prompt), **stop and ask the user** to allow `Bash(npx -y github:viniciussegura/agentsmith:*)` or install the CLI globally. Do **not** hand-edit `INDEX.md` to work around a blocked command -- the header marks it generated, and a hand-edited index goes stale silently.
+If the regeneration command is denied by the permission layer (in auto/non-interactive mode it is refused with no prompt), **stop and ask the user** to allow `Bash(npx -y github:viniciussegura/agentsmith:*)` or install the CLI globally.
+Do **not** hand-edit `INDEX.md` to work around a blocked command -- the header marks it generated, and a hand-edited index goes stale silently.
