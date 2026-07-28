@@ -35,6 +35,15 @@ test('renderIndex sorts date-desc then slug-asc and links to spec.md', () => {
   assert.match(out, /\| 2026-02-01 \| \[B\]\(2026-02-01-b\/spec\.md\) \| Draft \|/);
 });
 
+// The header names the portable CLI command, never the internal driver path:
+// bin/spec-index.js does not exist in a consumer / plugin-only install, so a
+// header pointing at it misleads the reader into hunting a nonexistent file.
+test('renderIndex header names `agentsmith spec-index`, not the bin/ driver', () => {
+  const out = renderIndex([]);
+  assert.ok(out.includes('agentsmith spec-index'), 'header must name the portable command');
+  assert.ok(!out.includes('bin/spec-index.js'), 'header must not name the internal driver path');
+});
+
 // Live drift gate: the committed INDEX.md must equal a fresh generation.
 test('docs/working-specs/INDEX.md is not stale', () => {
   const dir = join(ROOT, 'docs', 'working-specs');
