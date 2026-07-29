@@ -42,6 +42,7 @@ owners:
   swe-deep-modules: swe
   swe-branch-lifespan: swe
   swe-consolidation-audit: swe
+  swe-epic: swe
 
   # security
   swe-security: security

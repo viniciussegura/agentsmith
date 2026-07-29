@@ -63,6 +63,7 @@ interface Issue {
 // A canonical grouping of related issues, mutated in place across rounds by the PM.
 // An epic stays 'open' while any child is 'open', then rolls up by its children's
 // terminal states (all closing -> 'fixed'; any 'promoted' and none open -> 'promoted').
+// Distinct from the #swe-epic planning artifact (docs/epics/): same name, different purpose.
 interface Epic {
   id: string;                // "<roundId>#epic-<n>"
   kind: 'epic';
