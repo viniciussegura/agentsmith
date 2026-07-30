@@ -6,7 +6,7 @@ project, the [README](README.md) is all you need.
 
 ## Repository layout
 
-```
+```text
 instructions/      rule sections (the portable source of truth)
   main.md          preamble, emitted first
   core/            ai/ git/ swe/ ...            always-loaded modules

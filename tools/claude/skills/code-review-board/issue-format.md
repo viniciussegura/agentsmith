@@ -80,7 +80,7 @@ Filenames render the id filesystem-safely (the `#` may be written as `--`); the 
 
 Local, per-machine, gitignored, living (not committed, not per-round folders):
 
-```
+```text
 .agentsmith/review-board/
   config.yaml                            active roles + gating table (+ instruction-review.participants)
   issues/<role-id>/<id>-<slug>.json       open issues, mutated in place across rounds

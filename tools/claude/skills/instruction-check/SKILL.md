@@ -48,7 +48,7 @@ is often in what the diff left unchanged (a stale doc, a missing test).
 
 Walk the changed surface against the rubric's `#tags`. For each finding emit exactly one line:
 
-```
+```text
 path:line -- #tag: the specific problem. the concrete fix.
 ```
 

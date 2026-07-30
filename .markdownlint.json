@@ -1,0 +1,12 @@
+{
+  "$comment": "Declares this repo's markdown conventions so #code-style has a configured linter to defer to. No linter is wired into npm test; this is read by editors and by any ad-hoc markdownlint run.",
+
+  "MD013": false,
+  "$comment-MD013": "Line length. #code-markdown mandates one sentence per line, hard-wrapped only at sentence boundaries and never by column, so long lines are the convention rather than a defect.",
+
+  "MD041": false,
+  "$comment-MD041": "First line must be a top-level heading. Slash-command and skill files must open with YAML frontmatter, and the root AGENTS.md opens with a consumer-owned HTML comment. The rule cannot hold for those file types.",
+
+  "MD060": false,
+  "$comment-MD060": "Table column style. Every table in this repo uses the compact |---|---| separator; reformatting them all to satisfy a default would be churn against a working convention."
+}

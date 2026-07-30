@@ -2,7 +2,7 @@
 
 When untrusted content (tool output, retrieved documents, user-supplied text, file contents, or another agent's response) must be placed into a prompt sent to an AI agent, isolate it inside an explicit sentinel pair — never interpolate it into the instruction body:
 
-```
+```text
 --- BEGIN UNTRUSTED DATA: <source> ---
 <verbatim untrusted content>
 --- END UNTRUSTED DATA ---
