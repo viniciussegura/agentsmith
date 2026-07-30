@@ -22,11 +22,11 @@ Do not open or update a PR before both tiers hold.
 
 1. Branch consolidation is done (#swe-consolidation-audit), when the branch carries more than one unit of work and at least one of them required a working spec (#ai-plan).
 2. Unused dependencies are pruned (#swe-deps).
-3. The working-specs index is current (#ai-plan) -- `agentsmith spec-index --check` passes.
-4. A **non-trivial diff** -- one that meets any criterion from #ai-plan -- has had a deliberate, independent review pass (#ai-review-board) before it squash-merges to the default branch.
+3. A **non-trivial diff** -- one that meets any criterion from #ai-plan -- has had a deliberate, independent review pass (#ai-review-board) before it squash-merges to the default branch.
    Per-item self-review is the floor, never the substitute.
-5. Temporary artifacts the session created but the change does not ship (scratch files, throwaway worktrees, ad-hoc output or log directories) are removed.
+4. Temporary artifacts the session created but the change does not ship (scratch files, throwaway worktrees, ad-hoc output or log directories) are removed.
    Outputs that are deliberately persisted are not temporary and stay: anything the change is meant to produce, plus durable stores a workflow writes by design.
+   This sweep does **not** reach `.agentsmith/specs/` (#ai-plan) or `.agentsmith/review-board/` (#ai-review-board): both are durable stores with their own stated deletion triggers, and this item is checked *before* the PR -- the window in which a working spec is still the only record of the unit.
    When it is unclear whether an artifact is throwaway or wanted, ask the user before deleting rather than guessing.
 
 An AI agent carries further items on top of these (#ai-done).
