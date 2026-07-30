@@ -11,4 +11,4 @@
   A reword that leaves scope, constraints, and interface unchanged does **not** reset the cycle.
 - Convergence guard, checked after each review in this order: zero open blocking **and no contested `wontfix`** = converged; zero open blocking **with** a re-emitted (contested) `wontfix` = contested; otherwise two consecutive reviews **within the cycle** that fail to beat the best (lowest) open-blocking count = stalled (earliest the cycle's third review); otherwise a **5-round-per-cycle** cap.
 - On stall, cap, or contested, stop and ask the user how to proceed, summarizing open blockers and any contested `wontfix`.
-- No spec is committed at any point -- a working spec is uncommitted branch scratch (#ai-plan) -- and per-round reviews and rebuttals are likewise ephemeral, under `.agentsmith/tmp/spec-review/<spec-dir-name>/`, and never committed.
+- No spec is committed at any point -- a working spec is branch scratch in a store #ai-plan requires be gitignored -- and per-round reviews and rebuttals are likewise ephemeral, under `.agentsmith/tmp/spec-review/<spec-dir-name>/`, and never committed.

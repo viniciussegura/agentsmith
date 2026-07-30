@@ -22,6 +22,7 @@ devtools/          maintainer-only dev tooling, never shipped to consumers
   triage-ui/       the instruction-review triage server + apply engine
 .claude-plugin/marketplace.json   generated single-plugin marketplace (git-subdir -> tools/claude)
 manifest.json      preamble, ordered sections (folder + optional when/title), source label
+.markdownlint.jsonc  markdown conventions; read by editors, not wired into npm test
 src/generate.js    pure: (preamble, modules, source) -> AGENTS.md text
 src/build.js       pure: assembles the lean core, bundle files, and root stub
 src/sections.js    pure: splits manifest sections into core vs on-demand bundles

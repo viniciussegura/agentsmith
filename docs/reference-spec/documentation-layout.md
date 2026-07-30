@@ -26,3 +26,8 @@ The deliberate cost is cohesion: learning both *where* a folder is and *how* it 
 3. Cross-reference the two.
 
 The live map is `#swe-docs-layout`; this document is the standard it conforms to.
+Its counterpart is [`documentation-model.md`](./documentation-model.md), which says which record answers what.
+
+**Scope: `docs/` only.** The map is the single source of truth for every `docs/` path and naming pattern, and for nothing else.
+A store outside `docs/` -- the gitignored working-spec store at `.agentsmith/specs/` (`#ai-plan`), the review-board store at `.agentsmith/review-board/` (`#ai-review-board`) -- is named directly in its owner rule, because the map does not cover it.
+That is not a breach of the separation above: those paths are per-machine working state, not documentation, and they have exactly one home either way.

@@ -36,21 +36,29 @@ test('generator emits no dangling-tag or cross-boundary warnings', () => {
 
 // Removed vocabulary must stay removed (#ai-plan): the working spec is
 // uncommitted branch scratch and `agentsmith spec-index` no longer exists.
-// Two legs, because neither alone is sufficient:
-//   1. the source tree -- walk() reaches instructions/{frontend,backend,authoring}/,
-//      which the generated core does not carry;
-//   2. the generated core -- catches a token reaching output some other way.
+// Two legs with genuinely different reach:
+//   1. the source trees -- instructions/ AND tools/, which is where
+//      tools/claude/commands/spec-index.md actually lived; neither is fully
+//      carried by the generated core (bundles and adapters are separate files);
+//   2. the generated core -- catches a token reintroduced via generator template
+//      text in src/, which no source-tree walk would see.
+// docs/ is deliberately NOT walked: it holds two intentional residuals (the
+// cli.md migration-table row and the README migration step, which must name the
+// path it tells consumers to delete).
 // Match the PATH token `working-specs` (bare: #ai-plan once said "under
 // working-specs", with no docs/ prefix) and the COMMAND `spec-index`. The
 // singular term "working spec" / adjectival `working-spec` stays legal
 // throughout the set and must not be matched, or this fails on correct work.
 const REMOVED_TOKENS = ['working-specs', 'spec-index'];
+const GUARDED_TREES = ['instructions', 'tools'];
 
 test('removed working-spec/spec-index vocabulary is not reintroduced', () => {
-  for (const p of walk(join(ROOT, 'instructions'))) {
-    const text = readFileSync(p, 'utf8');
-    for (const tok of REMOVED_TOKENS) {
-      assert.ok(!text.includes(tok), `${tok} reintroduced in ${p}`);
+  for (const tree of GUARDED_TREES) {
+    for (const p of walk(join(ROOT, tree))) {
+      const text = readFileSync(p, 'utf8');
+      for (const tok of REMOVED_TOKENS) {
+        assert.ok(!text.includes(tok), `${tok} reintroduced in ${p}`);
+      }
     }
   }
   // Never read .agentsmith/AGENTS.md from disk: it is gitignored and absent on

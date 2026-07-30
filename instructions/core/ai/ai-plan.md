@@ -1,8 +1,10 @@
 # #ai-plan Specs and plans
 
 - A unit of work lives in one directory at `.agentsmith/specs/<branch>/<YYYY-MM-DD>-<slug>/`, holding `spec.md` and/or `plan.md`.
-  The store is gitignored and per-machine: a working spec is **branch scratch and is never committed**, so the unit's durable trace is its PR body (#git-pr-body), its standing rationale the design-decisions log (#swe-design-decisions), and its site-specific constraints comments at those sites (#code-style).
-  The `<branch>` component attributes each directory to the branch that created it; a `/` in a branch name nests as a subdirectory.
+  The store **MUST be gitignored** -- add `.agentsmith/specs/` to the project's `.gitignore`; nothing in the generator does this for you, so in a project that has not, the guarantees below do not hold and the corpus this rule exists to prevent will accumulate in version control.
+  Given that, a working spec is **branch scratch and is never committed**, so the unit's durable trace is its PR body (#git-pr-body), its standing rationale the design-decisions log (#swe-design-decisions), and its site-specific constraints comments at those sites (#code-style).
+  The `<branch>` component attributes each directory to the branch that created it, with every `/` **flattened to `--`** (`refactor/foo` -> `refactor--foo`), so the component is always one path segment.
+  It must not nest: nesting makes one branch's store a subdirectory of another's whenever one name prefixes another, so deleting `refactor/` at ship would destroy `refactor/foo`'s in-flight specs, and the revisit count below would read a sibling branch's units as its own.
   The directory may hold only `spec.md` (no plan yet) or only `plan.md` (trivial work that skipped a spec).
   Work trivial enough to carry no directory at all is still a unit of work, tracked as a request rather than a spec (#ai-multiple-requests).
 - A unit of work is started on an approved feature branch (#git-branch-workflow); if not yet on one, confirm the branch first.

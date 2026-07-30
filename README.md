@@ -41,6 +41,21 @@ A plugin-only install ships the commands but not the binary; its `npx` fallback 
 
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
+
+**Gitignore the working-state directories.** `install` does not modify your
+`.gitignore`, and several rules depend on these never being committed — the
+working-spec store in particular (`#ai-plan`), whose whole purpose is defeated
+if it lands in version control:
+
+```gitignore
+.agentsmith/specs/
+.agentsmith/review-board/
+.agentsmith/tmp/
+```
+
+Note these are the *subdirectories*, not `.agentsmith/` wholesale — ignoring the
+whole directory would also ignore the generated `AGENTS.md`, which the line
+above leaves to you.
 Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
 
 ```bash
@@ -107,12 +122,19 @@ A working spec is now branch scratch under `.agentsmith/specs/<branch>/<date>-<s
 — gitignored, per-machine, and deleted when the branch ships. A unit's durable
 record is its PR body, which carries the approved scope inline.
 
-If your project adopted the earlier workflow, one manual step is needed after
-updating the instruction set:
+If your project adopted the earlier workflow, two manual steps are needed after
+updating the instruction set — **in this order**:
 
-- **Delete `docs/working-specs/`.** Its contents are point-in-time history that
-  the current rules never consult; git retains them. There is no index to
-  regenerate and no `spec-index` command — both were removed with it.
+1. **Cross-check the specs before deleting them.** Git makes the contents
+   recoverable, not discoverable: nobody greps deleted files. Scan for anything
+   still live that exists *only* there — an open question, an accepted shortcut,
+   a decision that never graduated — and move it to `docs/future-work/`,
+   `docs/technical-debts/`, or `docs/design-decisions/` first. Specs still at
+   `Draft`/`Approved`, or with no `Status:` line, are the ones to read closely.
+   This repo's own migration found one such item across 25 directories.
+2. **Then delete `docs/working-specs/`.** What remains is point-in-time history
+   the current rules never consult. There is no index to regenerate and no
+   `spec-index` command — both were removed with it.
 
 The instruction-review / -apply engine that audits and edits the rule set itself
 is **authoring-only** (installed with `--dev`); see [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -57,3 +57,9 @@ comments at those sites (`#code-style`).
 This model is governed by the `#ai-plan`, `#swe-reference-spec`,
 `#swe-design-decisions`, and `#swe-epic` rules under [`instructions/`](../../instructions/), and its
 rationale is recorded in [`docs/design-decisions/records-architecture.md`](../design-decisions/records-architecture.md).
+
+Its counterpart is [`documentation-layout.md`](./documentation-layout.md): this
+document says **which record answers what**, that one says **where a folder's
+location lives versus its lifecycle**. The Directory column above is a reader's
+convenience — the authoritative path for every `docs/` folder is the layout map
+(`#swe-docs-layout`), per that standard.

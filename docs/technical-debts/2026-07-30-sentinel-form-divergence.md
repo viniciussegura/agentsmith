@@ -37,6 +37,14 @@ Option 2 is the more principled reading of the rule's own "single source of trut
 - `test/round-args.test.mjs` asserts the literal strings and must move with them.
 - Consider adding a check that fails when the rule text and the exported constant disagree -- the absence of one is why this drifted unnoticed.
 
+## Cost / risk
+
+Low today, and bounded by the fact that neither side is wrong in isolation -- each is a distinctive, paired delimiter and each is internally consistent, so no content escapes its data section. The cost is conformance, not exposure: a rule marked non-waivable is not being met, and any check, test, or reviewer keyed to one form silently passes content wrapped in the other.
+
+The risk grows with any new consumer of the sentinel. A fourth implementation would have two published forms to choose from and no way to tell which is authoritative.
+
 ## Provenance
 
 Found 2026-07-30 while verifying that a markdown fence-language edit had not altered the sentinel blocks. Pre-existing and unrelated to that change; surfaced rather than absorbed, since a security-baseline correction is its own unit of work.
+
+Filed first under `docs/future-work/` and moved here on review: an accepted, deliberate nonconformance with a stated cost is a technical debt (`#swe-technical-debts`), not deferred work (`#swe-future-work`). The distinction matters for how it is scanned -- a debt constrains work in its area, deferred work does not.

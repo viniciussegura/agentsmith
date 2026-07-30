@@ -13,7 +13,7 @@ Two distinct events, easily conflated, govern whether a spec is edited or replac
 - **Revisit** of an abstraction a prior unit on this branch already settled mints a **new** spec directory. The earlier one is superseded, never edited, and becomes read-only at that moment -- editing it instead would leave no new artifact, so the count below would silently read low.
 
 A superseded directory is retained until the branch ships.
-That is not "reviewable history": the store is gitignored, so it never reaches a diff, a PR, or the default branch -- it is a local counter, which is what the revisit check needs and all it needs.
+That is not "reviewable history", provided the store is gitignored as #ai-plan requires: it then never reaches a diff, a PR, or the default branch -- it is a local counter, which is what the revisit check needs and all it needs.
 Corrections to present truth go to the reference spec (#swe-reference-spec), never to a superseded spec.
 
 **Width is not the signal either.**
