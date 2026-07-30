@@ -13,7 +13,7 @@ detail; it carries no field-level schema.
 `reviewer-common.md` carries only the reviewer/maintainer invocation protocol, not
 the round and not the descriptor schema.
 
-The working-spec `2026-06-26-board-unification` §A simplified the round to six steps;
+The 2026-06-26 board-unification unit (§A, in git history) simplified the round to six steps;
 this document is the corrected canonical form — the verify sub-step is preserved for
 code and instruction (review semantics unchanged).
 

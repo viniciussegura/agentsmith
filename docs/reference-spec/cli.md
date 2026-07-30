@@ -8,7 +8,6 @@ It is the single drift-checked source of current CLI truth; the [README](../../R
 ```text
 agentsmith install    [--scope <user|project|PATH>] [--mode <single|split>] [--placement <root|nested>] [--no-tools] [--dev] [--clean] [--yes] [--dry-run]
 agentsmith uninstall  [--scope <user|project|PATH>] [--yes] [--dry-run]
-agentsmith spec-index [--check]
 agentsmith --stdout   [--mode <single|split>]
 agentsmith --help | -h
 agentsmith --version
@@ -57,20 +56,6 @@ agentsmith uninstall --scope user --yes
 
 An `uninstall` (or `install --clean`) targeting a scope that holds no agentsmith manifest prunes nothing -- the manifest-bounded prune (below) makes this a no-op, not an error.
 
-### `spec-index`
-
-Regenerates (or, with `--check`, validates) `docs/working-specs/INDEX.md` for the project in the current working directory.
-Unrelated to the three axes and the confirmation gate below; unchanged by this redesign.
-
-```bash
-agentsmith spec-index
-agentsmith spec-index --check
-```
-
-The regenerated `INDEX.md` header names this command (`agentsmith spec-index`), not the internal `bin/spec-index.js`, so it is accurate in a consumer project that has no `bin/`.
-When the binary is not on `PATH` -- a plugin-only install ships the command (`/agentsmith:spec-index`) but not the CLI -- the fallback is `npx -y github:viniciussegura/agentsmith spec-index [--check]`.
-Installing the CLI globally (`npm install -g github:viniciussegura/agentsmith`) removes that fallback and the permission prompt it triggers.
-
 ### `--stdout`
 
 A top-level query flag, not a subcommand and not part of `install`.
@@ -95,7 +80,7 @@ Help and version are queries: they never build or apply a plan.
 
 `agentsmith` with no verb and no recognized top-level flag runs the interactive wizard when stdin is a TTY.
 Off a TTY it errors: `agentsmith: error -- no subcommand -- run 'agentsmith install' or 'agentsmith --help'`, exit `1`.
-This is a deliberate, breaking divergence from the pre-redesign behavior, where bare invocation performed a silent project install; it is documented here as current truth, not re-argued (the working spec carries the transition rationale as point-in-time history).
+This is a deliberate, breaking divergence from the pre-redesign behavior, where bare invocation performed a silent project install; it is documented here as current truth, not re-argued (the transition rationale is in git and in the PR that carried it).
 
 Unknown flags and unknown subcommands are hard errors (`agentsmith: error -- unknown flag: ...` / `unknown subcommand: ...`), exit `1`, never silently ignored.
 
@@ -168,4 +153,4 @@ This is a tested guarantee: an install/uninstall run against a simulated plugin-
 | `--no-tools` | `--no-tools` | unchanged; now also un-merges the hook |
 | `--dev` | `--dev` | unchanged (an `install` modifier) |
 | `--stdout` | `--stdout` | unchanged; top-level query, verb-free |
-| `spec-index [--check]` | `spec-index [--check]` | unchanged |
+| `spec-index [--check]` | *(removed)* | the index it maintained no longer exists (`#ai-plan`) |

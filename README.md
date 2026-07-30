@@ -26,7 +26,7 @@ npx github:viniciussegura/agentsmith install          # latest
 npx github:viniciussegura/agentsmith#v0.1.0 install    # pinned, reproducible
 ```
 
-agentsmith is a verb-first CLI: `install`, `uninstall`, and `spec-index` are subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
+agentsmith is a verb-first CLI: `install` and `uninstall` are subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
 Bare `agentsmith` (no verb) opens an interactive wizard on a TTY, or errors off one.
 Full flag reference, the confirmation gate, and plugin-coexistence detail live in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md); this section is a summary.
 
@@ -36,8 +36,8 @@ To put the `agentsmith` binary on `PATH` -- so the examples below run without th
 npm install -g github:viniciussegura/agentsmith
 ```
 
-This is the recommended setup for repeated use, and for running `agentsmith spec-index --check` from an agent.
-A plugin-only install ships the commands but not the binary; its `npx` fallback is documented in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md#spec-index).
+This is the recommended setup for repeated use, and for running agentsmith from an agent.
+A plugin-only install ships the commands but not the binary; its `npx` fallback is documented in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md).
 
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
@@ -100,8 +100,19 @@ that realize the instruction protocols with real subagent delegation:
 - **`/instruction-check`** — a single-agent, fast pass that grades the current
   diff against the project's own generated `AGENTS.md` and reports rule
   violations. The light tier; reach for `/code-review-board` on larger changes.
-- **`/spec-index`** — regenerate (or `--check`) the working-specs index for a
-  project that adopts the `#ai-plan` spec workflow.
+
+### Upgrading: working specs are no longer committed
+
+A working spec is now branch scratch under `.agentsmith/specs/<branch>/<date>-<slug>/`
+— gitignored, per-machine, and deleted when the branch ships. A unit's durable
+record is its PR body, which carries the approved scope inline.
+
+If your project adopted the earlier workflow, one manual step is needed after
+updating the instruction set:
+
+- **Delete `docs/working-specs/`.** Its contents are point-in-time history that
+  the current rules never consult; git retains them. There is no index to
+  regenerate and no `spec-index` command — both were removed with it.
 
 The instruction-review / -apply engine that audits and edits the rule set itself
 is **authoring-only** (installed with `--dev`); see [CONTRIBUTING.md](CONTRIBUTING.md).

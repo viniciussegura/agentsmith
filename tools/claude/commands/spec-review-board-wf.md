@@ -4,7 +4,7 @@ description: Run one spec-review-board round via the deterministic Workflow driv
 
 Run **one** spec-review-board round using the Workflow driver instead of the main-loop orchestrator. The unified `board-round.mjs` driver runs exactly one round (Plan → Review → Reduce → Persist; spec has **no Verify**). The convergence loop — author revision + rebuttal between rounds — is **main-thread**, exactly as `spec-review-board` SKILL.md describes; this command does not loop inside the driver.
 
-1. **Setup** (main thread). Do the spec-review-board SKILL.md round-1 setup: confirm the target spec path, resolve `<spec-dir-name>` (the spec's directory name under `docs/working-specs/`), and mint a round id `<n>`. The scratch root is `.agentsmith/tmp/spec-review/<spec-dir-name>/`. Write the round **kickstart** to `<scratch>/kickstart.json` with the shared envelope and the spec payload:
+1. **Setup** (main thread). Do the spec-review-board SKILL.md round-1 setup: confirm the target spec path, resolve `<spec-dir-name>` (the spec's directory name under `.agentsmith/specs/<branch>/`), and mint a round id `<n>`. The scratch root is `.agentsmith/tmp/spec-review/<spec-dir-name>/`. Write the round **kickstart** to `<scratch>/kickstart.json` with the shared envelope and the spec payload:
    ```
    { board: 'spec',
      round: '<n>',
