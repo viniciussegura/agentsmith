@@ -376,11 +376,3 @@ test('install/uninstall never touch a simulated plugin-cache path', () => {
     assert.equal(readFileSync(pluginFile, 'utf8'), 'PLUGIN', 'plugin cache untouched by install+uninstall');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-
-test('spec-index rejects an unknown flag (fail-loud, consistent with the verbs)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agentsmith-'));
-  try {
-    mkdirSync(join(dir, 'docs/working-specs'), { recursive: true });
-    assert.throws(() => execFileSync('node', [cli, 'spec-index', '--bogus'], { cwd: dir, stdio: 'ignore' }));
-  } finally { rmSync(dir, { recursive: true, force: true }); }
-});

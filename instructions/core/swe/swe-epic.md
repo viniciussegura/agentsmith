@@ -10,7 +10,8 @@ It is topic-scoped, not point-in-time, so its directory carries no date prefix.
 It is deleted when its last unit of work ships or it is abandoned.
 
 Its location and naming live in the layout map (#swe-docs-layout); internally:
-```
+
+```text
 <epic-dir>/
   README.md                    // entry point: the problem, and how to read the rest.
   roadmap.md                   // sequencing plan: version order, per-version milestone order, and cross-cutting dependencies.

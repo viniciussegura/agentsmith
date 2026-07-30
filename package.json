@@ -11,8 +11,6 @@
     "build": "node bin/cli.js install",
     "build:plugin": "node bin/build-plugin.js",
     "build:board-round": "node bin/build-board-round.js",
-    "build:index": "node bin/spec-index.js",
-    "check:index": "node bin/spec-index.js --check",
     "triage": "node devtools/triage-ui/server.mjs"
   },
   "files": [
