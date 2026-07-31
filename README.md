@@ -41,22 +41,24 @@ A plugin-only install ships the commands but not the binary; its `npx` fallback 
 
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
+Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
 
 **Gitignore the working-state directories.** `install` does not modify your
-`.gitignore`, and several rules depend on these never being committed — the
+`.gitignore`, and several rules and tools depend on these never being committed — the
 working-spec store in particular (`#ai-plan`), whose whole purpose is defeated
 if it lands in version control:
 
 ```gitignore
 .agentsmith/specs/
 .agentsmith/review-board/
+.agentsmith/instruction-review/
 .agentsmith/tmp/
+.agentsmith/.install-manifest.json
 ```
 
-Note these are the *subdirectories*, not `.agentsmith/` wholesale — ignoring the
-whole directory would also ignore the generated `AGENTS.md`, which the line
-above leaves to you.
-Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
+Note these are the *subdirectories* and the manifest file, not `.agentsmith/`
+wholesale — ignoring the whole directory would also ignore the generated
+`AGENTS.md`, which the line above leaves to you.
 
 ```bash
 agentsmith install                    # project scope, default mode/placement

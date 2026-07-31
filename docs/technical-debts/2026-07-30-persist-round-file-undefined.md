@@ -14,11 +14,23 @@ The residual debt is the tool's: a `SKILL.md` step tells a human or agent to han
 
 Corrected in place: `rounds/2026-07-30.json` was rewritten to the real schema and `undefined.json` deleted; the store now lints clean.
 
+## Reach
+
+`persist.mjs` is **shipped to consumers**, not maintainer-only tooling. `planToolInstall` (`src/tools.js:13`) maps `tools/<ai>/<rest>` to `.<ai>/<rest>` for every install; only `devtools/` is authoring-only, and the sole exclusions are the two `PLUGIN_ONLY_COMMANDS`. Skills are copied unprefixed, so this file installs at `.claude/skills/code-review-board/persist.mjs` in every consumer project, behind the `/code-review-board` command the README documents.
+
 ## Cost / risk
 
-Low, and lower than first recorded. The failure is loud in `lint.mjs` rather than silent, and no issue or epic data was affected -- only the round record's filename and field names.
+Low, but on a user path rather than a private one.
 
-One sharp edge remains while unfixed: the filename is not round-scoped when `id` is missing, so two malformed rounds in the same store would overwrite each other's records at `undefined.json`. That matters for the `main`-target flow, where the next baseline is "the `commit` of the most recent prior `main` round" (`#ai-review-board`) -- a lost round record makes that baseline unresolvable.
+The failure is loud in `lint.mjs` rather than silent, and no issue or epic data was affected here -- only the round record's filename and field names.
+
+One sharp edge remains while unfixed: the filename is not round-scoped when `id` is missing, so **two malformed rounds** in the same store overwrite each other's records at `undefined.json`. Two are required -- a well-formed round writes `rounds/<id>.json` and never collides -- so this is a compounding-error case, not a first-mistake one. It matters for the `main`-target flow, where the next baseline is "the `commit` of the most recent prior `main` round" (`#ai-review-board`): a lost round record makes that baseline unresolvable.
+
+## Why accepted for now
+
+Not because the blast radius is private -- it is not. Because it is bounded and self-announcing: the store is per-machine and gitignored, `lint.mjs` reports it as an error, and the round's actual content survives intact under a wrong filename. A consumer who hits it loses a round record, not findings, and is told so.
+
+Deferred rather than fixed on this branch because it is unrelated to the change that surfaced it (`#swe-technical-debts` -- record at the moment incurred, remediate as its own unit).
 
 ## Remediation sketch
 

@@ -22,6 +22,12 @@ The implementation side is internally consistent across four sites -- `round-arg
 
 Nothing is leaking today. Both forms are distinctive, paired delimiters, so the boundary functions in each case. The live cost is that an agent following the *rule* and a code path following the *constant* emit different delimiters for the same job -- observed during the 2026-07-30 spec-review rounds, where hand-authored sub-agent dispatches used the rule's form while the board's own tooling used the constant's. Any future check, test, or reviewer keyed to one form silently passes content wrapped in the other.
 
+## Why accepted for now
+
+Accepted because neither form is unsafe: each is a distinctive, paired delimiter, each is internally consistent within its side, and no content escapes its data section under either. The gap is conformance with a rule that requires one form, not an open boundary.
+
+Accepted **for now** specifically, and narrowly: the choice below is cheap but not the author's to make unilaterally, since option 2 rewrites a non-waivable baseline rule's normative text. Filing it as a debt rather than deferred work is the point -- a debt is scanned before work in its area (`#swe-technical-debts`), so the next change touching either side is forced to see the divergence and decide, instead of adding a third form.
+
 ## The decision this needs
 
 Which form is canonical. The options are not symmetric:

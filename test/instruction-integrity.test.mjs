@@ -37,9 +37,12 @@ test('generator emits no dangling-tag or cross-boundary warnings', () => {
 // Removed vocabulary must stay removed (#ai-plan): the working spec is
 // uncommitted branch scratch and `agentsmith spec-index` no longer exists.
 // Two legs with genuinely different reach:
-//   1. the source trees -- instructions/ AND tools/, which is where
-//      tools/claude/commands/spec-index.md actually lived; neither is fully
-//      carried by the generated core (bundles and adapters are separate files);
+//   1. the .md files in the source trees -- instructions/ AND tools/, which is
+//      where tools/claude/commands/spec-index.md actually lived; neither is fully
+//      carried by the generated core (bundles and adapters are separate files).
+//      walk() collects .md only, so the .mjs scripts under tools/claude/skills/
+//      are OUT of this leg's reach -- a hardcoded path reintroduced there is not
+//      caught here;
 //   2. the generated core -- catches a token reintroduced via generator template
 //      text in src/, which no source-tree walk would see.
 // docs/ is deliberately NOT walked: it holds two intentional residuals (the
