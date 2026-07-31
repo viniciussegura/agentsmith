@@ -19,7 +19,7 @@ Both are satisfiable today by stating commands that were never executed. This ru
 
 ## Evidence
 
-The 2026-07-30 ephemeral-working-specs unit violated it four times in one session, all caught by `#ai-spec-review` at roughly one round each:
+The 2026-07-30 ephemeral-working-specs unit (in git history) violated it four times in one session, all caught by `#ai-spec-review` at roughly one round each:
 
 1. **A count derived from the wrong artifact.** "6 directories" written into the spec, read off a grep's hit list rather than counted from the corpus; the real number was 25. Written *before* the author had read the rule -- it is not in the loaded core, only in root `AGENTS.md`.
 2. **A command written from idiom, never run.** `npm run build -- --stdout` in a Verification table; the `build` script is `node bin/cli.js install`, so it expands to `install --stdout` and exits non-zero. `CONTRIBUTING.md` documented the same broken form, which is what made it look already-verified.
@@ -56,4 +56,4 @@ An unenforceable rule is not worthless -- this one is kept for the same reason t
 
 ## Provenance
 
-Raised at the close of the 2026-07-30 ephemeral-working-specs unit, after that unit's own review surfaced four violations of the rule. Recorded rather than actioned: promoting a rule into the shipped set is its own unit of work, not a rider on the branch that happened to expose the need.
+Raised at the close of the 2026-07-30 ephemeral-working-specs unit (in git history), after that unit's own review surfaced four violations of the rule. Recorded rather than actioned: promoting a rule into the shipped set is its own unit of work, not a rider on the branch that happened to expose the need.

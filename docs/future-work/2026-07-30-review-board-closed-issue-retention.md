@@ -20,4 +20,4 @@ Indefinite retention was chosen as the safe v1 default, not as a decision. The s
 
 ## Provenance
 
-Raised as an open question in the 2026-06-09 review-board unit of work and carried forward here when that unit's working spec was deleted (working specs are no longer committed -- `#ai-plan`). The original wording, and the rest of that unit's design discussion, are in git history.
+Raised as an open question in the 2026-06-09 review-board unit (in git history) and carried forward here when that unit's working spec was deleted (working specs are no longer committed -- `#ai-plan`). The original wording, and the rest of that unit's design discussion, went with it.

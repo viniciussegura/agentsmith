@@ -1,6 +1,6 @@
 /**
  * Schema, validation, and canonical serialization for the instruction-review
- * triage worksheet `triage.json` (see the 2026-06-17 triage-ui unit in git history).
+ * triage worksheet `triage.json` -- see the 2026-06-17 triage-ui unit (in git history).
  *
  * Dev-only: lives outside `tools/<ai>/` so it is never installed into a
  * consumer's `.claude/**`, and outside `package.json` `files` so it is never

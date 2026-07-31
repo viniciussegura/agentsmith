@@ -55,12 +55,21 @@ comments at those sites (`#code-style`).
   is deliberate; no reverse index is maintained — see Boundary 1).
 
 **Citing a past unit of work.** A shipped unit has no committed spec to link, so
-cite it by date and name and mark it unlinked: *the 2026-06-09 review-board unit
-(in git history)*. Use that one form — the phrasing is the only handle a reader
-has, and several variants of it read as several conventions. It is a deliberate
-dead end: git makes the contents recoverable, not discoverable, so anything from
-that unit still worth acting on belongs in a register rather than behind the
-citation.
+cite it in prose, in this order and with nothing between the date and the name:
+
+> the **2026-06-09** *review-board unit* **(in git history)**
+
+Three required elements: the unit's `YYYY-MM-DD` date, its name, and the literal
+marker `(in git history)` closing the citation. The marker is the handle — it is
+what a reader recognizes and what a grep finds — so it is fixed text, always
+parenthesized, never split from the name it follows. The noun is prose: *unit*,
+*audit*, *landing* all read fine, and forcing one word on all of them costs more
+than it buys. A section or part reference goes inside the marker, after it:
+`(in git history, §A)`.
+
+The citation is a deliberate dead end. Git makes the contents recoverable, not
+discoverable, so anything from that unit still worth acting on belongs in a
+register, not behind the citation.
 
 This model is governed by the `#ai-plan`, `#swe-reference-spec`,
 `#swe-design-decisions`, and `#swe-epic` rules under [`instructions/`](../../instructions/), and its
