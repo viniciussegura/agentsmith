@@ -16,19 +16,37 @@ Same shape as `2026-07-30-working-spec-store-has-no-deletion-actor.md`: a rule a
 
 The blast radius differs, though, and this one is worse. An un-deleted store is per-machine, gitignored, and read by nobody. An un-gitignored store is committed and shared.
 
+## What the README fix already changed
+
+The README block was originally an enumeration of the working-state paths -- default-allow, requiring the list to stay complete against a set that grows. It shipped missing two of five. It has since been inverted to deny-by-default, in the two forms a consumer can actually be in:
+
+```gitignore
+.agentsmith/                 # not committing the generated instructions
+```
+
+```gitignore
+.agentsmith/*                # committing them
+!.agentsmith/AGENTS.md
+!.agentsmith/agents/
+```
+
+(The `/*` is load-bearing: git will not re-include a file whose parent directory is excluded, so `.agentsmith/` paired with `!` exceptions silently ignores the core too. Verified both forms against a scratch repo.)
+
+That removes the drift risk entirely -- there is no longer a list of scratch paths to keep current, and a working-state directory added by a future version is covered without any consumer editing anything. What it does not do is reach a consumer who never reads the README.
+
 ## Options
 
-1. **A line in the intended-effects plan.** `install` already prints its plan and, on a TTY without `--yes`, waits for confirmation. Append the paths that must be gitignored. Cheapest, no new flags or verbs, lands where the operator is already reading and already deciding.
-2. **A check on `.gitignore`.** Read the target scope's `.gitignore`, and warn naming only the paths actually missing. Strictly better signal than option 1 -- silent when there is nothing to say -- at the cost of reading a file the installer does not currently touch, and of deciding what to do when there is no `.gitignore` at all.
-3. **Write the entries.** Rejected here rather than deferred: `install` modifying `.gitignore` mutates a file the user owns and did not name, which is the kind of unrequested edit the plan-then-confirm design exists to avoid.
+1. **A line in the intended-effects plan.** `install` already prints its plan and, on a TTY without `--yes`, waits for confirmation. State that `.agentsmith/` holds per-machine working state and must be gitignored, pointing at the README for the two forms. Cheapest; no new flags or verbs; lands where the operator is already reading and already deciding.
+2. **A check on `.gitignore`.** Read the target scope's `.gitignore` and warn only when the working state is not already covered. Better signal than option 1 -- silent when there is nothing to say -- but the check is now a coverage question rather than a set-membership one: it must recognize `.agentsmith/`, `.agentsmith/*`, a bare `.agentsmith`, and a parent-level ignore as all satisfying the requirement. `git check-ignore -q .agentsmith/specs` answers that directly and correctly, rather than re-implementing the match.
+3. **Write the entries.** Rejected rather than deferred: `install` modifying `.gitignore` mutates a file the user owns and did not name, which is the kind of unrequested edit the plan-then-confirm design exists to avoid.
 
-Option 2 is the recommendation, with option 1 as the fallback if reading `.gitignore` proves to complicate the scope resolution (`--scope user` has no meaningful `.gitignore` to check).
+Option 2 via `git check-ignore` is the recommendation -- it is a subprocess call and a conditional, and it cannot drift from what git actually does. Option 1 is the fallback where git is not available or the scope has no repository (`--scope user`), which is also the case where the warning matters least.
 
 ## Constraints
 
 - Warn, never fail. A consumer may deliberately commit the store -- unwise, but their call, and `install` is not the place to enforce an instruction-set rule.
-- Whatever ships must agree with the README block, which is currently the only enumeration of these paths. Two lists that can drift is the defect this note is about, one level up: prefer a single exported constant that the check reads and the docs cite.
-- The enumeration must stay complete. It gained `.agentsmith/instruction-review/` and `.agentsmith/.install-manifest.json` on review after shipping with three of five paths.
+- Do not re-implement gitignore matching. Precedence, negation, and parent-directory rules are exactly what the enumeration got wrong once already; ask git.
+- Say nothing when the paths are already ignored. A warning that fires on a correctly-configured project is noise on every install, and trains the operator to skip the plan output -- which is the surface this is trying to use.
 - New user-facing output is public surface (`#swe-public-surface-docs`) and needs its docs in the same change.
 
 ## Provenance
