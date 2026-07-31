@@ -31,4 +31,4 @@ Option 1 is the cheapest thing that makes the clause true. Option 3 is honest an
 
 ## Provenance
 
-Raised in review of the 2026-07-30 ephemeral-working-specs branch, alongside the observation that the store's gitignored status was likewise asserted but not established (fixed on that branch; this was not).
+Raised in review of the 2026-07-30 ephemeral-working-specs branch, alongside the observation that the store's gitignored status was likewise asserted but not established (documented on that branch, not enforced -- see `2026-07-31-install-does-not-surface-the-gitignore-requirement.md`; this was neither).

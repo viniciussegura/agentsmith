@@ -43,7 +43,8 @@ By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
 Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
 
-**Gitignore the working state.** `install` does not modify your `.gitignore`, and everything agentsmith writes under `.agentsmith/` besides the generated instructions is per-machine working state — the working-spec store (`#ai-plan`), the review-board issue store, scratch, and the install manifest. Several rules depend on these never being committed; the working-spec store in particular is defeated entirely if it lands in version control.
+**Gitignore the working state.** `install` does not modify your `.gitignore`, and everything agentsmith writes under `.agentsmith/` besides the generated instructions is per-machine working state — the working-spec store (`#ai-plan`), the review-board issue store, scratch, and the install manifest.
+Several rules depend on these never being committed; the working-spec store in particular is defeated entirely if it lands in version control.
 
 If you do **not** commit the generated instructions, ignore the directory:
 
@@ -59,7 +60,8 @@ If you **do** commit them (so teammates and CI get the set without running the i
 !.agentsmith/agents/
 ```
 
-Note the `/*` — `.agentsmith/` on its own cannot be paired with `!` exceptions, because git will not re-include a file whose parent directory is excluded. Both forms are deny-by-default, so a working-state directory added by a future version is ignored without your `.gitignore` needing an edit.
+Note the `/*` — `.agentsmith/` on its own cannot be paired with `!` exceptions, because git will not re-include a file whose parent directory is excluded.
+Both forms are deny-by-default, so a working-state directory added by a future version is ignored without your `.gitignore` needing an edit.
 
 ```bash
 agentsmith install                    # project scope, default mode/placement

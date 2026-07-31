@@ -12,7 +12,7 @@ A consumer who runs `agentsmith install` and does not read the README gets no si
 
 The failure is silent and lands in version control. `.agentsmith/specs/<branch>/` accretes one directory per unit of work, committed, on a project whose instruction set says it should not be -- which is the exact corpus accretion the ephemeral-working-specs change exists to remove. Nothing surfaces it until someone notices the directory in a diff.
 
-Same shape as `2026-07-30-working-spec-store-has-no-deletion-actor.md`: a rule asserts a property of the environment and no mechanism establishes it. That note records the deletion half; this is the gitignore half. Both were raised on the same branch and the second was recorded there as "fixed", which overstated it -- what shipped was README prose, and prose is not enforcement.
+Same shape as `2026-07-30-working-spec-store-has-no-deletion-actor.md`: a rule asserts a property of the environment and no mechanism establishes it. That note records the deletion half; this is the gitignore half. Both were raised on the same branch, where the gitignore half was recorded as "fixed" -- an overstatement, since what shipped was README prose and prose is not enforcement. That note's provenance line has been amended to say documented-not-enforced and to point here.
 
 The blast radius differs, though, and this one is worse. An un-deleted store is per-machine, gitignored, and read by nobody. An un-gitignored store is committed and shared.
 

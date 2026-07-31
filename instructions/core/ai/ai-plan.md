@@ -1,7 +1,8 @@
 # #ai-plan Specs and plans
 
 - A unit of work lives in one directory at `.agentsmith/specs/<branch>/<YYYY-MM-DD>-<slug>/`, holding `spec.md` and/or `plan.md`.
-  The store **MUST be gitignored** -- add `.agentsmith/specs/` to the project's `.gitignore`; nothing in the generator does this for you, so in a project that has not, the guarantees below do not hold and the corpus this rule exists to prevent will accumulate in version control.
+  The store **MUST be gitignored** -- ignore `.agentsmith/` as a whole (or `.agentsmith/*` with `!` exceptions for the generated instructions, where those are committed), never an enumeration of the working-state paths: the set grows, and a list that must stay complete is the shape that silently misses the next addition.
+  Nothing in the generator does this for you, so in a project that has not, the guarantees below do not hold and the corpus this rule exists to prevent will accumulate in version control.
   Given that, a working spec is **branch scratch and is never committed**, so the unit's durable trace is its PR body (#git-pr-body), its standing rationale the design-decisions log (#swe-design-decisions), and its site-specific constraints comments at those sites (#code-style).
   The `<branch>` component attributes each directory to the branch that created it, with every `/` **flattened to `--`** (`refactor/foo` -> `refactor--foo`), so the component is always one path segment.
   It must not nest: nesting makes one branch's store a subdirectory of another's whenever one name prefixes another, so deleting `refactor/` at ship would destroy `refactor/foo`'s in-flight specs, and the revisit count below would read a sibling branch's units as its own.
