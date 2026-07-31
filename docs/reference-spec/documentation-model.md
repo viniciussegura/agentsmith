@@ -54,6 +54,14 @@ comments at those sites (`#code-style`).
 - *What does decision X affect?* → grep its slug across `docs/` (one-way linking
   is deliberate; no reverse index is maintained — see Boundary 1).
 
+**Citing a past unit of work.** A shipped unit has no committed spec to link, so
+cite it by date and name and mark it unlinked: *the 2026-06-09 review-board unit
+(in git history)*. Use that one form — the phrasing is the only handle a reader
+has, and several variants of it read as several conventions. It is a deliberate
+dead end: git makes the contents recoverable, not discoverable, so anything from
+that unit still worth acting on belongs in a register rather than behind the
+citation.
+
 This model is governed by the `#ai-plan`, `#swe-reference-spec`,
 `#swe-design-decisions`, and `#swe-epic` rules under [`instructions/`](../../instructions/), and its
 rationale is recorded in [`docs/design-decisions/records-architecture.md`](../design-decisions/records-architecture.md).
