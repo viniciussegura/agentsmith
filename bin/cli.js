@@ -20,9 +20,6 @@ const manifest = JSON.parse(readFileSync(join(pkgRoot, 'manifest.json'), 'utf8')
 const read = (rel) => readFileSync(join(pkgRoot, rel), 'utf8');
 const pkgVersion = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8')).version;
 
-const args = process.argv.slice(2);
-const has = (flag) => args.includes(flag);
-
 const HELP = `agentsmith -- forge AGENTS.md for any project
 
 Usage:

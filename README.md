@@ -43,10 +43,7 @@ By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
 Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
 
-**Gitignore the working-state directories.** `install` does not modify your
-`.gitignore`, and several rules and tools depend on these never being committed — the
-working-spec store in particular (`#ai-plan`), whose whole purpose is defeated
-if it lands in version control:
+**Gitignore the working-state directories.** `install` does not modify your `.gitignore`, and several rules and tools depend on these never being committed — the working-spec store in particular (`#ai-plan`), whose whole purpose is defeated if it lands in version control:
 
 ```gitignore
 .agentsmith/specs/
@@ -56,9 +53,7 @@ if it lands in version control:
 .agentsmith/.install-manifest.json
 ```
 
-Note these are the *subdirectories* and the manifest file, not `.agentsmith/`
-wholesale — ignoring the whole directory would also ignore the generated
-`AGENTS.md`, which the line above leaves to you.
+Note these are the *subdirectories* and the manifest file, not `.agentsmith/` wholesale — ignoring the whole directory would also ignore the generated `AGENTS.md`, whose commit-or-not is the call left to you above.
 
 ```bash
 agentsmith install                    # project scope, default mode/placement

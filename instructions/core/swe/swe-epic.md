@@ -4,7 +4,7 @@ An epic organizes work too large to ship as a single squash-merge (#git-branch-w
 It is warranted when the work spans **more than one deliverable**: it cannot land in one squash-merge, so it must be broken down and sequenced.
 Distinct from the review board's *epic* (#ai-review-board), which clusters related issues in a triage report: a forward planning artifact here, an issue grouping there.
 
-Like the reference spec (#swe-reference-spec), an epic is **committed, mutable, and self-replacing**: every file is edited in place as understanding changes. A working spec (#ai-plan) differs on the first count -- it is uncommitted branch scratch, deleted when the branch ships -- which is why an epic entry, not the working spec, is a unit's durable record.
+Like the reference spec (#swe-reference-spec), an epic is **committed, mutable, and self-replacing**: every file is edited in place as understanding changes. A working spec (#ai-plan) differs on the first count -- it is uncommitted branch scratch, deleted when the branch ships -- which is why an epic entry, not the working spec, is a planned unit's durable planning record.
 It is **never** consulted for current truth -- it holds the current *plan*, not implemented fact.
 It is topic-scoped, not point-in-time, so its directory carries no date prefix.
 It is deleted when its last unit of work ships or it is abandoned.
@@ -20,7 +20,8 @@ Its location and naming live in the layout map (#swe-docs-layout); internally:
   open-questions.md            // open negotiations/blockers: need, options, recommendation, what unblocks.
 ```
 
-A milestone `<id>` is epic-local and author-chosen; it need only be unique within the epic, and carries one format constraint -- **no trailing `-<digits>`** -- so that a unit's display token splits unambiguously (a milestone `release-1` must not yield a unit token indistinguishable from a milestone `release-1-2`).
+A milestone `<id>` is epic-local and author-chosen; it need only be unique within the epic, and carries one format constraint -- **no trailing `-<digits>`** -- so a milestone id is never mistakable for a unit's display token (`release-2` as a milestone id reads exactly like unit 2 of milestone `release`).
+The constraint is for the reader, not the parser: `<milestone-id>-<n>` always splits mechanically at the final `-<digits>`, so nothing needs it to resolve a token.
 A unit of work's `<slug>` is its **stable identity** and is unique **epic-wide**: dependency declarations cross milestone boundaries and resolve by slug alone, so a slug shared across two milestones would make an edge ambiguous.
 The two namespaces need not be jointly disjoint, because dependency declarations are same-tier reference lists keyed on their own entity's identifier (milestone to milestone, unit to unit).
 
@@ -36,7 +37,9 @@ The roadmap defines the **sequencing plan**: versions run sequentially in time, 
 Every milestone and unit of work declares its dependencies -- what must ship before it can start, and what it blocks -- so the executable order is explicit, not inferred from list position.
 
 A unit of work is planned in the epic and executed as a working spec (#ai-plan) when it is picked up.
-The **epic entry remains the unit's durable record**; the working spec derived from it is branch scratch and never the copy of record, so the roadmap never has holes where its in-flight units should be.
+The **epic entry remains the unit's durable *planning* record**; the working spec derived from it is branch scratch and never the copy of record, so the roadmap never has holes where its in-flight units should be.
+It does not displace the PR body, which is the unit's durable *execution* record (#git-pr-body) -- the entry carries what the unit is meant to do and its place in the sequence, the PR body what shipped and how it was verified.
+An unplanned unit has only the latter.
 
 A unit entry is capped at **bird's-eye altitude**: title, a one-paragraph outcome, its dependencies, and its acceptance signal.
 Explicitly **not** file paths, symbol names, schema shapes, or interface contracts -- those are decided when the unit is picked up, and detail written before implementation decays.
