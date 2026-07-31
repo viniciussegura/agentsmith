@@ -13,7 +13,7 @@ detail; it carries no field-level schema.
 `reviewer-common.md` carries only the reviewer/maintainer invocation protocol, not
 the round and not the descriptor schema.
 
-The working-spec `2026-06-26-board-unification` §A simplified the round to six steps;
+The 2026-06-26 board-unification unit (in git history, §A) simplified the round to six steps;
 this document is the corrected canonical form — the verify sub-step is preserved for
 code and instruction (review semantics unchanged).
 
@@ -77,7 +77,7 @@ Workflow driver (which runs exactly one round per invocation).
 
 Written by the main thread; shared envelope, per-board payload; gitignored scratch.
 
-```
+```text
 { board: 'spec' | 'code' | 'instruction',
   round: <round-id>,
   subjectRef: <spec path | 'baseline..HEAD' | 'full-audit'>,
@@ -101,7 +101,7 @@ Written by the main thread; shared envelope, per-board payload; gitignored scrat
 Written by the maintainer's plan call; generalizes spec-review's existing
 `routing-<n>.json`. Validated by `ROUTING_SCHEMA` in `round-args.mjs`.
 
-```
+```text
 { lenses: [<role>...],
   perLens: { <role>: { focus?: string, questions?: string[] } } }
 ```
@@ -116,7 +116,7 @@ to this subject, and sets per-lens focus; for spec it judges which curated
 The shared Workflow driver (`board-round.mjs`) and the SKILL prose both parameterize
 over a per-board **args** descriptor, built by the pure builders in `round-args.mjs`:
 
-```
+```text
 { board: 'spec' | 'code' | 'instruction',
   roundId: <round-id>,
   scratch: <round scratch dir>,

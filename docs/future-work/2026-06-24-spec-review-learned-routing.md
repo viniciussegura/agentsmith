@@ -2,7 +2,7 @@
 
 Date: 2026-06-24
 Status: Deferred (`#swe-future-work`)
-Context: `docs/working-specs/2026-06-24-spec-review-specialist-fanout/`
+Context: the 2026-06-24 spec-review specialist-fanout unit (in git history)
 
 ## The gap
 

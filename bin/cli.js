@@ -6,7 +6,6 @@ import { dirname, join, resolve } from 'node:path';
 import { buildOutputs } from '../src/build.js';
 import { resolveSections, demoteForBasename } from '../src/sections.js';
 import { planToolInstall } from '../src/tools.js';
-import { runSpecIndex } from '../src/specindex.js';
 import { readManifest, writeManifest } from '../src/manifest.js';
 import { sourceRevision } from '../src/revision.js';
 import { parseArgs } from '../src/args.js';
@@ -21,42 +20,11 @@ const manifest = JSON.parse(readFileSync(join(pkgRoot, 'manifest.json'), 'utf8')
 const read = (rel) => readFileSync(join(pkgRoot, rel), 'utf8');
 const pkgVersion = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8')).version;
 
-const args = process.argv.slice(2);
-const has = (flag) => args.includes(flag);
-
-// Subcommand: `agentsmith spec-index [--check]` regenerates (or validates) the
-// working-specs index for the project in CWD (#ai-plan). Delegated here so npx
-// consumers reach it through the one `agentsmith` bin -- no second entrypoint.
-if (args[0] === 'spec-index') {
-  // Same fail-loud contract as the verb parser: reject anything but --check.
-  const unknown = args.slice(1).filter((a) => a !== '--check');
-  if (unknown.length) {
-    process.stderr.write(`agentsmith: error -- unknown flag(s) for spec-index: ${unknown.join(', ')}\n`);
-    process.exit(1);
-  }
-  const r = runSpecIndex({ cwd: process.cwd(), check: has('--check') });
-  if (r.missing) {
-    process.stderr.write(`agentsmith: no docs/working-specs/ in ${process.cwd()} -- nothing to index\n`);
-    process.exit(0);
-  }
-  if (has('--check')) {
-    process.stderr.write(
-      r.ok
-        ? `agentsmith: ${r.path} is current\n`
-        : `agentsmith: ${r.path} is STALE -- run \`agentsmith spec-index\` to regenerate\n`,
-    );
-    process.exit(r.ok ? 0 : 1);
-  }
-  process.stderr.write(`agentsmith: wrote ${r.path}\n`);
-  process.exit(0);
-}
-
 const HELP = `agentsmith -- forge AGENTS.md for any project
 
 Usage:
   agentsmith install   [--scope <user|project|PATH>] [--mode <single|split>] [--placement <root|nested>] [--no-tools] [--dev] [--clean] [--yes] [--dry-run]
   agentsmith uninstall [--scope <user|project|PATH>] [--yes] [--dry-run]
-  agentsmith spec-index [--check]
   agentsmith --stdout  [--mode <single|split>]
   agentsmith                       (bare: interactive wizard)
 

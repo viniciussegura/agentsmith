@@ -34,6 +34,45 @@ test('generator emits no dangling-tag or cross-boundary warnings', () => {
   assert.ok(!/warning -- core rule references a bundle-only/.test(stderr), `lean-split gate (cross-boundary):\n${stderr}`);
 });
 
+// Removed vocabulary must stay removed (#ai-plan): the working spec is
+// uncommitted branch scratch and `agentsmith spec-index` no longer exists.
+// Two legs with genuinely different reach:
+//   1. the .md files in the source trees -- instructions/ AND tools/, which is
+//      where tools/claude/commands/spec-index.md actually lived; neither is fully
+//      carried by the generated core (bundles and adapters are separate files).
+//      walk() collects .md only, so the .mjs scripts under tools/claude/skills/
+//      are OUT of this leg's reach -- a hardcoded path reintroduced there is not
+//      caught here;
+//   2. the generated core -- catches a token reintroduced via generator template
+//      text in src/, which no source-tree walk would see.
+// docs/ is deliberately NOT walked: it holds two intentional residuals (the
+// cli.md migration-table row and the README migration step, which must name the
+// path it tells consumers to delete).
+// Match the PATH token `working-specs` (bare: #ai-plan once said "under
+// working-specs", with no docs/ prefix) and the COMMAND `spec-index`. The
+// singular term "working spec" / adjectival `working-spec` stays legal
+// throughout the set and must not be matched, or this fails on correct work.
+const REMOVED_TOKENS = ['working-specs', 'spec-index'];
+const GUARDED_TREES = ['instructions', 'tools'];
+
+test('removed working-spec/spec-index vocabulary is not reintroduced', () => {
+  for (const tree of GUARDED_TREES) {
+    for (const p of walk(join(ROOT, tree))) {
+      const text = readFileSync(p, 'utf8');
+      for (const tok of REMOVED_TOKENS) {
+        assert.ok(!text.includes(tok), `${tok} reintroduced in ${p}`);
+      }
+    }
+  }
+  // Never read .agentsmith/AGENTS.md from disk: it is gitignored and absent on
+  // a fresh clone, so that would fail against a correct implementation.
+  const r = spawnSync('node', ['bin/cli.js', '--stdout'], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(r.status, 0, `cli.js exited ${r.status}\n${r.stderr}`);
+  for (const tok of REMOVED_TOKENS) {
+    assert.ok(!r.stdout.includes(tok), `${tok} reintroduced in the generated core`);
+  }
+});
+
 // ownership: every defined tag has exactly one resolvable owner.
 test('ownership coverage is clean (no orphan / double-owned / unresolved owner)', () => {
   const texts = walk(join(ROOT, 'instructions')).map((p) => readFileSync(p, 'utf8'));

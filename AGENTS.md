@@ -24,4 +24,4 @@ Before writing a command or a count into a spec, a PR body, or a done-claim, **e
 - **When a criterion's value depends on prose you are also writing, check that prose against every pattern that counts it** -- not only the one you were last corrected on.
 - A criterion whose own failure clause would trip on a correct implementation is worse than no criterion: it trains the next reader to ignore it.
 
-Seven rounds of `#ai-spec-review` on `docs/working-specs/2026-07-22-instruction-terminology-audit/` produced six findings of exactly this class, in every one of its forms above. It is a habit, not an accident, and the cost is a review round each time.
+Seven rounds of `#ai-spec-review` on the 2026-07-22 instruction-terminology audit (in git history) produced six findings of exactly this class, in every one of its forms above. It is a habit, not an accident, and the cost is a review round each time.

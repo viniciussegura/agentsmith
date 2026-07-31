@@ -36,7 +36,7 @@ Where subagents are unavailable, one agent role-plays the generalist and each co
 
 ## Scratch
 
-Write every artifact under `.agentsmith/tmp/spec-review/<spec-dir-name>/` (gitignored, never committed), where `<spec-dir-name>` is the spec's own directory name under `docs/working-specs/`:
+Write every artifact under `.agentsmith/tmp/spec-review/<spec-dir-name>/` (gitignored, never committed), where `<spec-dir-name>` is the spec's own directory name under `.agentsmith/specs/<branch>/`:
 
 - `routing-<n>.json` -- the directive consumed by round `n` (round 1: your bootstrap; round `n>=2`: the generalist's directive from round `n-1`).
 - `snapshots/<role>.md` -- the spec as lens `<role>` last saw it (for the dirtiness diff).

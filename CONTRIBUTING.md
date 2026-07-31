@@ -6,7 +6,7 @@ project, the [README](README.md) is all you need.
 
 ## Repository layout
 
-```
+```text
 instructions/      rule sections (the portable source of truth)
   main.md          preamble, emitted first
   core/            ai/ git/ swe/ ...            always-loaded modules
@@ -22,15 +22,14 @@ devtools/          maintainer-only dev tooling, never shipped to consumers
   triage-ui/       the instruction-review triage server + apply engine
 .claude-plugin/marketplace.json   generated single-plugin marketplace (git-subdir -> tools/claude)
 manifest.json      preamble, ordered sections (folder + optional when/title), source label
+.markdownlint.jsonc  markdown conventions; read by editors, not wired into npm test
 src/generate.js    pure: (preamble, modules, source) -> AGENTS.md text
 src/build.js       pure: assembles the lean core, bundle files, and root stub
 src/sections.js    pure: splits manifest sections into core vs on-demand bundles
 src/bundles.js     on-demand index + #tag reference-integrity + ownership coverage lint
 src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** install paths
-src/specindex.js   pure: renders docs/working-specs/INDEX.md
-bin/cli.js         verb-first CLI: install / uninstall / spec-index, plus the --stdout query
+bin/cli.js         verb-first CLI: install / uninstall, plus the --stdout query
 bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
-bin/spec-index.js  regenerate / --check the working-specs index
 test/              tests for the generator
 ```
 
@@ -65,19 +64,25 @@ repo's* instruction source and cannot run in a consumer project. Dogfood install
 
 ## Records and history
 
-How this repo organizes its specs, decisions, and history — the
-present-truth / point-in-time families — is in
-[`docs/reference-spec/documentation-model.md`](docs/reference-spec/documentation-model.md). New work follows
-`#ai-plan`: a working spec under `docs/working-specs/<date>-<slug>/`, indexed by
-`agentsmith spec-index`.
+How this repo organizes its decisions and history — the present-truth /
+point-in-time families — is in
+[`docs/reference-spec/documentation-model.md`](docs/reference-spec/documentation-model.md).
+
+New work follows `#ai-plan`: a working spec under
+`.agentsmith/specs/<branch>/<date>-<slug>/`. That store is **gitignored and
+per-machine** — a working spec is branch scratch, never committed, and the whole
+`<branch>` directory is deleted when the branch ships. It is not a record and
+there is no index: a unit's durable trace is its PR body, which carries the
+approved scope inline (`#git-pr-body`), its standing rationale a file under
+`docs/design-decisions/`, and its site-specific constraints comments at the code
+sites they constrain.
 
 ## Development
 
 ```bash
 npm test                     # node --test
-npm run build -- --stdout    # preview the forged AGENTS.md
+node bin/cli.js --stdout     # preview the forged AGENTS.md
 npm run build:plugin         # regenerate plugin.json + marketplace.json
-npm run build:index          # regenerate docs/working-specs/INDEX.md
 node bin/cli.js install --dev  # dogfood install, including the authoring tools
 ```
 

@@ -40,7 +40,7 @@ never interpolated into the instruction body.
 
 The section is opened and closed by a fixed sentinel, the source named on the open line:
 
-```
+```text
 --- DATA: <source> (untrusted) ---
 <verbatim untrusted content>
 --- END DATA ---

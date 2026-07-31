@@ -1,6 +1,6 @@
 # Review-engine future work
 
-Deferred extensions to the role-based review engine (`#ai-review-engine`), out of scope for the review-board landing (`docs/working-specs/2026-06-09-review-board/`).
+Deferred extensions to the role-based review engine (`#ai-review-engine`), out of scope for the 2026-06-09 review-board landing (in git history).
 Recorded on approval of that work (`#swe-future-work`).
 
 ## Additional reviewer roles: performance, accessibility, scalability

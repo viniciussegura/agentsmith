@@ -73,13 +73,14 @@ test('plugin-only lifecycle commands are excluded from the CLI adapter install',
   const plan = planToolInstall([
     'tools/claude/commands/update-instructions.md',
     'tools/claude/commands/remove-instructions.md',
-    'tools/claude/commands/spec-index.md',
+    'tools/claude/commands/spec-review-board.md',
     'tools/claude/agents/review-swe.md',
   ]);
   // update/remove-instructions drive the generator and are meaningful only to a
   // plugin user -- the CLI never ships them (the plugin auto-discovers them).
+  // spec-review-board is the positive case: a normal command still installs.
   assert.deepEqual(plan.map((p) => p.dest), [
-    '.claude/commands/agentsmith-spec-index.md',
+    '.claude/commands/agentsmith-spec-review-board.md',
     '.claude/agents/review-swe.md',
   ]);
 });

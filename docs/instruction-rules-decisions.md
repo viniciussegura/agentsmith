@@ -19,7 +19,7 @@ A deferred entry carries a placement hint `(-> <targetFile>, <role>)` so a futur
 
 ## Folded
 
-- `#swe-code-review` -- folded into `#swe-done` item 5: its one novel atom (a deliberate, independent review pass beyond self-review) is the escalation to `#ai-review-board` before squash-merge; no standalone tag.
+- `#swe-code-review` -- folded into `#swe-done` **per-branch item 3**: its one novel atom (a deliberate, independent review pass beyond self-review) is the escalation to `#ai-review-board` before squash-merge; no standalone tag.
 
 ## Rejected
 

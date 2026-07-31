@@ -26,7 +26,7 @@ npx github:viniciussegura/agentsmith install          # latest
 npx github:viniciussegura/agentsmith#v0.1.0 install    # pinned, reproducible
 ```
 
-agentsmith is a verb-first CLI: `install`, `uninstall`, and `spec-index` are subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
+agentsmith is a verb-first CLI: `install` and `uninstall` are subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
 Bare `agentsmith` (no verb) opens an interactive wizard on a TTY, or errors off one.
 Full flag reference, the confirmation gate, and plugin-coexistence detail live in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md); this section is a summary.
 
@@ -36,12 +36,32 @@ To put the `agentsmith` binary on `PATH` -- so the examples below run without th
 npm install -g github:viniciussegura/agentsmith
 ```
 
-This is the recommended setup for repeated use, and for running `agentsmith spec-index --check` from an agent.
-A plugin-only install ships the commands but not the binary; its `npx` fallback is documented in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md#spec-index).
+This is the recommended setup for repeated use, and for running agentsmith from an agent.
+A plugin-only install ships the commands but not the binary; its `npx` fallback is documented in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md).
 
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
 Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
+
+**Gitignore the working state.** `install` does not modify your `.gitignore`, and everything agentsmith writes under `.agentsmith/` besides the generated instructions is per-machine working state — the working-spec store (`#ai-plan`), the review-board issue store, scratch, and the install manifest.
+Several rules depend on these never being committed; the working-spec store in particular is defeated entirely if it lands in version control.
+
+If you do **not** commit the generated instructions, ignore the directory:
+
+```gitignore
+.agentsmith/
+```
+
+If you **do** commit them (so teammates and CI get the set without running the installer), deny the directory and re-admit just those two paths:
+
+```gitignore
+.agentsmith/*
+!.agentsmith/AGENTS.md
+!.agentsmith/agents/
+```
+
+Note the `/*` — `.agentsmith/` on its own cannot be paired with `!` exceptions, because git will not re-include a file whose parent directory is excluded.
+Both forms are deny-by-default, so a working-state directory added by a future version is ignored without your `.gitignore` needing an edit.
 
 ```bash
 agentsmith install                    # project scope, default mode/placement
@@ -100,8 +120,26 @@ that realize the instruction protocols with real subagent delegation:
 - **`/instruction-check`** — a single-agent, fast pass that grades the current
   diff against the project's own generated `AGENTS.md` and reports rule
   violations. The light tier; reach for `/code-review-board` on larger changes.
-- **`/spec-index`** — regenerate (or `--check`) the working-specs index for a
-  project that adopts the `#ai-plan` spec workflow.
+
+### Upgrading: working specs are no longer committed
+
+A working spec is now branch scratch under `.agentsmith/specs/<branch>/<date>-<slug>/`
+— gitignored, per-machine, and deleted when the branch ships. A unit's durable
+record is its PR body, which carries the approved scope inline.
+
+If your project adopted the earlier workflow, two manual steps are needed after
+updating the instruction set — **in this order**:
+
+1. **Cross-check the specs before deleting them.** Git makes the contents
+   recoverable, not discoverable: nobody greps deleted files. Scan for anything
+   still live that exists *only* there — an open question, an accepted shortcut,
+   a decision that never graduated — and move it to `docs/future-work/`,
+   `docs/technical-debts/`, or `docs/design-decisions/` first. Specs still at
+   `Draft`/`Approved`, or with no `Status:` line, are the ones to read closely.
+   This repo's own migration found one such item across 25 directories.
+2. **Then delete `docs/working-specs/`.** What remains is point-in-time history
+   the current rules never consult. There is no index to regenerate and no
+   `spec-index` command — both were removed with it.
 
 The instruction-review / -apply engine that audits and edits the rule set itself
 is **authoring-only** (installed with `--dev`); see [CONTRIBUTING.md](CONTRIBUTING.md).

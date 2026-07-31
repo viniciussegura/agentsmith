@@ -1,0 +1,27 @@
+// Markdown conventions for this repo, so #code-style's "defer to the project's
+// configured formatter and linter" has a referent.
+//
+// What reads this: editor markdownlint integrations (the source of the warnings
+// this file answers), and any ad-hoc `markdownlint-cli2 "**/*.md"` run. It is
+// deliberately NOT wired into `npm test` -- the repo carries no devDependencies
+// (#swe-deps), and taking one for a formatting pass is not justified. If a lint
+// step is ever added to CI, this file is already its config.
+//
+// JSONC rather than JSON: markdownlint validates its config against a schema, so
+// unrecognised "$comment" keys are not a safe way to annotate it. `//` is.
+{
+  // Line length. #code-markdown mandates one sentence per line, hard-wrapped only
+  // at sentence boundaries and never by column, so long lines are the convention.
+  "MD013": false,
+
+  // First line must be a top-level heading. Slash-command and skill files must
+  // open with YAML frontmatter, and the root AGENTS.md opens with a
+  // consumer-owned HTML comment. The rule cannot hold for those file types.
+  "MD041": false,
+
+  // Table column style. Every table here uses the compact |---|---| separator.
+  // Reformatting them all to satisfy a default would be churn against a working
+  // convention. (MD060 exists in the toolchain that raised it here; if you run a
+  // markdownlint build that predates it, this key is an inert no-op, not an error.)
+  "MD060": false
+}

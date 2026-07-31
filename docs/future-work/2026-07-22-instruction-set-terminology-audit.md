@@ -2,12 +2,12 @@
 
 Date: 2026-07-22
 Status: Deferred (`#swe-future-work`)
-Context: discharged by `docs/working-specs/2026-07-22-instruction-terminology-audit/`, which audited the clusters this file flagged.
+Context: discharged by the 2026-07-22 instruction-terminology audit (in git history), which audited the clusters this file flagged.
 
 ## The gap
 
 An inventory of `instructions/` found seven clusters: `` `main` `` used as a rule referent instead of an example (D1); `ship` and `land` each naming two altitudes at once (D2); the hyphenated spelling of `subagent` used inconsistently in prose (D3); the actor noun `AI assistant` vs `AI agent` (D4); the orphaned term `logical units` (D5); `standard`, inventoried and found to carry no defect (D6); and `change` used as the done-gate subject (D7).
-`docs/working-specs/2026-07-22-instruction-terminology-audit/` audited all seven and settled six with renames landed directly in `instructions/`; D6 needed no rename.
+The 2026-07-22 instruction-terminology audit (in git history) covered all seven and settled six with renames landed directly in `instructions/`; D6 needed no rename.
 Three residues remain, listed below.
 
 ## The deferred work
