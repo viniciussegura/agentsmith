@@ -24,6 +24,7 @@
 
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { argv, cwd, stdout } from 'node:process';
 import { isMain } from './is-main.mjs';
@@ -36,12 +37,31 @@ const PROBE_AGENT = join('.claude', 'agents', 'review-swe.md');
 const PLUGIN_PREFIX = 'agentsmith:';
 
 /**
+ * Where a bare-resolvable agent could live, in precedence order.
+ *
+ * BOTH locations matter, and checking only the first is a fatal bug: `agentsmith
+ * install --scope user` bases at homedir(), so its adapters land at
+ * `~/.claude/agents/` and Claude Code resolves them bare from any project. A
+ * cwd-only probe reports `agentsmith:` on such an install and every dispatch dies
+ * with `agent type not found` -- the very failure this module exists to prevent.
+ *
+ * A `--scope PATH` install is deliberately not covered: agents installed at some
+ * unrelated directory are not on the resolution path of a round run from here.
+ *
+ * @param {{ cwd: string, home: string }} roots
+ * @returns {string[]}
+ */
+export function probeLocations({ cwd: at, home }) {
+  return [join(at, PROBE_AGENT), join(home, PROBE_AGENT)];
+}
+
+/**
  * Decide the dispatch prefix and the skills root.
  *
  * The prefix keys off whether a BARE agent name would actually resolve -- i.e.
- * whether the project carries its own `.claude/agents/` copy -- rather than off
+ * whether any probe location carries a `.claude/agents/` copy -- rather than off
  * an install marker. That answers the operative question directly, and is right
- * in the both-installed case too: bare resolves, so bare is used.
+ * when more than one install is present: bare resolves, so bare is used.
  *
  * @param {{ hasProjectAgents: boolean, skillsDir: string, cwd: string }} probes
  * @returns {{ agentPrefix: string, skillsDir: string, cwd: string }}
@@ -65,7 +85,7 @@ const invokedDirectly = isMain(import.meta.url, argv[1]);
 if (invokedDirectly) {
   const at = cwd();
   const ctx = resolveContext({
-    hasProjectAgents: existsSync(join(at, PROBE_AGENT)),
+    hasProjectAgents: probeLocations({ cwd: at, home: homedir() }).some((p) => existsSync(p)),
     skillsDir: skillsRootOf(import.meta.url),
     cwd: at,
   });
