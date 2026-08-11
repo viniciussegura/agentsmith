@@ -1,6 +1,7 @@
 # #swe-environment Environment and secrets
 
 - Required environment variables are documented in a committed, discoverable manifest (for example an example env file, a config schema, or the project README); the file holding real values is gitignored and loaded by the code, never committed.
+  An env var is public surface, so adding or removing one carries that documentation obligation (#swe-public-surface-docs).
 - **Never** commit real secrets.
   Where CI is available, add a secret-scanning step (e.g. `gitleaks`, `trufflehog`, or the host's native scanner) to catch leaks before they merge; a pre-commit hook is the local complement.
 - Personal email addresses **MUST NOT** appear in committed files.
