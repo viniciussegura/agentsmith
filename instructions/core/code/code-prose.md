@@ -1,7 +1,8 @@
 # #code-prose Artifact prose
 
-Every artifact this set asks you to write -- a PR (#git-pr), a design decision (#swe-design-decisions), a reference-spec document (#swe-reference-spec), a working spec or plan (#ai-plan), an epic entry (#swe-epic), a technical-debt or future-work note (#swe-technical-debts, #swe-future-work), a code comment (#code-style), a `README` or any other doc (#swe-docs-drift) -- is read once, under time pressure, by someone answering one question.
+Every artifact this set asks you to write is read once, under time pressure, by someone answering one question.
 Write for that reader: direct, terse, to-the-point.
+Which artifacts those are is not listed here: each rule that asks for one cites this rule, so a new artifact rule registers itself in one place rather than two (#swe-reuse).
 
 - **Lead with the answer**, then its support: a reader who stops after the first sentence still gets the point.
 - **One claim per sentence.** Cut throat-clearing ("it is worth noting that"), hedging that carries no information, and any restatement of the sentence before it.
@@ -13,4 +14,4 @@ Terseness is a budget on words, **never** on content: an artifact that drops a c
 When the two collide, completeness wins and the prose gets tighter instead -- cut the telling, not the told.
 
 This rule governs prose; #code-markdown governs its formatting, and #ai-conversational the agent's own conversational register.
-Where another rule sets an explicit budget for one artifact (e.g. #git-pr's three sentences), that budget is this rule applied, not an addition to it.
+Where another rule sets an explicit budget for one artifact (e.g. #swe-epic's bird's-eye cap on a unit entry), that budget is this rule applied, not an addition to it.
