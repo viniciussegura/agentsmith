@@ -6,5 +6,5 @@ This stop-and-surface pause holds even under #ai-preflight non-stop mode -- a de
 A scope widening is new work: it needs its own spec or plan approval (#ai-plan), even when discovered mid-execution.
 When the widened scope is approved and constitutes a plan of its own, re-run #ai-preflight for that plan before executing it -- the original preflight answers do not carry over.
 A narrowing -- a step proves unnecessary -- may proceed, but is reported at the next natural pause.
-Where the unit's PR is already open, its body **SHOULD** be revised as part of the deviation -- the original scope, the revision, and why (#git-pr) -- so the durable record does not go stale against what actually shipped.
+Where the unit's PR is already open, its body **MUST** be revised as part of the deviation -- the original scope, the revision, and why (#git-pr) -- so the durable record does not go stale against what actually shipped.
 The in-session pause above is what catches the change; this is what records it.
