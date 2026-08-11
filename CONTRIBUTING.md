@@ -37,6 +37,17 @@ test/              tests for the generator
 
 - Each rule has a `#tag` (e.g. `#swe-reuse`) usable as a handle in conversation.
 - Rules follow their own `#code-markdown` convention: one sentence per line.
+- Rules are themselves artifacts, so they follow their own `#code-prose`: lead
+  with the obligation, state each constraint once, and cite a neighbouring rule
+  rather than restating it.
+- A rule that asks for a **prose** artifact **cites** `#code-prose`, or cites a
+  rule that does. That rule deliberately enumerates nothing, so the citation is
+  the only registration, and the coverage is on the artifact rather than the
+  rule: `#swe-entity` is covered through `#swe-reference-spec`, which names the
+  entity model as its canonical member. A new artifact reachable by neither
+  escapes the prose standard silently. Schema-bound output — a findings JSON, a
+  ledger, a directive — is not prose and needs no citation; whether it is local
+  or ephemeral does not matter, only whether a human reads it as prose.
 - To add a rule, drop a `.md` into a section group under `instructions/` (e.g.
   `core/swe/` or `backend/`); it is picked up automatically.
 - Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the
@@ -73,7 +84,7 @@ New work follows `#ai-plan`: a working spec under
 per-machine** — a working spec is branch scratch, never committed, and the whole
 `<branch>` directory is deleted when the branch ships. It is not a record and
 there is no index: a unit's durable trace is its PR body, which carries the
-approved scope inline (`#git-pr-body`), its standing rationale a file under
+approved scope inline (`#git-pr`), its standing rationale a file under
 `docs/design-decisions/`, and its site-specific constraints comments at the code
 sites they constrain.
 

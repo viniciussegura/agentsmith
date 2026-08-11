@@ -6,7 +6,7 @@ Date: 2026-07-30
 
 A working spec lives at `.agentsmith/specs/<branch>/<date>-<slug>/` (`#ai-plan`), gitignored and per-machine. `git clean -xfd` removes ignored files, so a routine cleanup mid-branch destroys the spec of the unit currently being executed, along with any superseded specs the branch was retaining as its revisit counter (`#swe-branch-lifespan`).
 
-The window is the implementation window -- after the spec is approved and before the PR body exists, which is the point at which the unit's durable record appears (`#git-pr-body`).
+The window is the implementation window -- after the spec is approved and before the PR body exists, which is the point at which the unit's durable record appears (`#git-pr`).
 
 ## Why accepted
 

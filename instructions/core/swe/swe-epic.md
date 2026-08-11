@@ -38,10 +38,10 @@ Every milestone and unit of work declares its dependencies -- what must ship bef
 
 A unit of work is planned in the epic and executed as a working spec (#ai-plan) when it is picked up.
 The **epic entry remains the unit's durable *planning* record**; the working spec derived from it is branch scratch and never the copy of record, so the roadmap never has holes where its in-flight units should be.
-It does not displace the PR body, which is the unit's durable *execution* record (#git-pr-body) -- the entry carries what the unit is meant to do and its place in the sequence, the PR body what shipped and how it was verified.
+It does not displace the PR body, which is the unit's durable *execution* record (#git-pr) -- the entry carries what the unit is meant to do and its place in the sequence, the PR body what shipped.
 An unplanned unit has only the latter.
 
-A unit entry is capped at **bird's-eye altitude**: title, a one-paragraph outcome, its dependencies, and its acceptance signal.
+Every file in an epic is written per #code-prose; a unit entry is capped at **bird's-eye altitude**: title, a one-paragraph outcome, its dependencies, and its acceptance signal.
 Explicitly **not** file paths, symbol names, schema shapes, or interface contracts -- those are decided when the unit is picked up, and detail written before implementation decays.
 Each entry carries a **delivery state**, deliberately distinct vocabulary from the review board's issue lifecycle (#ai-review-board):
 

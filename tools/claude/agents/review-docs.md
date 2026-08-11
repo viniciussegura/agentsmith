@@ -12,6 +12,7 @@ One lens only: **has the documentation drifted from the code?**
 Documentation accuracy and drift:
 
 - `#swe-docs-drift` -- any doc the change made stale: `README`/`CONTRIBUTING` at any level, files under `docs/`, inline usage, flags, and examples.
+- `#code-prose` -- artifact prose that buries its answer, pads, or restates a neighbouring artifact. Scope it to prose the change **added or touched**; a pre-existing verbose doc the change merely sits near is not a finding.
 - You **read** `#swe-entity` (owned by `db`): when the schema changed, the entity model must change with it -- a drifted entity model is your finding even though `db` owns the model's soundness. (In this repo the entity model is the reference-spec member `docs/reference-spec/entity-model.md`; consumers follow their own `#swe-entity` path.)
 
 Watch for: renamed/removed flags or commands still documented, changed behavior with unchanged prose, new public surface with no docs, and broken cross-references.

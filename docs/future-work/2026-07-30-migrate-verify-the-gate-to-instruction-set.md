@@ -13,9 +13,9 @@ The rule: before writing a command or a count into a spec, a PR body, or a done-
 Nothing in the rule is agentsmith-specific. It names a general failure of agent honesty -- a written claim about verification that was never performed -- and every consumer of this instruction set is exposed to it. It is also the rule that makes two shipped rules mean anything:
 
 - `#swe-done` item 2 requires stating the verification actually performed.
-- `#git-pr-body` item 3 requires the concrete commands run and their output, "not a bare it works".
+- `#git-pr`'s **Verification** item requires an untestable unit to state, in the body, the verification actually performed in place of tests.
 
-Both are satisfiable today by stating commands that were never executed. This rule is the pre-write obligation that closes that gap, and it ships nowhere.
+Both are satisfiable today by stating a verification that was never performed. This rule is the pre-write obligation that closes that gap, and it ships nowhere.
 
 ## Evidence
 
@@ -39,7 +39,7 @@ Migration fixes **discoverability** (the rule enters every session's loaded core
 - **Rename and rehome.** `#local-verify-the-gate` -> `#ai-verify-the-gate`, at `instructions/core/ai/ai-verify-the-gate.md`. The `#local-` prefix marks a repo-scoped rule and cannot ship.
 - **One `ownership.yaml` row.** The `ai` meta lens owns process rules governing agent behavior; without the row, `npm test`'s coverage lint fails on the orphan.
 - **Generalize the repo-local body.** Two passages are specific to this checkout and must not ship: the provenance line citing a 2026-07-22 audit of this repo, and a note that `grep -E '\b...'` is unsupported "by some grep builds on PATH here". Keep the substance (a near-variant pattern is not the pattern), drop the machine-specific claim.
-- **Check for overlap (`#swe-reuse`).** Adjacent but not duplicative: `#swe-test-quality`'s "a test must be able to fail" is the same idea one tier down, and `#swe-done` / `#git-pr-body` are the post-hoc statements this rule makes honest. It earns its own tag.
+- **Check for overlap (`#swe-reuse`).** Adjacent but not duplicative: `#swe-test-quality`'s "a test must be able to fail" is the same idea one tier down, and `#swe-done` / `#git-pr` are the post-hoc statements this rule makes honest. It earns its own tag.
 - **Decide whether the local rule is deleted or left as a pointer.** Leaving both invites drift between two copies of one rule -- the failure `#swe-reuse` names.
 
 ## Open question: the mechanical complement

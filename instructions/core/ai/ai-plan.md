@@ -3,7 +3,7 @@
 - A unit of work lives in one directory at `.agentsmith/specs/<branch>/<YYYY-MM-DD>-<slug>/`, holding `spec.md` and/or `plan.md`.
   The store **MUST be gitignored** -- ignore `.agentsmith/` as a whole (or `.agentsmith/*` with `!` exceptions for the generated instructions, where those are committed), never an enumeration of the working-state paths: the set grows, and a list that must stay complete is the shape that silently misses the next addition.
   Nothing in the generator does this for you, so in a project that has not, the guarantees below do not hold and the corpus this rule exists to prevent will accumulate in version control.
-  Given that, a working spec is **branch scratch and is never committed**, so the unit's durable trace is its PR body (#git-pr-body), its standing rationale the design-decisions log (#swe-design-decisions), and its site-specific constraints comments at those sites (#code-style).
+  Given that, a working spec is **branch scratch and is never committed**, so the unit's durable trace is its PR body (#git-pr), its standing rationale the design-decisions log (#swe-design-decisions), and its site-specific constraints comments at those sites (#code-style).
   The `<branch>` component attributes each directory to the branch that created it, with every `/` **flattened to `--`** (`refactor/foo` -> `refactor--foo`), so the component is always one path segment.
   It must not nest: nesting makes one branch's store a subdirectory of another's whenever one name prefixes another, so deleting `refactor/` at ship would destroy `refactor/foo`'s in-flight specs, and the revisit count below would read a sibling branch's units as its own.
   The directory may hold only `spec.md` (no plan yet) or only `plan.md` (trivial work that skipped a spec).
@@ -11,6 +11,8 @@
 - A unit of work is started on an approved feature branch (#git-branch-workflow); if not yet on one, confirm the branch first.
   Before minting a new working spec on a branch that already carries one, apply #swe-branch-lifespan -- the branch may be due to ship rather than to grow.
 - Each file carries a `Status:` line that is exactly one bare token: `Draft`, `Approved`, or `Implemented`.
+- A spec and a plan are written per #code-prose.
+  A spec states the outcome, the constraints, and the acceptance signal; a plan states the steps. Neither narrates the deliberation that produced it -- that is what the approving conversation was for.
 - The working spec of the unit **currently being executed is mutable**: it is edited in place as understanding of the unit improves, because forbidding the author to correct it only drives the correction into the reader's head instead of the document.
   A **superseded** working spec -- one that a later unit on the same branch replaced -- becomes read-only at the moment it is superseded (#swe-branch-lifespan).
   Corrections to the live system go to the reference spec (#swe-reference-spec), **never** to a spec that predates them.

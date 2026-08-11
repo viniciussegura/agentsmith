@@ -13,7 +13,8 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
   Layered work on one branch is fine -- it squashes into a single commit by design.
   That scope has an end: the branch ships once it stops converging (#swe-branch-lifespan).
 - The **squash-merge is performed by the human**, not the AI agent -- via the host's merge button or `git merge --squash`.
-  The squash-commit subject follows #git-title (it is the only commit that survives on the default branch); its body summarizes the change and links the PR (#git-pr-body).
+  The squash-commit subject follows #git-title (it is the only commit that survives on the default branch); its body summarizes the change and links the PR (#git-pr).
+  Where the branch carries AI-authored commits, the human performing the squash also carries their authorship trailers onto the squash commit (#git-usage): the host composes its default squash message from commit subjects and drops trailers, so attribution survives only if it is copied across deliberately.
   Delete the source branch after a successful squash-merge.
 - **One session, one branch.**
   Within a conversation / session, all work continues on the branch the session is operating on.
