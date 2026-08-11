@@ -1,13 +1,10 @@
-# #git-pr-body PR description
+# #git-pr PR structure
 
-A PR body **MUST** contain at minimum:
+The PR title **MUST** follow the conventional commits standard and start with the related issues codes if available.
+It must also feature a one short line about what was the outcome.
 
-1. **What changed** -- a concise summary of the diff's intent.
-2. **Why** -- the motivation or issue it addresses, and related issues.
-   State the unit's **approved scope and acceptance signal inline**, not as a link: a working spec is uncommitted branch scratch (#ai-plan), so there is nothing to link to and the PR body is the unit's durable record of what shipped.
-   An epic-planned unit also has an epic entry (#swe-epic), but that is the *planning* record and holds the plan, not the outcome; it never substitutes for this section.
-   When a deviation (#ai-plan-deviation) changes scope after the PR is open, update this section then -- original scope, the revision, and why -- so the record does not go stale against what shipped.
-   That account is prose, not a verbatim before/after diff; the in-session deviation pause is what catches the change as it happens.
-3. **Verification** -- the concrete steps taken: the commands run and any test output, or, when untestable, the explicit statement #swe-done requires of an untestable unit of work. Not a bare "it works".
-4. **Model** (AI-authored PRs only) -- the model(s) used, per #git-usage.
-5. **Reviewer notes** (optional) -- anything reviewers should scrutinize, and any follow-up deferred to #swe-future-work.
+A PR body **MUST** follow the structure:
+
+- A concise summary of the PR's intent -- the why and what.
+  About three sentences long, no heading, no bullet lists.
+- If related to any recorded artifacts (_e.g._ Jira tickets, Github issues, technical debts, future work), a summary bullet list with the format "<action verb> <reference>" (_e.g._ "fixes #123").
