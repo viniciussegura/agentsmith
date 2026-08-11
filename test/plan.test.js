@@ -138,7 +138,7 @@ test('renderPlan states the scope before the destructive delete line', () => {
 });
 
 test('renderPlan marks deletes distinctly from writes', () => {
-  const out = renderPlan({ base: '/b', absolute: false, manifestPaths: [], ops: [
+  const out = renderPlan({ base: '/b', absolute: false, scope: { kind: 'project' }, manifestPaths: [], ops: [
     { kind: 'write', path: '.agentsmith/AGENTS.md' },
     { kind: 'prune', paths: ['.claude/a.md', '.claude/b.md'] },
     { kind: 'unmergeSettings', path: '.claude/settings.json' },
@@ -150,7 +150,7 @@ test('renderPlan marks deletes distinctly from writes', () => {
 
 test('renderPlan lists every delete (no truncation) so a destructive confirm hides nothing', () => {
   const paths = ['a.md', 'b.md', 'c.md', 'd.md', 'e.md'];
-  const out = renderPlan({ base: '/b', absolute: false, manifestPaths: [], ops: [{ kind: 'prune', paths }] });
+  const out = renderPlan({ base: '/b', absolute: false, scope: { kind: 'project' }, manifestPaths: [], ops: [{ kind: 'prune', paths }] });
   for (const f of paths) assert.match(out, new RegExp(f), `${f} listed`);
   assert.doesNotMatch(out, /\.\.\./, 'no truncation ellipsis on the delete line');
 });

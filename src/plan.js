@@ -82,11 +82,10 @@ export function renderPlan(plan) {
     else if (op.kind === 'removeImport') updates.push(`${REL(op.path)} (remove agentsmith import)`);
     else if (op.kind === 'keepStub') keeps.push(REL(op.path));
   }
-  const lines = ['agentsmith plan:'];
   // Scope first: every path below is relative to this base, and a destructive
   // confirmation must never leave the reader guessing WHICH tree it is about to
-  // delete from. Absent only for a hand-built plan in a unit test.
-  if (plan.scope) lines.push(`  Scope: ${SCOPE_LABEL[plan.scope.kind]} (${plan.base})`);
+  // delete from. Both builders always set it, so this is unconditional.
+  const lines = ['agentsmith plan:', `  Scope: ${SCOPE_LABEL[plan.scope.kind]} (${plan.base})`];
   if (writes.length) lines.push(`  write   ${writes.length} file(s): ${writes.slice(0, 3).join(', ')}${writes.length > 3 ? ', ...' : ''}`);
   for (const u of updates) lines.push(`  update  ${u}`);
   // Deletes are the dangerous class -- list every one so a destructive confirmation

@@ -168,6 +168,14 @@ guessed by the caller.
   path, so it is not echoed into the args. Default `.claude/skills` (relative), which is
   correct only when the subagent's cwd is the project root.
 
+**The two drivers spell their commands differently, and both are right.** The
+main-thread SKILL prose invokes `node .claude/skills/...` because the main-loop agent
+runs in the project root and a relative path resolves correctly there. The Workflow
+driver's commands are absolute because its subagents do not inherit that cwd. These are
+not an inconsistency to reconcile: making the SKILL prose absolute would require it to
+resolve `skillsDir` first for no benefit, and making the driver relative reintroduces
+the bug. Change either only with the cwd it actually runs in in mind.
+
 Every path interpolated into `persistCmd`, `preReduceCmd`, and `guardCmd` is
 double-quoted: an absolute path routinely contains a space, and these strings are
 executed by an agent in a shell.

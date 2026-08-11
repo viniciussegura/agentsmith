@@ -11,7 +11,7 @@
 //   node persist.mjs apply   <store-dir> <round-id>
 
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
-import { join, dirname, basename, resolve } from 'node:path';
+import { join, dirname, basename, resolve, sep } from 'node:path';
 import { argv, stdout, stderr, exit } from 'node:process';
 import { lintStore, parseId, idToSafe } from './lint.mjs';
 import { isMain } from './is-main.mjs';
@@ -196,11 +196,13 @@ export function persistApply({ store, roundId, scratchDir }) {
 // inspecting the store afterwards.
 function countWritten({ store, written }) {
   const counts = { issues: 0, epics: 0, rounds: 0 };
-  const partitions = [['issues', join(store, 'issues')], ['epics', join(store, 'epics')], ['rounds', join(store, 'rounds')]];
+  // Match on the partition root plus a separator, never the bare prefix: a future
+  // sibling like `issues-archive/` would otherwise be counted as `issues/`.
+  const partitions = Object.keys(counts).map((name) => [name, resolve(join(store, name)) + sep]);
   // A path may be written more than once in a round (an issue re-placed by
   // reconcile); count files, not writes.
   for (const p of new Set(written.map((w) => resolve(w)))) {
-    const hit = partitions.find(([, root]) => p.startsWith(resolve(root)));
+    const hit = partitions.find(([, root]) => p.startsWith(root));
     if (hit) counts[hit[0]] += 1;
   }
   return counts;
