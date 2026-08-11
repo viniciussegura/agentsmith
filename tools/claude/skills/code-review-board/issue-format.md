@@ -55,6 +55,9 @@ interface ReviewRoundInfo {
 }
 ```
 
+`persist.mjs apply` names its output `rounds/<id>.json`, so it validates this record **before any write** and fails naming every missing required field and every unknown one together -- the failure it catches is a drifted field name (`selectedRoles` for `roles`), which is only legible when both halves are reported.
+Build the record with `roundRecord()` from `round-args.mjs` rather than by hand, so the field names cannot drift from this interface in the first place.
+
 ## Status lifecycle
 
 | status | meaning | set by |
@@ -93,7 +96,20 @@ Local, per-machine, gitignored, living (not committed, not per-round folders):
 ```
 
 `<round-id>` follows `<YYYY-MM-DD>[<letter>]-<target-branch>` (e.g. `2026-06-09b-feature-x`); it is the `<roundId>` prefix in every id minted that round.
-Per-run reasoning (reviewer outputs, verifier transcripts including rejected findings, PM deliberation) is **separate** per-run scratch under `.agentsmith/tmp/review-board/<round-id>/` (also gitignored), retained until the round's `triage.md` is reviewed.
+Per-run reasoning (reviewer outputs, verifier transcripts including rejected findings, PM deliberation) is **separate** per-run scratch under `.agentsmith/tmp/review-board/<round-id>/` (also gitignored), retained until the round's `triage.md` is reviewed:
+
+```text
+.agentsmith/tmp/review-board/<round-id>/
+  round.json               the ReviewRoundInfo above -- build it with roundRecord()
+  kickstart.json           planner input; REQUIRED, the Plan agent reads it (schema: review-board-protocol.md)
+  subject.diff             the computed diff; reviewers have no shell and cannot expand a revision range
+  git-baseline.txt         pre-round porcelain snapshot for round-guard.mjs
+  findings/<role>.json     each reviewer's raw output
+  verdicts/<id>.json       each verifier's accept/reject
+  pm-input.json            written by `persist.mjs summary` for the PM reduce
+  pm-directive.json        the PM's structured reduce output
+```
+
 The store is **local-lifetime**: within a machine's store no agent deletes files (a closing/promoted issue moves partition, never vanishes), so ids stay unique and `relatedIssues` links stay valid. The durable, shared record is the **tracker** (promoted issues) and **git history** (fixed commits), not this store. A store loss is atomic -- the whole `.agentsmith/review-board/` directory disappears together, leaving an empty store and a forced full sweep -- so there is no partial-absence that could dangle a reference.
 
 ## Validation

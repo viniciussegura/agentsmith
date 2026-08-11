@@ -18,6 +18,7 @@ Schema, status lifecycle, ids, and the store layout are in `issue-format.md`; re
 Reviewers fan out in parallel on a **cheap model**, one subagent per selected role (`review-correctness`, `review-swe`, `review-security`, `review-db`, `review-qa`, `review-docs`, `review-frontend`, `review-ux`).
 The verifier (`review-verifier`) is a per-finding skeptic, also cheap and parallel; the PM reduce (`project-manager`) runs on a **strong model**.
 Each reviewer is application-neutral: the spawn prompt has it read the shared protocol (`reviewer-common.md`) then its persona (`review-<role>.md`), supplies the **subject** (the diff + touched files, by reference), and names the **output schema** (`Issue`, per `issue-format.md`).
+**By reference means a path the reviewer can open.** Every reviewer, the verifier, and the PM declare `tools: Read, Grep, Glob, Write` -- none can run `git` -- so a subject of `baselineCommit..commit` is unreadable to them. Write the computed diff to `.agentsmith/tmp/review-board/<round-id>/subject.diff` and make the subject that path plus the touched files' repo paths.
 Where subagents are unavailable, role-play each lens sequentially, emitting the same artifacts (`#ai-review-engine` degradation).
 
 ## Store and scratch
@@ -36,7 +37,7 @@ Where subagents are unavailable, role-play each lens sequentially, emitting the 
   - `main`: `commit` = current default-branch HEAD. `baselineCommit` = the `commit` of the most recent prior `main` round in the local store (the recurring case: "current HEAD vs the last `main` round"). If **no prior `main` round** exists, **bootstrap**: `full-sweep`, `baselineCommit` = current default HEAD. If the **local store is absent** (fresh clone / wiped machine) the prior-round SHA is unknowable -- do not infer; offer bootstrap / full-sweep / a user-provided hash and ask at the confirmation gate.
 - `<default>` is the repo's configured default branch, resolved once. If a branch shares no history with it (`merge-base` empty), fall back to `full-sweep` with `baselineCommit` = current default HEAD.
 - **Mode precedence**: force `full-sweep` whenever no usable baseline diff exists (first repo round; first `main` round with no prior). The first round in a repo is always a `full-sweep` with no carry-forward.
-- Compute the diff over `baselineCommit..commit` (`diff` mode) or take the whole-project surface (`full-sweep`).
+- Compute the diff over `baselineCommit..commit` (`diff` mode) or take the whole-project surface (`full-sweep`), and **write it to `.agentsmith/tmp/review-board/<round-id>/subject.diff`** -- reviewers have no shell and cannot expand a revision range (see Roles).
 - **Select roles** from `.agentsmith/review-board/config.yaml`: a role runs when the diff touches a path matching its globs, or a commit message in `baselineCommit..commit` matches its keywords. `correctness` and `swe` always run. A `full-sweep` runs every active role. The user may force-add a role.
 - **Dirtiness scan** (the step-2 test) over all prior open **and recently-closed** issues; **force-select the owning role** (the issue id's `<role>` segment) of any dirty issue even if gating would skip it.
 - If `.agentsmith/review-board/config.yaml` is absent, create it from the **default config** (below) before selecting.
