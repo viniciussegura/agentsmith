@@ -90,6 +90,9 @@ interface ReviewRoundInfo {
 }
 ```
 
+A round record is **validated before it is persisted**: its store file is named `rounds/<id>.json`, so an absent or drifted field would otherwise name the file from `undefined` and lose the record silently.
+`persist.mjs apply` checks it against this interface before any write and fails naming every missing required field and every unknown one; `roundRecord()` in `round-args.mjs` emits it, so setup never hand-writes the field names.
+
 ## Instruction review
 
 The entity the instruction-review application (`#ai-instruction-review`) raises: a proposed change to the instruction set, triaged via an editable worksheet and applied through a separate human-gated step.
