@@ -1,6 +1,7 @@
 # #code-style Code style
 
 - Default to editing existing files; create new ones only when the structural fit is clear.
+- Code comments **SHOULD** document the current implementation, not the historical decision.
 - No gratuitous comments.
   Prefer named identifiers over explanatory prose.
   Two comments are **not** gratuitous and are the exception this rule carves out: a non-obvious constraint at the site it constrains (_e.g._ why a watcher API is avoided on one platform), and a pointer naming the slug of the design decision that governs the site (#swe-design-decisions).
