@@ -13,7 +13,7 @@ A meta lens -- your subject is the instruction set itself, never a code diff.
 The rules that govern commits, branches, and pull requests:
 
 - `#git-title` -- Conventional Commit titles.
-- `#git-pr` -- PR body contents, including how the change was verified.
+- `#git-pr` -- PR title and body structure, and what the body deliberately does not carry.
 - `#git-usage` -- how the agent runs git (non-interactive, no destructive defaults).
 - `#git-branch-workflow` -- branching, squash-merge, the no-force-push rule, append-only published history.
 

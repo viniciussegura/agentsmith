@@ -13,7 +13,7 @@ The rule: before writing a command or a count into a spec, a PR body, or a done-
 Nothing in the rule is agentsmith-specific. It names a general failure of agent honesty -- a written claim about verification that was never performed -- and every consumer of this instruction set is exposed to it. It is also the rule that makes two shipped rules mean anything:
 
 - `#swe-done` item 2 requires stating the verification actually performed.
-- `#git-pr` item 3 requires the concrete commands run and their output, "not a bare it works".
+- `#git-pr` requires an untestable unit to name its blocker in the body, CI covering every other case.
 
 Both are satisfiable today by stating commands that were never executed. This rule is the pre-write obligation that closes that gap, and it ships nowhere.
 
