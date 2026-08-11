@@ -2,7 +2,6 @@
 
 Every artifact this set asks you to write is read once, under time pressure, by someone answering one question.
 Write for that reader: direct, terse, to-the-point.
-Which artifacts those are is not listed here: each rule that asks for one cites this rule, so a new artifact rule registers itself in one place rather than two (#swe-reuse).
 
 - **Lead with the answer**, then its support: a reader who stops after the first sentence still gets the point.
 - **One claim per sentence.** Cut throat-clearing ("it is worth noting that"), hedging that carries no information, and any restatement of the sentence before it.
