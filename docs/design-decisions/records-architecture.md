@@ -10,6 +10,6 @@ Committing working specs turned out to be the same mistake one level up. The cor
 
 **Consequences.** Authoring a decision is a soft `#ai-session-hygiene` prompt scoped by reach, never a `#swe-done` merge gate; `#swe-done` only keeps existing decision files current. The reach test has one tier: below it, rationale goes to a code comment or to nothing.
 
-A unit's durable trace is its PR body (`#git-pr-body`), which carries the approved scope inline -- there is no committed spec to link. That places the record in the forge rather than the repo, so it is host-dependent and offline-unavailable; accepted, because the same reasoning that says deliberation need not be kept says it need not be kept locally. The PR is reached by `git blame` → commit → PR, which is the access pattern for "what was considered here" and costs nothing to maintain.
+A unit's durable trace is its PR body (`#git-pr`), which carries the approved scope inline -- there is no committed spec to link. That places the record in the forge rather than the repo, so it is host-dependent and offline-unavailable; accepted, because the same reasoning that says deliberation need not be kept says it need not be kept locally. The PR is reached by `git blame` → commit → PR, which is the access pattern for "what was considered here" and costs nothing to maintain.
 
 New working specs still carry a Conformance section (`#ai-plan`) reconciled against present-truth. There is no index of working specs, because there is no committed corpus to index.

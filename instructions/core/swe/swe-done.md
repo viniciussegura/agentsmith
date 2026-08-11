@@ -10,7 +10,7 @@ Do not open or update a PR before both tiers hold.
 1. The unit is complete as raised.
    A partial delivery is done only when the narrowing was surfaced and accepted (#ai-plan-deviation).
 2. Tests for the unit pass locally.
-   When the repo has no test harness, or the unit is genuinely untestable, the verification actually performed is stated and recorded (#git-pr-body, #swe-technical-debts): "done" is never "it compiled."
+   When the repo has no test harness, or the unit is genuinely untestable, the verification actually performed is stated and recorded (#git-pr, #swe-technical-debts): "done" is never "it compiled."
    Invoking the untestable exception **requires naming the specific blocker** (e.g. "no test harness exists", "purely declarative config with no executable path") -- "hard to test" or "not worth testing" do not qualify.
    If the blocker is an absent harness and the language/runtime makes one straightforward to establish, the exception is unavailable until it is established (#swe-testing).
 3. Documentation drift the unit caused is resolved (#swe-docs-drift), including the reference spec when current behavior changed (#swe-reference-spec), the entity model when the schema changed (#swe-entity), and the design-decisions log when the unit altered an existing decision's rationale (#swe-design-decisions).

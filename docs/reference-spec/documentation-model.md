@@ -18,7 +18,7 @@ A member of the reference spec (`#swe-reference-spec`): it reflects the model as
 **The working spec is not in this table**, and that is the point: it is not a
 record. It lives at `.agentsmith/specs/<branch>/<date>-<slug>/`, gitignored and
 per-machine, and is deleted when the branch ships (`#ai-plan`). Nothing here is
-kept for it, because a unit's durable trace is its PR body (`#git-pr-body`), its
+kept for it, because a unit's durable trace is its PR body (`#git-pr`), its
 standing rationale a design-decision file, and its site-specific constraints
 comments at those sites (`#code-style`).
 
