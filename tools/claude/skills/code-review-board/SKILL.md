@@ -75,7 +75,7 @@ Where subagents are unavailable, role-play each lens sequentially, emitting the 
 
 - Run `node .claude/skills/code-review-board/persist.mjs apply .agentsmith/review-board <round-id>`. It reads the findings + verdicts + `pm-directive.json`, drops rejected findings, writes verified-new issues under their minted ids, applies reconcile and PM transitions, moves closing issues to `closed/`, writes `rounds/<round-id>.json`, updates epics, and runs `lint.mjs` as its final step.
 - A non-zero exit means the scratch was malformed or the write left the store invalid. Read the reported errors, fix the offending scratch/directive, and rerun -- `persist.mjs` is deterministic, so a clean rerun reproduces a clean store.
-- **Containment check.** After persist, run `node .claude/skills/code-review-board/round-guard.mjs check .agentsmith/tmp/review-board/<round-id>/git-baseline.txt`. A non-zero exit lists paths an agent wrote outside the gitignored scratch/store -- stop, inspect, and revert the stray writes before presenting; do not promote a round whose guard failed.
+- **Containment check.** After persist, run `node .claude/skills/code-review-board/round-guard.mjs check .agentsmith/tmp/review-board/<round-id>/git-baseline.txt`. Exit `1` lists paths an agent wrote outside the gitignored scratch/store -- stop, inspect, and revert the stray writes before presenting; do not promote a round whose guard failed. Exit `3` means the baseline file was not found, so the check **did not run**: nothing escaped and there is nothing to revert. Fix the path (it is resolved against the running cwd, which the guard echoes) and re-check -- never report it as a containment violation.
 
 ### 6. Present (main thread)
 
