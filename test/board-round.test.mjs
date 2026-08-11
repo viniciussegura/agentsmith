@@ -31,7 +31,7 @@ test('code round runs Plan -> Review -> Verify -> Reduce -> Persist, every dispa
   assert.ok(h.calls.some((c) => c.opts.label === 'persist:apply'));
   // the round closes with the containment guard (round-guard check against the baseline)
   const guard = h.calls.find((c) => c.opts.label === 'guard:check');
-  assert.ok(guard && /round-guard\.mjs check/.test(guard.prompt), 'round ends with a guard:check dispatch');
+  assert.ok(guard && /round-guard\.mjs"? check/.test(guard.prompt), 'round ends with a guard:check dispatch');
   // code's two-step reduce: a pre-reduce CLI dispatch (persist.mjs summary) then a
   // PM reduce whose prompt restores the directive contract (pm-directive.json).
   assert.ok(h.calls.some((c) => c.opts.label === 'reduce:pre'), 'code runs a reduce:pre dispatch');
@@ -92,6 +92,68 @@ test('instruction fan-out appends the board reviewNote to every reviewer; code f
   const cReviews = hc.calls.filter((c) => c.opts.label?.startsWith('review:'));
   assert.ok(cReviews.length > 0);
   for (const c of cReviews) assert.doesNotMatch(c.prompt, /PORTABILITY/, 'code reviewers get no portability note');
+});
+
+test('agentPrefix reaches every dispatch site, so a plugin install resolves its agents', async () => {
+  const h = harness({ lenses: ['security', 'db'], perLens: {} });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security', 'db'], agentPrefix: 'agentsmith:' });
+  await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args });
+
+  const typed = h.calls.filter((c) => c.opts.agentType);
+  // plan + 2 reviewers + 2 verifiers + reduce -- every dispatch that names an agent.
+  assert.equal(typed.length, 6, 'all six agent-typed dispatches accounted for');
+  for (const c of typed) {
+    assert.ok(c.opts.agentType.startsWith('agentsmith:'), `${c.opts.label} dispatched as ${c.opts.agentType}`);
+  }
+  assert.equal(h.calls.find((c) => c.opts.label === 'plan').opts.agentType, 'agentsmith:project-manager');
+  assert.equal(h.calls.find((c) => c.opts.label === 'review:security').opts.agentType, 'agentsmith:review-security');
+  assert.equal(h.calls.find((c) => c.opts.label === 'verify:security').opts.agentType, 'agentsmith:review-verifier');
+  assert.equal(h.calls.find((c) => c.opts.label === 'reduce').opts.agentType, 'agentsmith:project-manager');
+});
+
+test('agentPrefix defaults to empty, so an npx/CLI install dispatches bare names', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} });
+  await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log,
+    args: codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] }) });
+  for (const c of h.calls.filter((c) => c.opts.agentType)) {
+    assert.ok(!c.opts.agentType.includes(':'), `${c.opts.label} stays bare: ${c.opts.agentType}`);
+  }
+});
+
+test('the spec and instruction boards namespace their maintainers too', async () => {
+  const hs = harness({ lenses: ['security'], perLens: {} });
+  await runRound({ agent: hs.agent, parallel: hs.parallel, phase: hs.phase, log: hs.log,
+    args: specArgs({ roundId: '1', scratch: '/p/x', subjectRef: 'spec.md', candidateLenses: ['security'], agentPrefix: 'agentsmith:' }) });
+  assert.equal(hs.calls.find((c) => c.opts.label === 'reduce').opts.agentType, 'agentsmith:spec-specialist');
+
+  const hi = harness({ lenses: ['swe'], perLens: {} });
+  await runRound({ agent: hi.agent, parallel: hi.parallel, phase: hi.phase, log: hi.log,
+    args: instructionArgs({ roundId: 'r', scratch: '/p/x', subjectRef: 'full-audit', candidateLenses: ['swe'], agentPrefix: 'agentsmith:' }) });
+  assert.equal(hi.calls.find((c) => c.opts.label === 'plan').opts.agentType, 'agentsmith:ai-engineer');
+});
+
+test('a guarded round without a guardCmd throws rather than skipping the containment check', async () => {
+  const h = harness();
+  const args = { ...codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] }), guardCmd: null };
+  await assert.rejects(
+    runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }),
+    /guardBaseline set without guardCmd/,
+  );
+});
+
+test('round commands are built from an absolute skillsDir, not resolved against cwd', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} });
+  const skillsDir = '/abs/plugin/cache/agentsmith/skills';
+  const args = codeArgs({ roundId: 'r1', store: '/abs/p/.agentsmith/review-board', scratch: '/abs/p/.agentsmith/tmp/r1',
+    subjectRef: 'x', candidateLenses: ['security'], skillsDir });
+  await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args });
+
+  for (const label of ['reduce:pre', 'persist:apply', 'guard:check']) {
+    const call = h.calls.find((c) => c.opts.label === label);
+    assert.ok(call, `${label} dispatched`);
+    assert.ok(call.prompt.includes(skillsDir), `${label} runs the absolute skill path`);
+    assert.ok(!/node "?\.claude\//.test(call.prompt), `${label} carries no cwd-relative skill path`);
+  }
 });
 
 test('a dispatch missing model throws (the in-driver assertion)', async () => {
