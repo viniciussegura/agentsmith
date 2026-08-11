@@ -103,6 +103,20 @@ The location-ish surface collapses into two orthogonal axes plus scope; each fla
 ## Confirmation gate
 
 The intended-effects plan is always printed before any write or delete.
+
+Its first line after the header states the scope and the absolute base directory every path below is relative to, so a confirmation never leaves the reader guessing which tree is about to be written to or deleted from:
+
+```text
+agentsmith plan:
+  Scope: project (/home/vinic/dev/myrepo)
+  write   37 file(s): .agentsmith/AGENTS.md, .agentsmith/agents/frontend.md, ...
+  update  .claude/settings.json (add agentsmith hook)
+  keep    AGENTS.md (unchanged)
+```
+
+The scope reads `user`, `project`, or `folder` (a `--scope PATH`), matching what the flag takes; the path is always the resolved absolute base, whichever form was given.
+Deletes are listed in full, never truncated behind an ellipsis.
+
 The gate then branches on whether the command is destructive:
 
 - **Non-destructive** = `install` without `--clean` (writes and overwrites owned paths; the manifest orphan-prune only removes paths a prior agentsmith run recorded).

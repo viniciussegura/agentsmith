@@ -209,7 +209,7 @@ async function main() {
     // --placement root import (correctness-3). AGENTS.md at the root => root core.
     const prevCorePath = prev.paths.includes('AGENTS.md') ? 'AGENTS.md' : '.agentsmith/AGENTS.md';
     const plan = buildUninstallPlan({
-      base, absolute, manifestPaths: prev.paths, corePath: prevCorePath,
+      base, absolute, scope: cmd.scope, manifestPaths: prev.paths, corePath: prevCorePath,
       stubContent: built.stub ? built.stub.content : null,
       stubOnDiskContent: existsSync(stubDest) ? readFileSync(stubDest, 'utf8') : null,
       settingsHasOwned,

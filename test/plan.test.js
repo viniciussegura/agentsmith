@@ -104,6 +104,39 @@ test('uninstall keeps an edited stub', () => {
   assert.ok(p.ops.some((o) => o.kind === 'keepStub'));
 });
 
+test('install and uninstall plans both carry the scope, so renderPlan can state it', () => {
+  const install = buildInstallPlan({ base: '/b', absolute: false, built, adapterPlan, scope: { kind: 'project' },
+    flags: { mode: 'split', placement: 'nested', tools: true, dev: false, clean: false, yes: false, dryRun: false },
+    prevManifestPaths: [], stubExists: false });
+  assert.deepEqual(install.scope, { kind: 'project' });
+
+  const uninstall = buildUninstallPlan({ base: '/home', absolute: true, manifestPaths: [], scope: { kind: 'user' },
+    stubContent: 'STUB', stubOnDiskContent: null, settingsHasOwned: false, hasClaudeMd: false, isUser: true });
+  assert.deepEqual(uninstall.scope, { kind: 'user' });
+});
+
+test('renderPlan states the scope kind and the absolute base it resolved to', () => {
+  const line = (scope, base) => renderPlan({ base, absolute: true, scope, manifestPaths: [], ops: [
+    { kind: 'write', path: '.agentsmith/AGENTS.md' },
+  ] }).split('\n')[1];
+
+  assert.equal(line({ kind: 'project' }, '/repo'), '  Scope: project (/repo)');
+  assert.equal(line({ kind: 'user' }, '/home/vinic'), '  Scope: user (/home/vinic)');
+  // A --scope PATH install reads as `folder` -- 'path' is the internal enum.
+  assert.equal(line({ kind: 'path', path: '../sibling' }, '/repos/sibling'), '  Scope: folder (/repos/sibling)');
+});
+
+test('renderPlan states the scope before the destructive delete line', () => {
+  const out = renderPlan({ base: '/home/vinic', absolute: true, scope: { kind: 'user' }, manifestPaths: [], ops: [
+    { kind: 'prune', paths: ['.agentsmith/AGENTS.md'] },
+  ] });
+  const scopeAt = out.indexOf('Scope: user');
+  const deleteAt = out.indexOf('DELETE');
+  assert.ok(scopeAt >= 0, 'scope line present');
+  assert.ok(deleteAt >= 0, 'delete line present');
+  assert.ok(scopeAt < deleteAt, 'scope precedes what is about to be deleted');
+});
+
 test('renderPlan marks deletes distinctly from writes', () => {
   const out = renderPlan({ base: '/b', absolute: false, manifestPaths: [], ops: [
     { kind: 'write', path: '.agentsmith/AGENTS.md' },
