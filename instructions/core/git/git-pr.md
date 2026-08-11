@@ -2,13 +2,13 @@
 
 The PR **title** follows #git-title -- same format, same issue-code and outcome rules as the commit subject.
 
-The PR **body** carries one load-bearing obligation: it states the unit's **approved scope** inline.
+The PR **body** carries one load-bearing obligation: it states the unit's **approved scope** inline, because a working spec is uncommitted branch scratch (#ai-plan) and nothing else durably records it.
 Inline means *stated*, not *transcribed* -- the scope in a sentence, not the spec pasted in.
 
 Around that, the body is a summary a reviewer reads once, not an archive they excavate (#code-prose).
 It holds the following, in order, and nothing else:
 
-1. **What and why** -- a short paragraph of prose, no heading and no bullets, carrying the approved scope above.
+1. **What and why** -- a short paragraph of prose, no heading and no bullets, carrying the approved scope above and any later revision to it.
 2. **Linked artifacts** -- one bullet per related record (issue, ticket, technical debt, future-work note, epic entry), formatted `<action verb> <reference>`: `fixes #123`, `pays off docs/technical-debts/2026-07-30-scratch-spec-loss.md`.
    Omit the section when there are none.
 3. **Verification** -- one line, and **only** when the unit invoked #swe-done's untestable exception: the blocker it named, and the verification actually performed in place of tests.

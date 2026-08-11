@@ -40,6 +40,9 @@ test/              tests for the generator
 - Rules are themselves artifacts, so they follow their own `#code-prose`: lead
   with the obligation, state each constraint once, and cite a neighbouring rule
   rather than restating it.
+- A rule that asks for a written artifact **cites** `#code-prose`. That rule
+  deliberately enumerates nothing, so the citation is the only registration —
+  a new artifact rule that omits it escapes the prose standard silently.
 - To add a rule, drop a `.md` into a section group under `instructions/` (e.g.
   `core/swe/` or `backend/`); it is picked up automatically.
 - Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the
