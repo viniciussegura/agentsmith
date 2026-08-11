@@ -10,11 +10,11 @@
 //   node persist.mjs summary <store-dir> <round-id>
 //   node persist.mjs apply   <store-dir> <round-id>
 
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, realpathSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname, basename, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { argv, stdout, stderr, exit } from 'node:process';
 import { lintStore, parseId, idToSafe } from './lint.mjs';
+import { isMain } from './is-main.mjs';
 
 // ---------- io helpers ----------
 
@@ -315,14 +315,7 @@ export function persistSummary({ store, roundId, scratchDir }) {
 
 // ---------- CLI ----------
 
-// argv[1] may be a SYMLINK -- a plugin install exposes this skill at
-// `.claude/skills/code-review-board`, a link into the plugin cache -- while
-// import.meta.url is always the realpath. `resolve` absolutizes without following
-// links, so comparing against it never matches through the documented install path
-// and the CLI block below silently no-ops (exit 0, no output). realpathSync
-// collapses the link; an argv[1] not on disk falls back to the absolutized form.
-const realArgv1 = (p) => { try { return realpathSync(resolve(p)); } catch { return resolve(p); } };
-const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === realArgv1(argv[1]);
+const invokedDirectly = isMain(import.meta.url, argv[1]);
 if (invokedDirectly) {
   const [cmd, storeArg, roundId] = argv.slice(2);
   const store = resolve(storeArg || '');

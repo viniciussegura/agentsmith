@@ -150,13 +150,18 @@ export function runGuard({ scratchDir, n, newCycle = false }) {
 
 // --- CLI wrapper ------------------------------------------------------------
 const argv = process.argv;
-// argv[1] may be a SYMLINK -- a plugin install exposes this skill at
-// `.claude/skills/spec-review-board`, a link into the plugin cache -- while
-// import.meta.url is always the realpath. `resolve` absolutizes without following
-// links, so comparing against it never matches through the documented install path
-// and the CLI block below silently no-ops: the convergence verdict is never
-// computed and the review loop has nothing to stop it. realpathSync collapses the
-// link; an argv[1] not on disk falls back to the absolutized form.
+// Deliberately NOT imported from `../code-review-board/is-main.mjs`, which holds the
+// same comparison for the three call sites in that directory. This skill loads and
+// runs standalone today; importing across the skill boundary would make guard.mjs
+// fail at load time if only spec-review-board were present. The duplication is four
+// lines, the coupling would be permanent, and `test/skill-cli-entry.test.mjs` invokes
+// every one of these guards through a linked directory, so neither copy can rot.
+//
+// Why realpath at all: a plugin install exposes this skill at
+// `.claude/skills/spec-review-board`, a symlink into the plugin cache, while
+// import.meta.url is the realpath. Comparing against a merely-absolutized argv[1]
+// never matches there, so the CLI block below would silently no-op -- the
+// convergence verdict never computed, and the review loop with nothing to stop it.
 const realArgv1 = (p) => { try { return realpathSync(resolve(p)); } catch { return resolve(p); } };
 const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === realArgv1(argv[1]);
 if (invokedDirectly) {

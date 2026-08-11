@@ -23,9 +23,10 @@
 // probes as inputs and touches no globals.
 
 import { existsSync, realpathSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argv, cwd, stdout } from 'node:process';
+import { isMain } from './is-main.mjs';
 
 // The agent whose presence is probed. `swe` is the always-on base lens, so it
 // exists in every install that has agents at all.
@@ -60,10 +61,7 @@ export function skillsRootOf(moduleUrl) {
   return realpathSync(dirname(dirname(fileURLToPath(moduleUrl))));
 }
 
-// argv[1] may be a symlink while import.meta.url is the realpath; compare like
-// for like or this CLI block silently no-ops (see persist.mjs for the full note).
-const realArgv1 = (p) => { try { return realpathSync(resolve(p)); } catch { return resolve(p); } };
-const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === realArgv1(argv[1]);
+const invokedDirectly = isMain(import.meta.url, argv[1]);
 if (invokedDirectly) {
   const at = cwd();
   const ctx = resolveContext({

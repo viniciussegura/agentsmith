@@ -96,9 +96,11 @@ test('every skill CLI entry guard resolves argv[1] through realpath', async () =
       if (!f.endsWith('.mjs')) continue;
       const src = readFileSync(join(dir, f), 'utf8');
       if (!src.includes('invokedDirectly')) continue;
-      // `resolve(argv[1])` alone is the defect: it absolutizes without following links.
-      if (!src.includes('realpathSync')) offenders.push(`${skill}/${f}`);
+      // Either route is correct: the shared `isMain` helper, or an inline
+      // realpathSync. `resolve(argv[1])` ALONE is the defect -- it absolutizes
+      // without following links.
+      if (!src.includes('realpathSync') && !src.includes('isMain')) offenders.push(`${skill}/${f}`);
     }
   }
-  assert.deepEqual(offenders, [], 'a CLI entry guard without realpathSync silently no-ops through a link');
+  assert.deepEqual(offenders, [], 'a CLI entry guard without realpath resolution silently no-ops through a link');
 });
