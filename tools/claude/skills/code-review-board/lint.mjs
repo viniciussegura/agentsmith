@@ -15,7 +15,7 @@
 //   node .claude/skills/code-review-board/lint.mjs [store-dir] [--strict]
 //   (default dir: ./.agentsmith/review-board; --strict promotes warnings to a non-zero exit)
 
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { join, relative, sep, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argv, stdout, stderr, exit, cwd } from 'node:process';
@@ -233,7 +233,14 @@ export function lintStore({ root }) {
 
 // ---------- CLI ----------
 
-const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === resolve(argv[1]);
+// argv[1] may be a SYMLINK -- a plugin install exposes this skill at
+// `.claude/skills/code-review-board`, a link into the plugin cache -- while
+// import.meta.url is always the realpath. `resolve` absolutizes without following
+// links, so comparing against it never matches through the documented install path
+// and the CLI block below silently no-ops (exit 0, no output). realpathSync
+// collapses the link; an argv[1] not on disk falls back to the absolutized form.
+const realArgv1 = (p) => { try { return realpathSync(resolve(p)); } catch { return resolve(p); } };
+const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === realArgv1(argv[1]);
 if (invokedDirectly) {
   const strict = argv.includes('--strict');
   const dirArg = argv.slice(2).find((a) => !a.startsWith('--'));

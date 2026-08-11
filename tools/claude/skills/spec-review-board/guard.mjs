@@ -15,7 +15,7 @@
 // Usage:
 //   node guard.mjs <scratch-dir> <n> [--new-cycle]
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -150,7 +150,15 @@ export function runGuard({ scratchDir, n, newCycle = false }) {
 
 // --- CLI wrapper ------------------------------------------------------------
 const argv = process.argv;
-const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === resolve(argv[1]);
+// argv[1] may be a SYMLINK -- a plugin install exposes this skill at
+// `.claude/skills/spec-review-board`, a link into the plugin cache -- while
+// import.meta.url is always the realpath. `resolve` absolutizes without following
+// links, so comparing against it never matches through the documented install path
+// and the CLI block below silently no-ops: the convergence verdict is never
+// computed and the review loop has nothing to stop it. realpathSync collapses the
+// link; an argv[1] not on disk falls back to the absolutized form.
+const realArgv1 = (p) => { try { return realpathSync(resolve(p)); } catch { return resolve(p); } };
+const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === realArgv1(argv[1]);
 if (invokedDirectly) {
   const rest = argv.slice(2);
   const newCycle = rest.includes('--new-cycle');
