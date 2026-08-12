@@ -1,13 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runGuard } from '../tools/claude/skills/spec-review-board/guard.mjs';
+import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
 
-function scratch() {
-  return mkdtempSync(join(tmpdir(), 'sr-guard-'));
-}
+const scratch = (t) => makeTempDir(t, 'sr-guard-');
 function writeJson(p, o) {
   writeFileSync(p, JSON.stringify(o, null, 2));
 }
@@ -25,8 +23,8 @@ function readLedger(dir) {
   return JSON.parse(readFileSync(join(dir, 'ledger.json'), 'utf8'));
 }
 
-test('empty ledger + 2 blocking + 1 nit -> 3 findings, b=2, continue', () => {
-  const dir = scratch();
+test('empty ledger + 2 blocking + 1 nit -> 3 findings, b=2, continue', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b'), finding('c', { tag: 'nit' })]);
   const r = runGuard({ scratchDir: dir, n: 1 });
   assert.equal(r.b, 2);
@@ -34,8 +32,8 @@ test('empty ledger + 2 blocking + 1 nit -> 3 findings, b=2, continue', () => {
   assert.equal(readLedger(dir).findings.length, 3);
 });
 
-test('finding missing origin or tag -> throws (fails closed)', () => {
-  const dir = scratch();
+test('finding missing origin or tag -> throws (fails closed)', (t) => {
+  const dir = scratch(t);
   writeJson(join(dir, 'round-1.review.json'), {
     round: 1, openBlocking: 1,
     findings: [{ id: 'a', tag: 'blocking', problem: 'p', fix: 'f' }], // no origin
@@ -43,14 +41,14 @@ test('finding missing origin or tag -> throws (fails closed)', () => {
   assert.throws(() => runGuard({ scratchDir: dir, n: 1 }), /origin|tag/);
 });
 
-test('malformed JSON -> throws', () => {
-  const dir = scratch();
+test('malformed JSON -> throws', (t) => {
+  const dir = scratch(t);
   writeFileSync(join(dir, 'round-1.review.json'), '{ not json');
   assert.throws(() => runGuard({ scratchDir: dir, n: 1 }));
 });
 
-test('recurring id with changed tag -> tag updated, tagHistory appended, origin/roundRaised preserved', () => {
-  const dir = scratch();
+test('recurring id with changed tag -> tag updated, tagHistory appended, origin/roundRaised preserved', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a', { origin: 'db', tag: 'blocking' })]);
   runGuard({ scratchDir: dir, n: 1 });
   writeReview(dir, 2, [finding('a', { origin: 'db', tag: 'nit', tagReason: 'minor on reflection' })]);
@@ -63,8 +61,8 @@ test('recurring id with changed tag -> tag updated, tagHistory appended, origin/
   assert.equal(f.tagHistory[1].tag, 'nit');
 });
 
-test('recurring id NOT re-emitted -> ledger tag unchanged (reconcile preservation)', () => {
-  const dir = scratch();
+test('recurring id NOT re-emitted -> ledger tag unchanged (reconcile preservation)', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a', { tag: 'nit' }), finding('b', { tag: 'blocking' })]);
   runGuard({ scratchDir: dir, n: 1 });
   writeReview(dir, 2, [finding('b', { tag: 'blocking' })]); // 'a' not re-emitted
@@ -74,8 +72,8 @@ test('recurring id NOT re-emitted -> ledger tag unchanged (reconcile preservatio
   assert.equal(a.tagHistory.length, 1);
 });
 
-test('generalist down-tag leaves b(n) but keeps status open + records tagHistory', () => {
-  const dir = scratch();
+test('generalist down-tag leaves b(n) but keeps status open + records tagHistory', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a', { origin: 'db', tag: 'blocking' })]);
   let r = runGuard({ scratchDir: dir, n: 1 });
   assert.equal(r.b, 1);
@@ -87,15 +85,15 @@ test('generalist down-tag leaves b(n) but keeps status open + records tagHistory
   assert.equal(a.tagHistory.at(-1).by, 'generalist');
 });
 
-test('no rebuttal -> all merged findings stay open', () => {
-  const dir = scratch();
+test('no rebuttal -> all merged findings stay open', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b')]);
   runGuard({ scratchDir: dir, n: 1 });
   assert.ok(readLedger(dir).findings.every((f) => f.status === 'open'));
 });
 
-test('rebuttal resolved/wontfix drop from b(n) and set status', () => {
-  const dir = scratch();
+test('rebuttal resolved/wontfix drop from b(n) and set status', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b'), finding('c')]);
   runGuard({ scratchDir: dir, n: 1 });
   writeReview(dir, 2, [finding('a'), finding('b'), finding('c')]);
@@ -110,21 +108,21 @@ test('rebuttal resolved/wontfix drop from b(n) and set status', () => {
   assert.equal(led.findings.find((f) => f.id === 'b').status, 'wontfix');
 });
 
-test('openBlocking divergence -> computed b authoritative, no throw', () => {
-  const dir = scratch();
+test('openBlocking divergence -> computed b authoritative, no throw', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b')], 5); // claims 5, really 2
   const r = runGuard({ scratchDir: dir, n: 1 });
   assert.equal(r.b, 2);
 });
 
-test('b=0 -> converged', () => {
-  const dir = scratch();
+test('b=0 -> converged', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a', { tag: 'nit' })]);
   assert.equal(runGuard({ scratchDir: dir, n: 1 }).verdict, 'converged');
 });
 
-test('two consecutive non-progress reviews -> stalled (earliest 3rd review)', () => {
-  const dir = scratch();
+test('two consecutive non-progress reviews -> stalled (earliest 3rd review)', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b'), finding('c')]); // b=3, best=3
   assert.equal(runGuard({ scratchDir: dir, n: 1 }).verdict, 'continue');
   writeReview(dir, 2, [finding('a'), finding('b'), finding('c')]); // b=3, non-progress (streak 1)
@@ -145,8 +143,8 @@ function resolve(dir, n, ids) {
 // step 4 -- so a rebuttal is never on disk for its own guard call and must be
 // folded by a later one. The fixtures above pre-stage it, an ordering the live
 // driver cannot produce; this one follows the real sequence.
-test('rebuttal written after its own round is folded by the next guard run (live driver order)', () => {
-  const dir = scratch();
+test('rebuttal written after its own round is folded by the next guard run (live driver order)', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b')]);
   assert.equal(runGuard({ scratchDir: dir, n: 1 }).b, 2);
   resolve(dir, 1, ['a']); // author revises and rebuts only after the guard has run
@@ -160,8 +158,8 @@ test('rebuttal written after its own round is folded by the next guard run (live
 // dispute the claim -- otherwise a review converges on the author's say-so and the
 // adversarial filter is one-sided. A re-emission at round n overrides a rebuttal
 // from an earlier round; `wontfix` is an author decision the guard never overrides.
-test('re-emitting a resolved finding reopens it', () => {
-  const dir = scratch();
+test('re-emitting a resolved finding reopens it', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b')]);
   runGuard({ scratchDir: dir, n: 1 });
   resolve(dir, 1, ['a']);
@@ -172,8 +170,8 @@ test('re-emitting a resolved finding reopens it', () => {
   assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'open');
 });
 
-test('re-emitting a wontfix finding does NOT reopen it, but a dispute yields `contested` not `converged`', () => {
-  const dir = scratch();
+test('re-emitting a wontfix finding does NOT reopen it, but a dispute yields `contested` not `converged`', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a')]);
   runGuard({ scratchDir: dir, n: 1 });
   writeJson(join(dir, 'round-1.rebuttal.json'), {
@@ -186,8 +184,8 @@ test('re-emitting a wontfix finding does NOT reopen it, but a dispute yields `co
   assert.equal(readLedger(dir).findings.find((f) => f.id === 'a').status, 'wontfix'); // still the author's call
 });
 
-test('an undisputed wontfix converges (not re-emitted -> no dispute)', () => {
-  const dir = scratch();
+test('an undisputed wontfix converges (not re-emitted -> no dispute)', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a')]);
   runGuard({ scratchDir: dir, n: 1 });
   writeJson(join(dir, 'round-1.rebuttal.json'), {
@@ -200,8 +198,8 @@ test('an undisputed wontfix converges (not re-emitted -> no dispute)', () => {
 // The durability property the reopen fix must guarantee (correctness-1/db-1):
 // once a dispute reopens a finding, a LATER round that simply omits its id --
 // with no fresh rebuttal -- must NOT let the stale pre-reopen `resolved` replay.
-test('a reopened finding stays open when a later round omits it (reopen is durable)', () => {
-  const dir = scratch();
+test('a reopened finding stays open when a later round omits it (reopen is durable)', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b')]);
   runGuard({ scratchDir: dir, n: 1 });
   resolve(dir, 1, ['a']); // author resolves a after guard 1
@@ -220,8 +218,8 @@ test('a reopened finding stays open when a later round omits it (reopen is durab
 // The complement: a rebuttal from the reopen round (or later) DOES re-settle,
 // even if the next round omits the id -- distinguishing a fresh answer from the
 // stale pre-reopen one the test above forbids.
-test('a rebuttal at the reopen round re-settles a reopened finding', () => {
-  const dir = scratch();
+test('a rebuttal at the reopen round re-settles a reopened finding', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b')]);
   runGuard({ scratchDir: dir, n: 1 });
   resolve(dir, 1, ['a']);
@@ -234,8 +232,8 @@ test('a rebuttal at the reopen round re-settles a reopened finding', () => {
   assert.equal(r.b, 1);
 });
 
-test('re-running guard at the same n is idempotent (ledger and verdict identical)', () => {
-  const dir = scratch();
+test('re-running guard at the same n is idempotent (ledger and verdict identical)', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b'), finding('c')]);
   const r1 = runGuard({ scratchDir: dir, n: 1 });
   const ledger1 = JSON.stringify(readLedger(dir));
@@ -246,8 +244,8 @@ test('re-running guard at the same n is idempotent (ledger and verdict identical
   assert.equal(readLedger(dir).meta.roundsInCycle, 1);
 });
 
-test('a rebuttal id with no ledger match is ignored, not applied to another finding', () => {
-  const dir = scratch();
+test('a rebuttal id with no ledger match is ignored, not applied to another finding', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a')]);
   runGuard({ scratchDir: dir, n: 1 });
   writeJson(join(dir, 'round-1.rebuttal.json'), {
@@ -261,8 +259,8 @@ test('a rebuttal id with no ledger match is ignored, not applied to another find
 // A finding reopened at round 2 and re-resolved by the round-2 rebuttal is back
 // to resolved once round 3 omits it (b=0). The reopen-durability boundary itself
 // is pinned by the two dedicated tests below; this guards the b=0 outcome.
-test('a reopened-then-re-resolved finding is resolved once a later round omits it', () => {
-  const dir = scratch();
+test('a reopened-then-re-resolved finding is resolved once a later round omits it', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a')]);
   runGuard({ scratchDir: dir, n: 1 });
   resolve(dir, 1, ['a']);
@@ -273,8 +271,8 @@ test('a reopened-then-re-resolved finding is resolved once a later round omits i
   assert.equal(runGuard({ scratchDir: dir, n: 3 }).b, 0);
 });
 
-test('progress review resets the stall streak', () => {
-  const dir = scratch();
+test('progress review resets the stall streak', (t) => {
+  const dir = scratch(t);
   const emit = (n, ids) => writeReview(dir, n, ids.map((id) => finding(id)));
   emit(1, ['a', 'b', 'c']); // b=3, best=3
   runGuard({ scratchDir: dir, n: 1 });
@@ -289,8 +287,8 @@ test('progress review resets the stall streak', () => {
   assert.equal(runGuard({ scratchDir: dir, n: 5 }).verdict, 'stalled');
 });
 
-test('5 progressing rounds without converge -> cap', () => {
-  const dir = scratch();
+test('5 progressing rounds without converge -> cap', (t) => {
+  const dir = scratch(t);
   // b = 5,4,3,2,1: the author resolves one blocker after each review, and the next
   // review re-emits only what is still open. (Re-emitting a resolved one would
   // reopen it -- that is the disputed-fix path, covered above, not this one.)
@@ -308,8 +306,8 @@ test('5 progressing rounds without converge -> cap', () => {
   }
 });
 
-test('--new-cycle resets round count and best', () => {
-  const dir = scratch();
+test('--new-cycle resets round count and best', (t) => {
+  const dir = scratch(t);
   writeReview(dir, 1, [finding('a'), finding('b'), finding('c')]); // cycle1 best=3
   runGuard({ scratchDir: dir, n: 1 });
   writeReview(dir, 2, [finding('a'), finding('b')]); // b=2 progress

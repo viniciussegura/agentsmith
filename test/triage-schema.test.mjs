@@ -7,7 +7,7 @@ import {
   canonicalJSON,
   versionToken,
   migrateWorksheet,
-  validateCandidate, validateScorecard, PRIORITIES, CANDIDATE_VERDICTS, SCORECARD_VERDICTS,
+  validateCandidate, validateScorecard,
   deriveVerdict, SCORECARD_RANK,
 } from '../devtools/triage-ui/schema.mjs';
 

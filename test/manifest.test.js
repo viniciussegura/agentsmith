@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  manifestPath, readManifest, orphanPaths, pruneOrphans, writeManifest, MANIFEST_REL,
+  manifestPath, readManifest, orphanPaths, pruneOrphans, writeManifest,
 } from '../src/manifest.js';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'agentsmith-mf-'));

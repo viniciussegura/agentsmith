@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, hasCommittableChanges } from '../devtools/triage-ui/server.mjs';
-import { canonicalJSON, versionToken, migrateWorksheet } from '../devtools/triage-ui/schema.mjs';
+import { canonicalJSON, migrateWorksheet } from '../devtools/triage-ui/schema.mjs';
+import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
 
 const validFile = () => ({
   round: '2026-06-17',
@@ -27,13 +27,10 @@ function withServer(opts, fn) {
   });
 }
 
-function tmpTriage() {
-  const dir = mkdtempSync(join(tmpdir(), 'triage-'));
-  return join(dir, 'triage.json');
-}
+const tmpTriage = (t) => join(makeTempDir(t, 'triage-'), 'triage.json');
 
-test('GET /api/triage on absent file -> empty + null version', async () => {
-  const triagePath = tmpTriage();
+test('GET /api/triage on absent file -> empty + null version', async (t) => {
+  const triagePath = tmpTriage(t);
   await withServer({ triagePath }, async (base) => {
     const r = await fetch(`${base}/api/triage`);
     const body = await r.json();
@@ -42,8 +39,8 @@ test('GET /api/triage on absent file -> empty + null version', async () => {
   });
 });
 
-test('PUT creates the file (version null) then GET round-trips', async () => {
-  const triagePath = tmpTriage();
+test('PUT creates the file (version null) then GET round-trips', async (t) => {
+  const triagePath = tmpTriage(t);
   await withServer({ triagePath }, async (base) => {
     const data = validFile();
     const put = await fetch(`${base}/api/triage`, {
@@ -63,8 +60,8 @@ test('PUT creates the file (version null) then GET round-trips', async () => {
   });
 });
 
-test('PUT with a stale version -> 409, file unchanged', async () => {
-  const triagePath = tmpTriage();
+test('PUT with a stale version -> 409, file unchanged', async (t) => {
+  const triagePath = tmpTriage(t);
   const data = validFile();
   writeFileSync(triagePath, canonicalJSON(data), 'utf8');
   const before = readFileSync(triagePath, 'utf8');
@@ -78,8 +75,8 @@ test('PUT with a stale version -> 409, file unchanged', async () => {
   });
 });
 
-test('PUT schema-invalid -> 400 with problems', async () => {
-  const triagePath = tmpTriage();
+test('PUT schema-invalid -> 400 with problems', async (t) => {
+  const triagePath = tmpTriage(t);
   await withServer({ triagePath }, async (base) => {
     const bad = validFile();
     delete bad.entries[0].draft; // strengthen requires draft
@@ -93,8 +90,8 @@ test('PUT schema-invalid -> 400 with problems', async () => {
   });
 });
 
-test('unparseable file is never overwritten (PUT -> 409)', async () => {
-  const triagePath = tmpTriage();
+test('unparseable file is never overwritten (PUT -> 409)', async (t) => {
+  const triagePath = tmpTriage(t);
   writeFileSync(triagePath, '{ not json', 'utf8');
   await withServer({ triagePath }, async (base) => {
     const got = await (await fetch(`${base}/api/triage`)).json();
@@ -108,16 +105,16 @@ test('unparseable file is never overwritten (PUT -> 409)', async () => {
   });
 });
 
-test('static assets are served with Cache-Control: no-store', async () => {
-  await withServer({ triagePath: tmpTriage() }, async (base) => {
+test('static assets are served with Cache-Control: no-store', async (t) => {
+  await withServer({ triagePath: tmpTriage(t) }, async (base) => {
     const r = await fetch(`${base}/`);
     assert.equal(r.status, 200);
     assert.equal(r.headers.get('cache-control'), 'no-store');
   });
 });
 
-test('GET /api/triage exposes prevScorecard from a triage.prev.json sibling (null when absent)', async () => {
-  const triagePath = tmpTriage();
+test('GET /api/triage exposes prevScorecard from a triage.prev.json sibling (null when absent)', async (t) => {
+  const triagePath = tmpTriage(t);
   // No archive yet -> prevScorecard is null.
   await withServer({ triagePath }, async (base) => {
     const a = await (await fetch(`${base}/api/triage`)).json();
@@ -139,16 +136,16 @@ test('GET /api/triage exposes prevScorecard from a triage.prev.json sibling (nul
   });
 });
 
-test('GET /api/tags returns injected tags', async () => {
-  await withServer({ triagePath: tmpTriage() }, async (base) => {
+test('GET /api/tags returns injected tags', async (t) => {
+  await withServer({ triagePath: tmpTriage(t) }, async (base) => {
     const body = await (await fetch(`${base}/api/tags`)).json();
     assert.deepEqual(body.tags, ['#swe-done']);
   });
 });
 
 // F16: migrate-on-read — pre-v2 worksheet GET token == PUT compare token (no spurious 409)
-test('migrate-on-read: pre-v2 worksheet GET token == PUT compare token (no spurious 409)', async () => {
-  const triagePath = tmpTriage();
+test('migrate-on-read: pre-v2 worksheet GET token == PUT compare token (no spurious 409)', async (t) => {
+  const triagePath = tmpTriage(t);
   // A pre-v2 entry: has `current` field AND adopt decision with `details`
   const preV2 = {
     round: '2026-06-17',
@@ -181,8 +178,8 @@ test('migrate-on-read: pre-v2 worksheet GET token == PUT compare token (no spuri
 });
 
 // F6: GET /api/rule
-test('GET /api/rule returns text for an existing instructions file, exists:false for missing, 400 for traversal', async () => {
-  await withServer({ triagePath: tmpTriage() }, async (base) => {
+test('GET /api/rule returns text for an existing instructions file, exists:false for missing, 400 for traversal', async (t) => {
+  await withServer({ triagePath: tmpTriage(t) }, async (base) => {
     // Existing file
     const r1 = await fetch(`${base}/api/rule?targetFile=instructions/core/swe/_intro.md`);
     assert.equal(r1.status, 200);
@@ -213,8 +210,8 @@ test('hasCommittableChanges: true for ignored-only, false for wanted-only', () =
   assert.equal(hasCommittableChanges({ adopted: [], rejected: [], folded: [], deferred: [], ignored: [], wanted: ['y'] }), false);
 });
 
-test('PUT round-trips a file carrying scorecard + candidates', async () => {
-  const triagePath = tmpTriage();
+test('PUT round-trips a file carrying scorecard + candidates', async (t) => {
+  const triagePath = tmpTriage(t);
   await withServer({ triagePath }, async (base) => {
     const data = {
       round: '2026-06-18',
@@ -233,8 +230,8 @@ test('PUT round-trips a file carrying scorecard + candidates', async () => {
   });
 });
 
-test('PUT with cells stale relative to findings is recomputed (no 409/400) and stored consistent', async () => {
-  const triagePath = tmpTriage();
+test('PUT with cells stale relative to findings is recomputed (no 409/400) and stored consistent', async (t) => {
+  const triagePath = tmpTriage(t);
   await withServer({ triagePath }, async (base) => {
     const data = {
       round: '2026-06-19',
@@ -266,10 +263,10 @@ test('PUT with cells stale relative to findings is recomputed (no 409/400) and s
 // a dirty working tree returns 409 (dirty-base preflight), which means the lock
 // guard code was reached and the dirty check executed.
 // The 423 lock path is covered by manual / integration verification.
-test('POST /api/apply dirty-base preflight returns 409 on dirty instructions (or 200/500 on clean)', async () => {
+test('POST /api/apply dirty-base preflight returns 409 on dirty instructions (or 200/500 on clean)', async (t) => {
   // We cannot control git state inside tests, so we just assert the route exists
   // and returns a sensible status code (not 404).
-  await withServer({ triagePath: tmpTriage() }, async (base) => {
+  await withServer({ triagePath: tmpTriage(t) }, async (base) => {
     const r = await fetch(`${base}/api/apply`, { method: 'POST' });
     // Route must exist (not 404). Accepted: 200 (clean+apply ok), 409 (dirty), 500 (apply error)
     // We do NOT allow it to run the real test suite in CI so we accept any of these.
