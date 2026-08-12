@@ -1,7 +1,8 @@
-// test-helpers/tmp-dir.mjs
-//
 // Lives outside test/ deliberately: `node --test` discovers `**/test/**/*.?(c|m)js`,
 // so a helper under test/ would be run as a test file that asserts nothing.
+// The directory alone does not exempt a file: the basename patterns `test.*`,
+// `test-*`, `*-test.*`, `*_test.*` and `*.test.*` are discovered anywhere in the
+// tree, so a second helper here must avoid all five.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

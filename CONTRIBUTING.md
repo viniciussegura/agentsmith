@@ -31,7 +31,8 @@ src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** i
 bin/cli.js         verb-first CLI: install / uninstall, plus the --stdout query
 bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
 test/              tests for the generator
-test-helpers/      shared test scaffolding; outside test/ so `node --test` skips it
+test-helpers/      shared test scaffolding; skipped by `node --test` only while
+                   outside test/ AND not named test.*/test-*/*-test.*/*_test.*/*.test.*
 ```
 
 ## Editing the rules
