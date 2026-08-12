@@ -75,7 +75,10 @@ Workflow driver (which runs exactly one round per invocation).
 
 ## Kickstart schema (planner input)
 
-Written by the main thread; shared envelope, per-board payload; gitignored scratch.
+Written by the main thread to `<scratch>/kickstart.json`; shared envelope, per-board
+payload; gitignored scratch.
+It is **required on every board whose args set `plan`** — which is all three — because
+the Plan step has the maintainer read it. A round set up without it dies in Plan.
 
 ```text
 { board: 'spec' | 'code' | 'instruction',
@@ -95,6 +98,16 @@ Written by the main thread; shared envelope, per-board payload; gitignored scrat
 - **instruction** — ownership-coverage-lint output (orphans / double-owned tags), the
   generated-output ref (`node bin/cli.js --stdout`), and a parked-worksheet-state
   summary.
+
+### `subjectRef` names a readable artifact, never a git ref
+
+Every reviewer, verifier, and maintainer declares `tools: Read, Grep, Glob, Write`.
+None can run `git`, so a `subjectRef` such as `baselineCommit..commit` cannot be
+expanded by the agent that receives it: on a diff-mode code round the setup step
+**writes the diff to scratch** (`<scratch>/subject.diff`) and points `subjectRef` at
+that path plus the changed files' repo paths.
+"Passed by reference" means a reference to a file the reviewer can open, not a revision
+range it would have to resolve.
 
 ## Routing directive schema (planner output)
 
@@ -127,6 +140,9 @@ over a per-board **args** descriptor, built by the pure builders in `round-args.
   verify: boolean,                     // true for code/instruction, false for spec
   persistCmd: <CLI string>,            // board persist (or 'true' no-op for instruction)
   preReduceCmd: <CLI string | null>,   // optional pre-reduce summary step (code)
+  guardBaseline: <path | null>,        // pre-round porcelain snapshot; present enables Guard
+  guardCmd: <CLI string | null>,       // the Guard-phase command, built from skillsDir
+  agentPrefix: <string>,               // dispatch namespace; '' bare, 'agentsmith:' plugin
   reducePrompt: <maintainer reduce prompt>,
   plan?: { routingSchema: <JSON-Schema object> } } // present enables the Plan step
 ```
@@ -135,6 +151,50 @@ over a per-board **args** descriptor, built by the pure builders in `round-args.
 runtime globals. Every dispatch **must** carry an explicit `model`; `runRound` asserts
 it (the `require-explicit-model` hook does not see Workflow dispatches). When `plan` is
 unset the `candidateLenses` are the consult set directly (today's code behavior).
+
+### Install-dependent fields
+
+`agentPrefix` and `skillsDir` differ per install, and the wrong value fails a whole
+round. `round-context.mjs` resolves both and is what the setup step calls; neither is
+guessed by the caller.
+
+- **`agentPrefix`** — a plugin install registers agents under the plugin namespace
+  (`agentsmith:review-swe`), an npx/CLI install copies them bare. It is applied to
+  every agent-typed dispatch (plan, each reviewer, each verifier, reduce), so no
+  dispatch site is unreachable from args. Default `''`.
+- **`skillsDir`** — a builder **input**, not a descriptor field: Workflow subagents do
+  **not** inherit the invoking worktree's cwd, so every round command is built absolute
+  from this value rather than as `.claude/skills/...`. The commands carry the resolved
+  path, so it is not echoed into the args. Default `.claude/skills` (relative), which is
+  correct only when the subagent's cwd is the project root.
+
+**The two drivers spell their commands differently, and both are right.** The
+main-thread SKILL prose invokes `node .claude/skills/...` because the main-loop agent
+runs in the project root and a relative path resolves correctly there. The Workflow
+driver's commands are absolute because its subagents do not inherit that cwd. These are
+not an inconsistency to reconcile: making the SKILL prose absolute would require it to
+resolve `skillsDir` first for no benefit, and making the driver relative reintroduces
+the bug. Change either only with the cwd it actually runs in in mind.
+
+Every path interpolated into `persistCmd`, `preReduceCmd`, and `guardCmd` is
+double-quoted: an absolute path routinely contains a space, and these strings are
+executed by an agent in a shell.
+
+`guardCmd` is built alongside `guardBaseline` rather than in the driver, so it carries
+the absolute `skillsDir`. A round declaring a `guardBaseline` with no `guardCmd` is an
+error the driver **throws** on: silently skipping the containment check is worse than
+failing loudly.
+
+### Round record
+
+`persist.mjs apply` names its output `rounds/<record.id>.json`, so the record is
+validated against `ReviewRoundInfo` (`issue-format.md`) **before any write** — every
+missing required field and every unknown field reported together, because the failure
+this catches is a drifted field name. Build it with `roundRecord()` from
+`round-args.mjs` rather than by hand.
+
+`apply` reports what reached the store on every run, zeros included, so a round that
+persisted nothing says so in the transcript.
 
 ## Maintainer table (plan + reduce, per board)
 

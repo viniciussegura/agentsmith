@@ -40,11 +40,11 @@ export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, fl
   if (flags.tools) ops.push({ kind: 'mergeSettings', path: SETTINGS_REL });
   else if (settingsHasOwned) ops.push({ kind: 'unmergeSettings', path: SETTINGS_REL });
 
-  return { base, absolute, ops, manifestPaths };
+  return { base, absolute, scope, ops, manifestPaths };
 }
 
 // buildUninstallPlan: reverse an install of the same scope (pure).
-export function buildUninstallPlan({ base, absolute, manifestPaths, corePath, stubContent, stubOnDiskContent, settingsHasOwned, hasClaudeMd, isUser }) {
+export function buildUninstallPlan({ base, absolute, scope, manifestPaths, corePath, stubContent, stubOnDiskContent, settingsHasOwned, hasClaudeMd, isUser }) {
   const ops = [];
   if (manifestPaths.length) ops.push({ kind: 'prune', paths: manifestPaths });
   // Un-merge only when an owned hook is actually present: a --no-tools install
@@ -58,10 +58,14 @@ export function buildUninstallPlan({ base, absolute, manifestPaths, corePath, st
     ops.push(stubOnDiskContent === stubContent ? { kind: 'prune', paths: ['AGENTS.md'] } : { kind: 'keepStub', path: 'AGENTS.md' });
   }
   ops.push({ kind: 'prune', paths: ['.agentsmith/.install-manifest.json'] });
-  return { base, absolute, ops, manifestPaths: [] };
+  return { base, absolute, scope, ops, manifestPaths: [] };
 }
 
 const REL = (p) => p.replace(/\\/g, '/');
+
+// A --scope PATH is `path` internally; readers see `folder`, which is what they typed
+// against. `user`/`project` are already the words the flag takes.
+const SCOPE_LABEL = { user: 'user', project: 'project', path: 'folder' };
 
 // renderPlan: user-facing text. Internal op names never printed; deletes marked distinctly.
 export function renderPlan(plan) {
@@ -78,7 +82,10 @@ export function renderPlan(plan) {
     else if (op.kind === 'removeImport') updates.push(`${REL(op.path)} (remove agentsmith import)`);
     else if (op.kind === 'keepStub') keeps.push(REL(op.path));
   }
-  const lines = ['agentsmith plan:'];
+  // Scope first: every path below is relative to this base, and a destructive
+  // confirmation must never leave the reader guessing WHICH tree it is about to
+  // delete from. Both builders always set it, so this is unconditional.
+  const lines = ['agentsmith plan:', `  Scope: ${SCOPE_LABEL[plan.scope.kind]} (${plan.base})`];
   if (writes.length) lines.push(`  write   ${writes.length} file(s): ${writes.slice(0, 3).join(', ')}${writes.length > 3 ? ', ...' : ''}`);
   for (const u of updates) lines.push(`  update  ${u}`);
   // Deletes are the dangerous class -- list every one so a destructive confirmation

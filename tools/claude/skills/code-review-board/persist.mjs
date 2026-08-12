@@ -11,10 +11,10 @@
 //   node persist.mjs apply   <store-dir> <round-id>
 
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
-import { join, dirname, basename, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, dirname, basename, resolve, sep } from 'node:path';
 import { argv, stdout, stderr, exit } from 'node:process';
 import { lintStore, parseId, idToSafe } from './lint.mjs';
+import { isMain } from './is-main.mjs';
 
 // ---------- io helpers ----------
 
@@ -77,18 +77,57 @@ function issuePath(store, roleDir, placement, issue) {
   return join(dir, issueFileName(issue));
 }
 
+// ---------- round-record validation ----------
+
+// ReviewRoundInfo, per issue-format.md. Checked before any write: the round file is
+// NAMED from `record.id`, so an absent or drifted field used to produce
+// `rounds/undefined.json` and exit 0 -- a defect caught only by lint, after the whole
+// round had run, and never by the step that caused it. Two such rounds in one store
+// then overwrote each other at that single filename.
+const ROUND_REQUIRED = ['id', 'mode', 'targetRef', 'commit', 'baselineCommit', 'roles'];
+const ROUND_OPTIONAL = ['previousRound'];
+
+/**
+ * Throw unless `record` matches ReviewRoundInfo. Reports EVERY problem at once --
+ * missing required fields and unknown ones together -- because the failure this
+ * exists for is a drifted field name (`selectedRoles` for `roles`), which is only
+ * legible when both halves are named in the same message.
+ * @param {unknown} record
+ * @param {string} source  path of the file it came from, for the message
+ */
+export function assertRoundRecord(record, source) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) {
+    throw new Error(`round record (${source}) is not a JSON object`);
+  }
+  const missing = ROUND_REQUIRED.filter((k) => record[k] === undefined || record[k] === null || record[k] === '');
+  const known = new Set([...ROUND_REQUIRED, ...ROUND_OPTIONAL]);
+  const unknown = Object.keys(record).filter((k) => !known.has(k));
+  if (!missing.length && !unknown.length) return;
+
+  const problems = [];
+  if (missing.length) problems.push(`missing required field(s): ${missing.join(', ')}`);
+  if (unknown.length) problems.push(`unknown field(s): ${unknown.join(', ')}`);
+  throw new Error(
+    `round record (${source}) does not match ReviewRoundInfo -- ${problems.join('; ')}. ` +
+      `Required: ${ROUND_REQUIRED.join(', ')}; optional: ${ROUND_OPTIONAL.join(', ')}. ` +
+      'Build it with roundRecord() from round-args.mjs rather than by hand.',
+  );
+}
+
 // ---------- apply ----------
 
 /**
  * Write the store for a round from its JSON scratch. Never throws on store
  * content; throws only on malformed/unreadable scratch (fail closed before any write).
  * @param {{ store: string, roundId: string, scratchDir?: string }} input
- * @returns {{ written: string[], errors: string[], warnings: string[] }}
+ * @returns {{ written: string[], errors: string[], warnings: string[], counts: { issues: number, epics: number, rounds: number } }}
  */
 export function persistApply({ store, roundId, scratchDir }) {
   const scratch = scratchDir || defaultScratchDir(store, roundId);
-  // Parse ALL inputs up front so malformed scratch fails before any write.
-  const round = readJson(join(scratch, 'round.json'));
+  // Parse AND validate ALL inputs up front so malformed scratch fails before any write.
+  const roundPathIn = join(scratch, 'round.json');
+  const round = readJson(roundPathIn);
+  assertRoundRecord(round, roundPathIn);
   const findings = readDirJson(join(scratch, 'findings'));
   const verdicts = readDirJson(join(scratch, 'verdicts'));
   const directive = existsSync(join(scratch, 'pm-directive.json'))
@@ -148,7 +187,25 @@ export function persistApply({ store, roundId, scratchDir }) {
 
   // 5) Validate.
   const { errors, warnings } = lintStore({ root: store });
-  return { written, errors, warnings };
+  return { written, errors, warnings, counts: countWritten({ store, written }) };
+}
+
+// Tally what reached the store, by partition. Reported unconditionally (zeros
+// included) so a round that persisted NOTHING says so in the transcript, rather
+// than looking identical to a successful one and having to be inferred by
+// inspecting the store afterwards.
+function countWritten({ store, written }) {
+  const counts = { issues: 0, epics: 0, rounds: 0 };
+  // Match on the partition root plus a separator, never the bare prefix: a future
+  // sibling like `issues-archive/` would otherwise be counted as `issues/`.
+  const partitions = Object.keys(counts).map((name) => [name, resolve(join(store, name)) + sep]);
+  // A path may be written more than once in a round (an issue re-placed by
+  // reconcile); count files, not writes.
+  for (const p of new Set(written.map((w) => resolve(w)))) {
+    const hit = partitions.find(([, root]) => p.startsWith(root));
+    if (hit) counts[hit[0]] += 1;
+  }
+  return counts;
 }
 
 const CLOSING = new Set(['fixed', 'deprecated', 'superseded']);
@@ -260,16 +317,22 @@ export function persistSummary({ store, roundId, scratchDir }) {
 
 // ---------- CLI ----------
 
-const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === resolve(argv[1]);
+const invokedDirectly = isMain(import.meta.url, argv[1]);
 if (invokedDirectly) {
   const [cmd, storeArg, roundId] = argv.slice(2);
   const store = resolve(storeArg || '');
   try {
     if (cmd === 'apply') {
-      const { errors, warnings } = persistApply({ store, roundId });
+      const { errors, warnings, counts } = persistApply({ store, roundId });
       for (const w of warnings) stderr.write(`warning: ${w}\n`);
       for (const e of errors) stderr.write(`error: ${e}\n`);
-      stdout.write(`review-board persist apply: ${errors.length} error(s)\n`);
+      // Always states what reached the store, zeros included: an empty store must be
+      // readable off this line, not inferred by going and looking at the store.
+      stdout.write(
+        `review-board persist apply: wrote ${counts.issues} issue(s), ${counts.epics} epic(s), ` +
+          `${counts.rounds} round record(s) to ${store} -- ` +
+          `${warnings.length} warning(s), ${errors.length} error(s)\n`,
+      );
       if (errors.length) exit(1);
     } else if (cmd === 'summary') {
       persistSummary({ store, roundId });

@@ -64,7 +64,7 @@ It then **accounts for every rubric dimension** (`proposal-format.md`): consolid
 
 ### 5. Reduce output + handoff (main thread)
 
-**Containment check first.** Run `node .claude/skills/code-review-board/round-guard.mjs check .agentsmith/tmp/instruction-review/<round-id>/git-baseline.txt`. A round writes only the gitignored worksheet, so a non-zero exit means a role/verifier wrote outside scratch — stop, inspect, and revert before presenting.
+**Containment check first.** Run `node .claude/skills/code-review-board/round-guard.mjs check .agentsmith/tmp/instruction-review/<round-id>/git-baseline.txt`. A round writes only the gitignored worksheet, so exit `1` means a role/verifier wrote outside scratch — stop, inspect, and revert before presenting. Exit `3` means the baseline was not found, so the check **did not run**: nothing escaped and there is nothing to revert; fix the path (resolved against the running cwd, which the guard echoes) and re-check.
 
 Present the **dimension scorecard** (a Strong/Good/Weak/Gaps verdict per rubric dimension, with `file`/`#tag` citations -- each cell is the worst of its per-rule findings, Strong when none) and the **mechanical-nits** list. The scorecard is never omitted **when reduce runs**; the setup gate's *Stop and process* path runs no reduce and so presents no new scorecard -- that is the one sanctioned no-scorecard path.
 

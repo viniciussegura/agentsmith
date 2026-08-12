@@ -27,7 +27,17 @@ npx github:viniciussegura/agentsmith#v0.1.0 install    # pinned, reproducible
 ```
 
 agentsmith is a verb-first CLI: `install` and `uninstall` are subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
-Bare `agentsmith` (no verb) opens an interactive wizard on a TTY, or errors off one.
+
+`install` runs with defaults — project scope, split mode, nested placement, tool adapters on — and asks only to confirm the resulting plan.
+To be *asked* for those choices rather than take the defaults, run it with **no verb at all**:
+
+```bash
+agentsmith                                             # interactive wizard
+```
+
+The wizard prompts for verb, then scope, then — on the install path only — content mode, placement, and whether to install the adapters, and feeds the same plan and confirmation gate a flag-driven run does.
+It needs a TTY: off one (a pipe, a CI job, most agent shells) bare `agentsmith` exits `1` rather than guessing what you meant, so pass a verb there.
+
 Full flag reference, the confirmation gate, and plugin-coexistence detail live in [`docs/reference-spec/cli.md`](docs/reference-spec/cli.md); this section is a summary.
 
 To put the `agentsmith` binary on `PATH` -- so the examples below run without the `npx github:…` prefix and its per-call permission prompt -- install it globally once:
@@ -41,7 +51,7 @@ A plugin-only install ships the commands but not the binary; its `npx` fallback 
 
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
-Before writing anything, it prints the intended-effects plan and, on a TTY without `--yes`, asks for confirmation.
+Before writing anything, it prints the intended-effects plan — naming the scope and the absolute base directory every path is relative to — and, on a TTY without `--yes`, asks for confirmation.
 
 **Gitignore the working state.** `install` does not modify your `.gitignore`, and everything agentsmith writes under `.agentsmith/` besides the generated instructions is per-machine working state — the working-spec store (`#ai-plan`), the review-board issue store, scratch, and the install manifest.
 Several rules depend on these never being committed; the working-spec store in particular is defeated entirely if it lands in version control.

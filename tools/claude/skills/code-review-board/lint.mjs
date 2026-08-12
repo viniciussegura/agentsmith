@@ -17,8 +17,8 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, relative, sep, basename, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { argv, stdout, stderr, exit, cwd } from 'node:process';
+import { isMain } from './is-main.mjs';
 
 const VALID_STATUS = new Set(['open', 'promoted', 'fixed', 'deprecated', 'superseded', 'duplicated']);
 const CLOSING_STATUS = new Set(['fixed', 'deprecated', 'superseded', 'duplicated']);
@@ -233,7 +233,7 @@ export function lintStore({ root }) {
 
 // ---------- CLI ----------
 
-const invokedDirectly = argv[1] && fileURLToPath(import.meta.url) === resolve(argv[1]);
+const invokedDirectly = isMain(import.meta.url, argv[1]);
 if (invokedDirectly) {
   const strict = argv.includes('--strict');
   const dirArg = argv.slice(2).find((a) => !a.startsWith('--'));

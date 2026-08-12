@@ -202,3 +202,93 @@ test('epic child that the PM rejected is dropped, store stays lint-clean', () =>
   const epic = JSON.parse(readFileSync(join(store, 'epics', epicFile), 'utf8'));
   assert.deepEqual(epic.relatedIssues.map((r) => r.issueId), ['r7#swe-1']);
 });
+
+// --- round-record validation (pays off the 2026-07-30 debt) -----------------
+// persistApply derived `rounds/<record.id>.json` from an unvalidated field, so a
+// record missing `id` wrote `rounds/undefined.json` and exited 0. The defect was
+// caught only by lint, after the whole round had run -- and two malformed rounds
+// overwrote each other at that one filename.
+
+// Overwrite the scaffolded round.json with `over`, dropping any key set to undefined.
+function withRound(scratchDir, over) {
+  const path = join(scratchDir, 'round.json');
+  const round = JSON.parse(readFileSync(path, 'utf8'));
+  const next = { ...round, ...over };
+  for (const [k, v] of Object.entries(over)) if (v === undefined) delete next[k];
+  writeFileSync(path, JSON.stringify(next, null, 2));
+}
+
+test('apply rejects a round record missing id, before writing anything', () => {
+  const { store, scratchDir, roundId } = scaffold();
+  withRound(scratchDir, { id: undefined });
+  writeJson(join(scratchDir, 'findings', 'swe.json'), { role: 'swe', new: [newFinding('r1#swe-1')], reconcile: [] });
+  writeJson(join(scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+
+  assert.throws(() => persistApply({ store, scratchDir, roundId }), /round record/i);
+  assert.equal(existsSync(join(store, 'rounds', 'undefined.json')), false, 'never names a file from undefined');
+  assert.equal(existsSync(join(store, 'rounds')), false, 'fails closed: no round file at all');
+  assert.equal(existsSync(join(store, 'issues', 'swe')), false, 'fails closed: no issue written either');
+});
+
+test('apply names every missing required field, not just the first', () => {
+  const { store, scratchDir, roundId } = scaffold();
+  withRound(scratchDir, { id: undefined, baselineCommit: undefined, roles: undefined });
+  try {
+    persistApply({ store, scratchDir, roundId });
+    assert.fail('expected a throw');
+  } catch (e) {
+    for (const f of ['id', 'baselineCommit', 'roles']) {
+      assert.match(e.message, new RegExp(f), `names the missing field ${f}`);
+    }
+  }
+});
+
+test('apply reports an unknown round field, catching a drifted field name', () => {
+  const { store, scratchDir, roundId } = scaffold();
+  // The exact operator error from the debt: ReviewRoundInfo's `roles`, hand-written
+  // as `selectedRoles`. Reported as BOTH a missing required field and an unknown one.
+  withRound(scratchDir, { roles: undefined, selectedRoles: ['swe'] });
+  try {
+    persistApply({ store, scratchDir, roundId });
+    assert.fail('expected a throw');
+  } catch (e) {
+    assert.match(e.message, /selectedRoles/, 'names the unknown field');
+    assert.match(e.message, /roles/, 'and the required one it was meant to be');
+  }
+});
+
+test('apply accepts a valid record carrying the optional previousRound', () => {
+  const { store, scratchDir, roundId } = scaffold();
+  withRound(scratchDir, { previousRound: 'r0' });
+  const res = persistApply({ store, scratchDir, roundId });
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+  assert.ok(existsSync(join(store, 'rounds', 'r1.json')));
+});
+
+// --- apply reports what it wrote -------------------------------------------
+// A run that wrote nothing was indistinguishable from a successful one: apply
+// printed only an error count, so an empty store had to be inferred by inspecting
+// the store rather than read off the transcript.
+
+test('apply returns counts of what it wrote, zero included', () => {
+  const { store, scratchDir, roundId } = scaffold();
+  const res = persistApply({ store, scratchDir, roundId });
+  assert.deepEqual(res.counts, { issues: 0, epics: 0, rounds: 1 }, 'an empty round still reports its zeros');
+});
+
+test('apply counts issues and epics separately from the round record', () => {
+  const { store, scratchDir, roundId } = scaffold();
+  writeJson(join(scratchDir, 'findings', 'swe.json'), {
+    role: 'swe', new: [newFinding('r1#swe-1'), newFinding('r1#swe-2', { title: 'Second' })], reconcile: [],
+  });
+  for (const id of ['r1--swe-1', 'r1--swe-2']) {
+    writeJson(join(scratchDir, 'verdicts', `${id}.json`), { id: id.replace('--', '#'), verdict: 'accept', rationale: 'ok' });
+  }
+  writeJson(join(scratchDir, 'pm-directive.json'), {
+    epics: [{ id: 'r1#epic-1', title: 'Theme', priority: 'high', priorityRationale: 'rollup', children: ['r1#swe-1'] }],
+  });
+
+  const res = persistApply({ store, scratchDir, roundId });
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+  assert.deepEqual(res.counts, { issues: 2, epics: 1, rounds: 1 });
+});

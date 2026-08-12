@@ -10,7 +10,11 @@
 // so a well-behaved round produces ZERO porcelain delta and the check is clean.
 //
 //   node round-guard.mjs snapshot <baseline-file>   # run BEFORE the round (main thread)
-//   node round-guard.mjs check    <baseline-file>   # run AFTER the round; exit 1 on any escape
+//   node round-guard.mjs check    <baseline-file>   # run AFTER the round
+//
+// check exits: 0 clean, 1 an agent escaped scratch, 3 the baseline is missing so the
+// check could not run, 2 bad usage. 1 and 3 are deliberately distinct -- conflating
+// them reports a path mistake as a containment violation.
 //
 // Zero dependency. The baseline file itself should live under the gitignored scratch.
 //
@@ -21,8 +25,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { argv, stdout, stderr, exit } from 'node:process';
+import { dirname, resolve } from 'node:path';
+import { argv, stdout, stderr, exit, cwd } from 'node:process';
 
 const splitLines = (s) => s.split('\n').map((l) => l.replace(/\r$/, '')).filter(Boolean);
 
@@ -39,19 +43,35 @@ if (!cmd || !file) {
   exit(2);
 }
 
+// Both subcommands echo where they resolved the baseline to. A relative path is
+// resolved against the RUNNING cwd, and a Workflow subagent does not inherit the
+// invoking worktree's cwd -- so when the two disagree, the resolved path in the
+// transcript is what makes it obvious rather than something to deduce.
+const at = resolve(file);
+const where = `baseline ${at} (cwd ${cwd()})`;
+
 if (cmd === 'snapshot') {
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, porcelain().join('\n') + '\n');
-  stdout.write('round-guard snapshot: ok\n');
+  mkdirSync(dirname(at), { recursive: true });
+  writeFileSync(at, porcelain().join('\n') + '\n');
+  stdout.write(`round-guard snapshot: ok -- ${where}\n`);
 } else if (cmd === 'check') {
-  const before = new Set(existsSync(file) ? splitLines(readFileSync(file, 'utf8')) : []);
+  // A MISSING baseline is not an escape, and must never be reported as one: with no
+  // baseline every dirty path reads as new, so the check would indict a clean round
+  // for the caller's path mistake. Its own exit code (3) separates "could not run
+  // the check" from exit 1, "the check ran and found an escape".
+  if (!existsSync(at)) {
+    stderr.write(`round-guard: no baseline to check against -- ${where}\n`);
+    stderr.write('  the guard did NOT run. Snapshot before the round, and pass the same path here.\n');
+    exit(3);
+  }
+  const before = new Set(splitLines(readFileSync(at, 'utf8')));
   const violations = porcelain().filter((line) => !before.has(line));
   if (violations.length) {
     stderr.write(`round-guard: ${violations.length} write(s) escaped scratch (path not gitignored):\n`);
     for (const v of violations) stderr.write(`  ${v}\n`);
     exit(1);
   }
-  stdout.write('round-guard check: clean (no writes escaped scratch)\n');
+  stdout.write(`round-guard check: clean (no writes escaped scratch) -- ${where}\n`);
 } else {
   stderr.write(`round-guard: unknown command "${cmd}"\n`);
   exit(2);
