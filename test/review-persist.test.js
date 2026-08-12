@@ -1,13 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { persistApply, persistSummary } from '../tools/claude/skills/code-review-board/persist.mjs';
 
 // Build a round scratch dir + empty store; return { store, scratchDir, roundId }.
-function scaffold(roundId = 'r1') {
+// Cleanup is registered on the test context, so it runs even when an assertion throws.
+function scaffold(t, roundId = 'r1') {
   const base = mkdtempSync(join(tmpdir(), 'rb-'));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
   const store = join(base, '.agentsmith', 'review-board');
   const scratchDir = join(base, '.agentsmith', 'tmp', 'review-board', roundId);
   mkdirSync(store, { recursive: true });
@@ -36,8 +38,8 @@ function newFinding(id, over = {}) {
   };
 }
 
-test('apply writes only accepted new issues, and lints clean', () => {
-  const { store, scratchDir, roundId } = scaffold();
+test('apply writes only accepted new issues, and lints clean', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
     role: 'swe',
     new: [newFinding('r1#swe-1'), newFinding('r1#swe-2', { title: 'Rejected one' })],
@@ -58,8 +60,8 @@ test('apply writes only accepted new issues, and lints clean', () => {
   assert.ok(existsSync(join(store, 'rounds', 'r1.json')));
 });
 
-test('reconcile closes, reopens, and refreshes still-open issues', () => {
-  const { store, scratchDir, roundId } = scaffold('r2');
+test('reconcile closes, reopens, and refreshes still-open issues', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t, 'r2');
   // Seed an existing open issue (from a prior round r1) and a recently-closed one.
   writeJson(join(store, 'issues', 'swe', 'r1--swe-1-old.json'), {
     ...newFinding('r1#swe-1', { title: 'Old open' }), lastConfirmedCommit: 'aaa',
@@ -97,8 +99,8 @@ test('reconcile closes, reopens, and refreshes still-open issues', () => {
   assert.equal(ro.closedInRound, undefined);
 });
 
-test('reconcile still-open refreshes locations and baseline', () => {
-  const { store, scratchDir, roundId } = scaffold('r3');
+test('reconcile still-open refreshes locations and baseline', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t, 'r3');
   writeJson(join(store, 'issues', 'swe', 'r1--swe-1-old.json'), {
     ...newFinding('r1#swe-1'), lastConfirmedCommit: 'aaa',
   });
@@ -114,8 +116,8 @@ test('reconcile still-open refreshes locations and baseline', () => {
   assert.deepEqual(o.locations[0].lines, [5, 9]);
 });
 
-test('pm directive writes epics, applies overrides and duplicates', () => {
-  const { store, scratchDir, roundId } = scaffold('r4');
+test('pm directive writes epics, applies overrides and duplicates', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t, 'r4');
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
     role: 'swe',
     new: [newFinding('r4#swe-1'), newFinding('r4#swe-2', { title: 'Dup of one' })],
@@ -146,8 +148,8 @@ test('pm directive writes epics, applies overrides and duplicates', () => {
   assert.equal(dup.relatedIssues.at(-1).issueId, 'r4#swe-1');
 });
 
-test('malformed findings JSON fails closed before writing the store', () => {
-  const { store, scratchDir, roundId } = scaffold('r5');
+test('malformed findings JSON fails closed before writing the store', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t, 'r5');
   writeFileSync(join(scratchDir, 'findings', 'swe.json'), '{ this is not json');
   assert.throws(() => persistApply({ store, scratchDir, roundId }), /JSON/i);
   // No partial store written.
@@ -155,8 +157,8 @@ test('malformed findings JSON fails closed before writing the store', () => {
   assert.equal(existsSync(join(store, 'issues')), false);
 });
 
-test('summary projects carried-forward open issues and accepted new findings', () => {
-  const { store, scratchDir, roundId } = scaffold('r6');
+test('summary projects carried-forward open issues and accepted new findings', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t, 'r6');
   // A carried-forward open issue already in the store.
   writeJson(join(store, 'issues', 'swe', 'r1--swe-1-carried.json'), {
     ...newFinding('r1#swe-1', { title: 'Carried' }),
@@ -177,8 +179,8 @@ test('summary projects carried-forward open issues and accepted new findings', (
   assert.equal(out.new[0].description, undefined);
 });
 
-test('epic child that the PM rejected is dropped, store stays lint-clean', () => {
-  const { store, scratchDir, roundId } = scaffold('r7');
+test('epic child that the PM rejected is dropped, store stays lint-clean', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t, 'r7');
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
     role: 'swe',
     new: [newFinding('r7#swe-1'), newFinding('r7#swe-2', { title: 'Rejected child' })],
@@ -218,8 +220,8 @@ function withRound(scratchDir, over) {
   writeFileSync(path, JSON.stringify(next, null, 2));
 }
 
-test('apply rejects a round record missing id, before writing anything', () => {
-  const { store, scratchDir, roundId } = scaffold();
+test('apply rejects a round record missing id, before writing anything', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
   withRound(scratchDir, { id: undefined });
   writeJson(join(scratchDir, 'findings', 'swe.json'), { role: 'swe', new: [newFinding('r1#swe-1')], reconcile: [] });
   writeJson(join(scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
@@ -230,8 +232,8 @@ test('apply rejects a round record missing id, before writing anything', () => {
   assert.equal(existsSync(join(store, 'issues', 'swe')), false, 'fails closed: no issue written either');
 });
 
-test('apply names every missing required field, not just the first', () => {
-  const { store, scratchDir, roundId } = scaffold();
+test('apply names every missing required field, not just the first', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
   withRound(scratchDir, { id: undefined, baselineCommit: undefined, roles: undefined });
   try {
     persistApply({ store, scratchDir, roundId });
@@ -243,8 +245,8 @@ test('apply names every missing required field, not just the first', () => {
   }
 });
 
-test('apply reports an unknown round field, catching a drifted field name', () => {
-  const { store, scratchDir, roundId } = scaffold();
+test('apply reports an unknown round field, catching a drifted field name', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
   // The exact operator error from the debt: ReviewRoundInfo's `roles`, hand-written
   // as `selectedRoles`. Reported as BOTH a missing required field and an unknown one.
   withRound(scratchDir, { roles: undefined, selectedRoles: ['swe'] });
@@ -257,8 +259,8 @@ test('apply reports an unknown round field, catching a drifted field name', () =
   }
 });
 
-test('apply accepts a valid record carrying the optional previousRound', () => {
-  const { store, scratchDir, roundId } = scaffold();
+test('apply accepts a valid record carrying the optional previousRound', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
   withRound(scratchDir, { previousRound: 'r0' });
   const res = persistApply({ store, scratchDir, roundId });
   assert.equal(res.errors.length, 0, res.errors.join('\n'));
@@ -270,14 +272,14 @@ test('apply accepts a valid record carrying the optional previousRound', () => {
 // printed only an error count, so an empty store had to be inferred by inspecting
 // the store rather than read off the transcript.
 
-test('apply returns counts of what it wrote, zero included', () => {
-  const { store, scratchDir, roundId } = scaffold();
+test('apply returns counts of what it wrote, zero included', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
   const res = persistApply({ store, scratchDir, roundId });
   assert.deepEqual(res.counts, { issues: 0, epics: 0, rounds: 1 }, 'an empty round still reports its zeros');
 });
 
-test('apply counts issues and epics separately from the round record', () => {
-  const { store, scratchDir, roundId } = scaffold();
+test('apply counts issues and epics separately from the round record', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
     role: 'swe', new: [newFinding('r1#swe-1'), newFinding('r1#swe-2', { title: 'Second' })], reconcile: [],
   });
