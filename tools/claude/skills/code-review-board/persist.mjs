@@ -11,9 +11,9 @@
 //   node persist.mjs apply   <store-dir> <round-id>
 
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
-import { join, dirname, basename, resolve, sep } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 import { argv, stdout, stderr, exit } from 'node:process';
-import { lintStore, parseId, idToSafe } from './lint.mjs';
+import { lintStore, idToSafe } from './lint.mjs';
 import { isMain } from './is-main.mjs';
 
 // ---------- io helpers ----------
