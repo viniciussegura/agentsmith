@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { persistApply, persistSummary } from '../tools/claude/skills/code-review-board/persist.mjs';
-import { withTempDir } from '../test-helpers/tmp-dir.mjs';
+import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
 
 // Build a round scratch dir + empty store; return { store, scratchDir, roundId }.
 function scaffold(t, roundId = 'r1') {
-  const base = withTempDir(t, 'rb-');
+  const base = makeTempDir(t, 'rb-');
   const store = join(base, '.agentsmith', 'review-board');
   const scratchDir = join(base, '.agentsmith', 'tmp', 'review-board', roundId);
   mkdirSync(store, { recursive: true });

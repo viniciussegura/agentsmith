@@ -4,7 +4,7 @@ import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, hasCommittableChanges } from '../devtools/triage-ui/server.mjs';
 import { canonicalJSON, migrateWorksheet } from '../devtools/triage-ui/schema.mjs';
-import { withTempDir } from '../test-helpers/tmp-dir.mjs';
+import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
 
 const validFile = () => ({
   round: '2026-06-17',
@@ -27,7 +27,7 @@ function withServer(opts, fn) {
   });
 }
 
-const tmpTriage = (t) => join(withTempDir(t, 'triage-'), 'triage.json');
+const tmpTriage = (t) => join(makeTempDir(t, 'triage-'), 'triage.json');
 
 test('GET /api/triage on absent file -> empty + null version', async (t) => {
   const triagePath = tmpTriage(t);

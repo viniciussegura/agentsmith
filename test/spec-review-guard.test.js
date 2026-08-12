@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runGuard } from '../tools/claude/skills/spec-review-board/guard.mjs';
-import { withTempDir } from '../test-helpers/tmp-dir.mjs';
+import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
 
-const scratch = (t) => withTempDir(t, 'sr-guard-');
+const scratch = (t) => makeTempDir(t, 'sr-guard-');
 function writeJson(p, o) {
   writeFileSync(p, JSON.stringify(o, null, 2));
 }
