@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, hasCommittableChanges } from '../devtools/triage-ui/server.mjs';
-import { canonicalJSON, versionToken, migrateWorksheet } from '../devtools/triage-ui/schema.mjs';
+import { canonicalJSON, migrateWorksheet } from '../devtools/triage-ui/schema.mjs';
 import { withTempDir } from '../test-helpers/tmp-dir.mjs';
 
 const validFile = () => ({

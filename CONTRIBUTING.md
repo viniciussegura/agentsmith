@@ -31,6 +31,7 @@ src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** i
 bin/cli.js         verb-first CLI: install / uninstall, plus the --stdout query
 bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
 test/              tests for the generator
+test-helpers/      shared test scaffolding; outside test/ so `node --test` skips it
 ```
 
 ## Editing the rules
