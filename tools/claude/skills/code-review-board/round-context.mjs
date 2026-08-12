@@ -37,7 +37,10 @@ const PROBE_AGENT = join('.claude', 'agents', 'review-swe.md');
 const PLUGIN_PREFIX = 'agentsmith:';
 
 /**
- * Where a bare-resolvable agent could live, in precedence order.
+ * Every location a bare-resolvable agent could live.
+ *
+ * The listed order is presentational (project, then user): the only consumer asks
+ * whether ANY location has one, so no precedence is implied or relied on.
  *
  * BOTH locations matter, and checking only the first is a fatal bug: `agentsmith
  * install --scope user` bases at homedir(), so its adapters land at
@@ -63,12 +66,12 @@ export function probeLocations({ cwd: at, home }) {
  * an install marker. That answers the operative question directly, and is right
  * when more than one install is present: bare resolves, so bare is used.
  *
- * @param {{ hasProjectAgents: boolean, skillsDir: string, cwd: string }} probes
+ * @param {{ bareResolves: boolean, skillsDir: string, cwd: string }} probes
  * @returns {{ agentPrefix: string, skillsDir: string, cwd: string }}
  */
-export function resolveContext({ hasProjectAgents, skillsDir, cwd: at }) {
+export function resolveContext({ bareResolves, skillsDir, cwd: at }) {
   return {
-    agentPrefix: hasProjectAgents ? '' : PLUGIN_PREFIX,
+    agentPrefix: bareResolves ? '' : PLUGIN_PREFIX,
     skillsDir,
     cwd: at,
   };
@@ -85,7 +88,7 @@ const invokedDirectly = isMain(import.meta.url, argv[1]);
 if (invokedDirectly) {
   const at = cwd();
   const ctx = resolveContext({
-    hasProjectAgents: probeLocations({ cwd: at, home: homedir() }).some((p) => existsSync(p)),
+    bareResolves: probeLocations({ cwd: at, home: homedir() }).some((p) => existsSync(p)),
     skillsDir: skillsRootOf(import.meta.url),
     cwd: at,
   });

@@ -11,13 +11,13 @@ import { resolveContext, skillsRootOf, probeLocations } from '../tools/claude/sk
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = join(repo, 'tools', 'claude', 'skills', 'code-review-board', 'round-context.mjs');
 
-test('a project carrying its own agents dispatches bare; one without them namespaces', () => {
-  assert.equal(resolveContext({ hasProjectAgents: true, skillsDir: '/s', cwd: '/p' }).agentPrefix, '');
-  assert.equal(resolveContext({ hasProjectAgents: false, skillsDir: '/s', cwd: '/p' }).agentPrefix, 'agentsmith:');
+test('a bare name that resolves dispatches bare; one that does not gets the namespace', () => {
+  assert.equal(resolveContext({ bareResolves: true, skillsDir: '/s', cwd: '/p' }).agentPrefix, '');
+  assert.equal(resolveContext({ bareResolves: false, skillsDir: '/s', cwd: '/p' }).agentPrefix, 'agentsmith:');
 });
 
 test('resolveContext passes the skills root and cwd through untouched', () => {
-  const ctx = resolveContext({ hasProjectAgents: false, skillsDir: '/abs/skills', cwd: '/abs/worktree' });
+  const ctx = resolveContext({ bareResolves: false, skillsDir: '/abs/skills', cwd: '/abs/worktree' });
   assert.deepEqual(ctx, { agentPrefix: 'agentsmith:', skillsDir: '/abs/skills', cwd: '/abs/worktree' });
 });
 
@@ -80,11 +80,14 @@ test('the CLI reports a bare prefix once the project carries the probe agent', (
 // each needs its own case: one test cannot show that both are consulted.
 test('probeLocations covers the project AND the user home', () => {
   const at = '/some/project';
-  const home = '/home/vinic';
-  assert.deepEqual(probeLocations({ cwd: at, home }), [
-    join(at, '.claude', 'agents', 'review-swe.md'),
-    join(home, '.claude', 'agents', 'review-swe.md'),
-  ]);
+  const home = '/some/home';
+  const found = probeLocations({ cwd: at, home });
+  // Membership, not order: the consumer is `.some()`, so listing order carries no
+  // meaning and asserting it would pin a property nothing depends on.
+  assert.equal(found.length, 2, 'exactly the two locations, no more');
+  for (const root of [at, home]) {
+    assert.ok(found.includes(join(root, '.claude', 'agents', 'review-swe.md')), `${root} probed`);
+  }
 });
 
 test('a user-scope install dispatches bare from a project that has no agents of its own', () => {
