@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, hasCommittableChanges } from '../devtools/triage-ui/server.mjs';
 import { canonicalJSON, versionToken, migrateWorksheet } from '../devtools/triage-ui/schema.mjs';
+import { withTempDir } from '../test-helpers/tmp-dir.mjs';
 
 const validFile = () => ({
   round: '2026-06-17',
@@ -27,13 +27,7 @@ function withServer(opts, fn) {
   });
 }
 
-// Cleanup is registered on the test context, so it runs even when an assertion throws.
-// The returned path is a file inside the dir, so the cleanup closes over the dir itself.
-function tmpTriage(t) {
-  const dir = mkdtempSync(join(tmpdir(), 'triage-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  return join(dir, 'triage.json');
-}
+const tmpTriage = (t) => join(withTempDir(t, 'triage-'), 'triage.json');
 
 test('GET /api/triage on absent file -> empty + null version', async (t) => {
   const triagePath = tmpTriage(t);

@@ -1,15 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { persistApply, persistSummary } from '../tools/claude/skills/code-review-board/persist.mjs';
+import { withTempDir } from '../test-helpers/tmp-dir.mjs';
 
 // Build a round scratch dir + empty store; return { store, scratchDir, roundId }.
-// Cleanup is registered on the test context, so it runs even when an assertion throws.
 function scaffold(t, roundId = 'r1') {
-  const base = mkdtempSync(join(tmpdir(), 'rb-'));
-  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const base = withTempDir(t, 'rb-');
   const store = join(base, '.agentsmith', 'review-board');
   const scratchDir = join(base, '.agentsmith', 'tmp', 'review-board', roundId);
   mkdirSync(store, { recursive: true });

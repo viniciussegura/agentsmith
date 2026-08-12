@@ -1,16 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { runGuard } from '../tools/claude/skills/spec-review-board/guard.mjs';
+import { withTempDir } from '../test-helpers/tmp-dir.mjs';
 
-// Cleanup is registered on the test context, so it runs even when an assertion throws.
-function scratch(t) {
-  const dir = mkdtempSync(join(tmpdir(), 'sr-guard-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  return dir;
-}
+const scratch = (t) => withTempDir(t, 'sr-guard-');
 function writeJson(p, o) {
   writeFileSync(p, JSON.stringify(o, null, 2));
 }
