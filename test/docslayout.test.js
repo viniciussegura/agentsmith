@@ -716,6 +716,12 @@ test('no two rows may resolve to the same location', () => {
     ['a relocation onto another row\'s default directory', lines('  swe-future-work:', '    path: docs/technical-debts/<YYYY-MM-DD>-<slug>.md'), 2, '#swe-technical-debts'],
     ['a single file inside another row\'s default directory', lines('  swe-future-work:', '    path: docs/technical-debts/FUTURE.md'), 2, '#swe-technical-debts'],
     ['a directory holding another row\'s records', lines('  swe-future-work:', '    path: docs/epics/'), 2, '#swe-epic'],
+    // A row storing each record as a directory claims every directory at its location, so
+    // this one would read the other rows' default directories as epics.
+    ['records as directories at the parent of other rows\' directories', lines('  swe-epic:', '    path: docs/<slug>/'), 2, '#swe-reference-spec'],
+    ['a file and a directory of the same name', lines('  swe-technical-debts:', '    path: docs/notes', '  swe-future-work:', '    path: docs/notes/<slug>.md'), 4, '#swe-technical-debts'],
+    ['locations differing only in case', lines('  swe-technical-debts:', '    path: docs/Notes/<slug>.md', '  swe-future-work:', '    path: docs/notes/<slug>.md'), 4, '#swe-technical-debts'],
+    ['single files differing only in case', lines('  swe-technical-debts:', '    path: docs/DEBTS.md', '  swe-future-work:', '    path: docs/debts.md'), 4, '#swe-technical-debts'],
   ];
   for (const [label, body, line, includes] of collisions) {
     assertRejected(lines('rows:', body), { line, includes }, label);
@@ -726,6 +732,12 @@ test('no two rows may resolve to the same location', () => {
     parse(lines('rows:', '  swe-technical-debts:', '    external: jira/ENG', '  swe-future-work:', '    path: docs/technical-debts/<slug>.md')),
     { 'swe-technical-debts': { external: 'jira/ENG' }, 'swe-future-work': { path: 'docs/technical-debts/<slug>.md' } },
   );
+  // The mirror of the directory case above: a row storing each record as a FILE claims the
+  // files at its location and leaves the other rows' directories alone.
+  assert.deepEqual(
+    parse(lines('rows:', '  swe-technical-debts:', '    path: docs/<YYYY-MM-DD>-<slug>.md')),
+    { 'swe-technical-debts': { path: 'docs/<YYYY-MM-DD>-<slug>.md' } },
+  );
   // Two rows each collapsed to one fixed file: a shared parent, distinct locations.
   assert.deepEqual(
     parse(lines('rows:', '  swe-technical-debts:', '    path: docs/DEBTS.md', '  swe-future-work:', '    path: docs/FUTURE.md')),
@@ -733,6 +745,22 @@ test('no two rows may resolve to the same location', () => {
   );
   const everyDefault = parseLayoutTable(realModule).map(({ owner, path }) => lines(`  ${owner}:`, `    path: ${path}`));
   assert.equal(Object.keys(parse(lines('rows:', ...everyDefault))).length, 5, 'every shipped default restated at once');
+});
+
+test('a trailing comment is stripped, as YAML strips it', () => {
+  // Reported as misleading errors rather than as a parse failure: `rows:  # remap` was an
+  // "unknown top-level key", and the same comment on a row or field line gave two further
+  // wrong messages.
+  assert.deepEqual(
+    parse(lines('rows:  # remap', '  swe-future-work:  # later', '    path: docs/later/<slug>.md  # dated')),
+    { 'swe-future-work': { path: 'docs/later/<slug>.md' } },
+  );
+  assert.deepEqual(parse(lines('rows:\t# tab before the comment', '  swe-future-work:', '    path: docs/later/')), { 'swe-future-work': { path: 'docs/later/' } });
+  // A `#` with no space before it is part of the value, which no allowed charset admits.
+  assertRejected(rowsWith('swe-future-work', `path: docs/${SYNTHETIC}#x`), { line: 3, includes: 'not a safe repo-relative path' }, 'hash inside a path');
+  assertRejected(rowsWith('swe-future-work', `external: jira/#${SYNTHETIC}`), { line: 3, includes: 'external label is not valid' }, 'hash inside a label');
+  // Stripping must not turn the hashed row key back into a comment.
+  assertRejected(lines('rows:', '  #swe-future-work:'), { line: 2, includes: 'leading #' }, 'hashed row key');
 });
 
 test('a row whose records are directories rejects a path that is not one', () => {

@@ -85,6 +85,7 @@ const ROWS_KEY = 'rows:';
 const TOP_LEVEL_KEY = /^[A-Za-z_][\w-]*:/;
 const ROW_KEY = /^([a-z][a-z0-9-]*):$/;
 const HASHED_ROW_KEY = /^[ \t]*#([a-z][a-z0-9-]*):[ \t]*$/;
+const TRAILING_COMMENT = /[ \t]+#.*$/;
 const FIELD_LINE = /^([a-z]+):(?: +(.*))?$/;
 const ROW_INDENT = 2;
 const FIELD_INDENT = 4;
@@ -307,12 +308,16 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
     if (hashedTag !== undefined && known.has(hashedTag)) {
       throw error(lineNo, 'row key is written with a leading #', 'write the owner tag bare, or put a space after the # to comment the line out');
     }
-    if (raw === '' || /^\s*#/.test(raw)) return;
+    // Stripped as YAML strips it, and only after the check above, which must still see a
+    // row key the author commented out. No allowed value admits a `#`, so one with no
+    // whitespace before it stays part of the value for the charset rules to reject.
+    const line = raw.replace(TRAILING_COMMENT, '');
+    if (line === '' || /^\s*#/.test(line)) return;
 
-    const leading = /^[ \t]*/.exec(raw)[0];
+    const leading = /^[ \t]*/.exec(line)[0];
     if (leading.includes('\t')) throw error(lineNo, 'indentation uses a tab', `use spaces: ${INDENT_RULE}`);
     const indent = leading.length;
-    const content = raw.slice(indent);
+    const content = line.slice(indent);
 
     if (indent === 0) {
       closeRow();
@@ -373,18 +378,30 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
   // The location compared is the path minus a final segment that names one record, so two
   // rows that each collapse to a single fixed file may share a parent: the decision file
   // permits a row to become one file, and two files in `docs/` answer no scan ambiguously.
+  // A location is compared lowercased, because the default Windows and macOS filesystems
+  // treat `docs/Notes/` and `docs/notes/` as one directory.
+  // `directories` says what the row claims there: a path ending in a slash after a segment
+  // naming one record stores each record as its own directory, and so claims every
+  // directory at that location, while any other shape claims files. That is the whole
+  // difference between `docs/<slug>/`, which would read the other rows' default
+  // directories as its own records, and `docs/<YYYY-MM-DD>-<slug>.md`, which leaves them be.
   const locationOf = (path) => {
     const segments = (path.endsWith('/') ? path.slice(0, -1) : path).split('/');
-    if (segments.at(-1).includes(PLACEHOLDER_OPEN)) return `${segments.slice(0, -1).join('/')}/`;
-    return path;
+    if (!segments.at(-1).includes(PLACEHOLDER_OPEN)) return { at: path.toLowerCase(), directories: false };
+    return { at: `${segments.slice(0, -1).join('/')}/`.toLowerCase(), directories: path.endsWith('/') };
   };
-  // Nesting one record directory inside another is not a collision -- the whole map nests
-  // under `docs/`, and the map owns those directories rather than the root (see
-  // `deriveMappedPrefixes`), so a row flat in `docs/` leaves the others' directories alone.
-  // A record FILE directly inside another row's record directory is the harmful case: a
-  // scan of that directory returns it.
-  const holdsFile = (dir, file) => dir.endsWith('/') && !file.endsWith('/') && file.startsWith(dir);
-  const overlaps = (a, b) => a === b || holdsFile(a, b) || holdsFile(b, a);
+  // Nesting one record directory inside another is not in itself a collision -- the whole
+  // map nests under `docs/`, and the map owns those directories rather than the root (see
+  // `deriveMappedPrefixes`). The harmful cases are a shared location, a record file inside
+  // another row's record directory, and a record directory inside one: each answers a scan
+  // the owner rules make with another row's records.
+  const bare = (at) => (at.endsWith('/') ? at.slice(0, -1) : at);
+  // Trailing slash ignored, so a file cannot take the name of another row's directory.
+  const sameLocation = (a, b) => bare(a.at) === bare(b.at);
+  const holdsFile = (dir, file) => dir.at.endsWith('/') && !file.at.endsWith('/') && file.at.startsWith(dir.at);
+  const holdsDirectory = (dir, other) => dir.directories && other.at.endsWith('/') && other.at.startsWith(dir.at);
+  const overlaps = (a, b) =>
+    sameLocation(a, b) || holdsFile(a, b) || holdsFile(b, a) || holdsDirectory(a, b) || holdsDirectory(b, a);
 
   const resolved = [];
   for (const { owner, path } of knownRows) {
