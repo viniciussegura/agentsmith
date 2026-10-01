@@ -83,7 +83,7 @@ const PROTECTED_BASENAMES = new Set(['agents.md', 'claude.md', 'gemini.md', 'pac
 const ROWS_KEY = 'rows:';
 const TOP_LEVEL_KEY = /^[A-Za-z_][\w-]*:/;
 const ROW_KEY = /^([a-z][a-z0-9-]*):$/;
-const HASHED_ROW_KEY = /^[ \t]*#[a-z][a-z0-9-]*:[ \t]*$/;
+const HASHED_ROW_KEY = /^[ \t]*#([a-z][a-z0-9-]*):[ \t]*$/;
 const FIELD_LINE = /^([a-z]+):(?: +(.*))?$/;
 const ROW_INDENT = 2;
 const FIELD_INDENT = 4;
@@ -168,14 +168,24 @@ const pathProblem = (value, placeholder) => {
       'use segments of letters, digits, dot, underscore and hyphen, each starting with a letter or digit, with no .. and no node_modules',
     ];
   }
-  // The denylist is checked against the segment with placeholders ELIDED as well as
-  // substituted: `AGENTS<name>.md` substitutes to `AGENTS0.md` and slips past, but a
-  // reader resolving `<name>` to nothing lands on the protected file. Checked before
-  // the root rule below, so naming a protected file says so rather than blaming depth.
-  const finalSegment = (s) => s.split('/').filter(Boolean).at(-1) ?? '';
-  const elided = PLACEHOLDER_TOKENS.reduce((acc, token) => acc.replaceAll(token, ''), value);
-  for (const candidate of [finalSegment(substituted), finalSegment(elided)]) {
-    if (PROTECTED_BASENAMES.has(candidate.toLowerCase())) {
+  // The rules above pass on the substituted path, so they are re-applied to the path
+  // with its placeholders ELIDED, over every segment rather than the last:
+  // `AGENTS<name>.md` substitutes to `AGENTS0.md` and `<slug>.git/hooks/pre-commit` to
+  // `0.git/hooks/pre-commit`, but a reader resolving the placeholder to nothing lands on
+  // the protected file and inside `.git`. A dot-leading elided directory covers `..` as
+  // well, so elision cannot forge a traversal the literal form would have been refused.
+  const segmentsOf = (s) => s.split('/').filter(Boolean);
+  const elided = segmentsOf(PLACEHOLDER_TOKENS.reduce((acc, token) => acc.replaceAll(token, ''), value));
+  if (elided.slice(0, -1).some((segment) => segment.startsWith('.'))) {
+    return [
+      'path reaches a dot directory once a placeholder is elided',
+      'keep every directory segment literal, so no directory name depends on a placeholder',
+    ];
+  }
+  // Checked before the root rule below, so naming a protected file says so rather than
+  // blaming depth.
+  for (const segment of [...segmentsOf(substituted), ...elided]) {
+    if (PROTECTED_BASENAMES.has(segment.toLowerCase())) {
       return ['path names an instruction or manifest file', 'those files cannot be a remap target'];
     }
   }
@@ -257,9 +267,12 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
     // A row key written with its leading `#` is a mistake, not a comment, and it is
     // the mistake the surfaces invite: every other agentsmith surface -- including
     // this module's own unknown-tag message -- spells these tags as `#swe-...`.
-    // Swallowing it as a comment yields a silent no-op remap.
-    if (HASHED_ROW_KEY.test(raw)) {
-      throw error(lineNo, 'row key is written with a leading #', 'write the owner tag bare, without the #');
+    // Swallowing it as a comment yields a silent no-op remap. Only a known row tag
+    // reads that way: `#rows:` or `#todo:` is an ordinary comment, so commenting the
+    // config out -- the documented way to turn the remap off -- is not an error.
+    const hashedTag = HASHED_ROW_KEY.exec(raw)?.[1];
+    if (hashedTag !== undefined && known.has(hashedTag)) {
+      throw error(lineNo, 'row key is written with a leading #', 'write the owner tag bare, or put a space after the # to comment the line out');
     }
     if (raw === '' || /^\s*#/.test(raw)) return;
 

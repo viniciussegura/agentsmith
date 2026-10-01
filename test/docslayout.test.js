@@ -692,10 +692,29 @@ test('a row key written with its leading # is an error, not a silent comment', (
   // Swallowing it as a comment yielded exit 0 and a silently unremapped install,
   // and every agentsmith surface -- including this module's own unknown-tag
   // message -- spells these tags as `#swe-...`, so it is the invited mistake.
+  // Only a known row tag reads that way, so an ordinary comment that happens to be
+  // shaped like one stays a comment and the install is not aborted.
   assertRejected(lines('rows:', '  #swe-design-decisions:', '    path: docs/adr/<decision-slug>.md'),
     { line: 2, includes: 'row key is written with a leading #' }, 'hashed row key');
+  assertRejected(lines('#swe-epic:', 'rows:'),
+    { line: 1, includes: 'row key is written with a leading #' }, 'hashed row key at column 0');
+  assert.deepEqual(parse(lines('#rows:', '#  swe-epic:', '#    path: docs/epics/<slug>/')), {}, 'whole config commented out');
   assert.deepEqual(
-    parse(lines('rows:', '  # a note', '  swe-future-work:', '    path: docs/later/')),
+    parse(lines('rows:', '  # a note', `  #${SYNTHETIC}:`, '  swe-future-work:', '    path: docs/later/')),
     { 'swe-future-work': { path: 'docs/later/' } },
   );
+});
+
+test('a placeholder may not be the only thing keeping a path out of a dot directory', () => {
+  // Each rule is applied to the path with its placeholders elided as well as
+  // substituted: a reader resolving one to nothing must not land somewhere the
+  // literal form would have been refused.
+  for (const value of ['<slug>.git/hooks/pre-commit', 'docs/<slug>.ssh/x.md', 'docs/<slug>.<slug>./x.md']) {
+    assertRejected(rowsWith('swe-technical-debts', `path: ${value}`), { line: 3, includes: 'placeholder is elided' }, value);
+  }
+  assertRejected(rowsWith('swe-technical-debts', 'path: docs/package.json/x.md'),
+    { line: 3, includes: 'instruction or manifest file' }, 'protected name in a directory segment');
+  for (const { owner, path } of parseLayoutTable(realModule)) {
+    assert.deepEqual(parse(rowsWith(owner, `path: ${path}`)), { [owner]: { path } }, `shipped default for ${owner}`);
+  }
 });

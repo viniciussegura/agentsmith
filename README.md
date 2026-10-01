@@ -145,9 +145,9 @@ The config arrives with any clone or pull request and its values become instruct
 Four rules are worth knowing before you write one:
 
 - A path lives **under a directory** — a bare name at the repository root is refused, because a placeholder there resolves to any file at all.
-- A path may **not name** `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` or `package.json`, including behind a placeholder (`AGENTS<name>.md` is refused too).
+- A path may **not name** `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` or `package.json` in any segment, and no directory segment may begin with a dot. Both rules are applied twice, once with each placeholder standing for a name and once with it removed, so `AGENTS<name>.md` and `<slug>.git/hooks/pre-commit` are refused as well.
 - Three rows must **keep a placeholder**, because something else resolves their records individually: `swe-reference-spec` keeps `<name>`, `swe-design-decisions` keeps `<decision-slug>`, and `swe-epic` keeps `<slug>` (an epic is a directory per record, with fixed children inside it, so dropping the slug would collapse every epic into one directory). The other two rows are free to drop theirs and declare a different naming pattern.
-- A row key is the **bare** tag: write `swe-future-work:`, not `#swe-future-work:`. The hashed form is rejected rather than read as a comment.
+- A row key is the **bare** tag: write `swe-future-work:`, not `#swe-future-work:` — the hashed form of a real row tag is an error, because reading it as a comment would leave that row silently unremapped. Every other `#` line is an ordinary comment, so a space after the `#` is how you comment a row out.
 `agentsmith --stdout` deliberately reads no config and always prints the defaults; `agentsmith install --dry-run` is the way to preview a remapped set.
 
 Because both gitignore recipes above deny `.agentsmith/` wholesale, the config needs its `!.agentsmith/docs-layout.yaml` re-admit or teammates never receive it — `install` warns when git reports the file ignored.
