@@ -94,14 +94,17 @@ const JUNK_ALLOWED = 'allowed are rows:, a row key, a path or external field, bl
 /**
  * Merge the parsed table with `ROW_POLICY`, deny-by-default: a tag absent from
  * the policy is ineligible for `external` and requires no placeholder.
+ * The table's own `path` is carried through as each row's default: an un-overridden row
+ * still occupies it, and its trailing slash states whether the row's records are
+ * directories -- neither of which is policy, so neither belongs in `ROW_POLICY`.
  *
- * @param {{ owner: string }[]} tableRows Output of `parseLayoutTable`.
- * @returns {{ owner: string, external: boolean, placeholder: string | null }[]}
+ * @param {{ owner: string, path?: string }[]} tableRows Output of `parseLayoutTable`.
+ * @returns {{ owner: string, external: boolean, placeholder: string | null, path: string }[]}
  */
 export function withRowPolicy(tableRows) {
-  return tableRows.map(({ owner }) => {
+  return tableRows.map(({ owner, path = '' }) => {
     const policy = Object.hasOwn(ROW_POLICY, owner) ? ROW_POLICY[owner] : undefined;
-    return { owner, external: policy?.external === true, placeholder: policy?.placeholder ?? null };
+    return { owner, external: policy?.external === true, placeholder: policy?.placeholder ?? null, path };
   });
 }
 
@@ -154,8 +157,12 @@ export function readLayoutConfig({ base, resolve = realpathSync }) {
   }
 }
 
-/** @returns {[string, string] | null} [what is wrong, what is allowed], or null when valid. */
-const pathProblem = (value, placeholder) => {
+/**
+ * @param {string} value
+ * @param {{ placeholder?: string | null, path?: string }} policy The row's policy and default path.
+ * @returns {[string, string] | null} [what is wrong, what is allowed], or null when valid.
+ */
+const pathProblem = (value, { placeholder = null, path: defaultPath = '' }) => {
   if (value.length > MAX_PATH_LENGTH) {
     return [`path is longer than ${MAX_PATH_LENGTH} characters`, 'use a shorter repo-relative path'];
   }
@@ -213,6 +220,13 @@ const pathProblem = (value, placeholder) => {
   if (placeholder !== null && !value.includes(placeholder)) {
     return [`path drops the ${placeholder} placeholder this row requires`, `keep ${placeholder} in the new path`];
   }
+  // A row whose default path is a directory stores each record as a directory, not as a
+  // file: #swe-epic mandates children inside each epic's own directory, which a file per
+  // epic cannot hold. The map's trailing slash already says this, so it is read from there
+  // rather than declared in ROW_POLICY.
+  if (defaultPath.endsWith('/') && !value.endsWith('/')) {
+    return ['path does not name a directory, which this row requires', 'end the path with a slash: this row stores each record as its own directory'];
+  }
   return null;
 };
 
@@ -269,12 +283,15 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
   let sawRows = false;
   let current = null;
 
+  const rowLines = new Map();
+
   const closeRow = () => {
     if (current === null) return;
     if (current.override === null) {
       throw error(current.line, 'row declares neither path nor external', 'declare exactly one of path or external');
     }
     overrides[current.tag] = current.override;
+    rowLines.set(current.tag, current.line);
     current = null;
   };
 
@@ -338,7 +355,7 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
         throw error(lineNo, 'external is not allowed for this row', `eligible rows are ${eligible}`);
       }
       if (value === '') throw error(lineNo, `${field} value is empty`, `give ${field} a value`);
-      const problem = field === 'path' ? pathProblem(value, current.policy.placeholder ?? null) : externalProblem(value);
+      const problem = field === 'path' ? pathProblem(value, current.policy) : externalProblem(value);
       if (problem !== null) throw error(lineNo, ...problem);
       current.override = { [field]: value };
       return;
@@ -347,6 +364,48 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
     throw error(lineNo, 'wrong indentation', INDENT_RULE);
   });
   closeRow();
+
+  // Two rows resolving to one location give an agent contradictory instructions: the rules
+  // tell it to scan a directory for every record of one type, so a directory holding two
+  // types answers both scans with the other's records -- #swe-technical-debts says its
+  // directory holds only open debts. A row keeps its default path until overridden, so a
+  // relocation onto a directory another row still holds by default collides too.
+  // The location compared is the path minus a final segment that names one record, so two
+  // rows that each collapse to a single fixed file may share a parent: the decision file
+  // permits a row to become one file, and two files in `docs/` answer no scan ambiguously.
+  const locationOf = (path) => {
+    const segments = (path.endsWith('/') ? path.slice(0, -1) : path).split('/');
+    if (segments.at(-1).includes(PLACEHOLDER_OPEN)) return `${segments.slice(0, -1).join('/')}/`;
+    return path;
+  };
+  // Nesting one record directory inside another is not a collision -- the whole map nests
+  // under `docs/`, and the map owns those directories rather than the root (see
+  // `deriveMappedPrefixes`), so a row flat in `docs/` leaves the others' directories alone.
+  // A record FILE directly inside another row's record directory is the harmful case: a
+  // scan of that directory returns it.
+  const holdsFile = (dir, file) => dir.endsWith('/') && !file.endsWith('/') && file.startsWith(dir);
+  const overlaps = (a, b) => a === b || holdsFile(a, b) || holdsFile(b, a);
+
+  const resolved = [];
+  for (const { owner, path } of knownRows) {
+    const override = overrides[owner];
+    if (override !== undefined && 'external' in override) continue;
+    const effective = override?.path ?? path;
+    if (effective === '') continue;
+    const line = rowLines.get(owner);
+    const location = locationOf(effective);
+    // Only a pair the config had a hand in: two defaults colliding would be the shipped
+    // map's doing, which this file's author cannot act on and no line here could name.
+    const clash = resolved.find((other) => overlaps(other.location, location) && (line !== undefined || other.line !== undefined));
+    if (clash !== undefined) {
+      // Blame the row written later in the file and name the other one, so the message
+      // always points at a line the author can edit -- the colliding row may be a default
+      // they never wrote, and table order is not file order.
+      const [at, other] = (line ?? 0) >= (clash.line ?? 0) ? [line ?? 0, clash.owner] : [clash.line ?? 0, owner];
+      throw error(at, `row resolves to the same location as #${other}`, 'give each row a directory or file of its own');
+    }
+    resolved.push({ owner, location, line });
+  }
 
   return overrides;
 }

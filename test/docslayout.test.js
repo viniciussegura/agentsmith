@@ -315,7 +315,7 @@ test('U6 accepted path and external values', () => {
 
 test('U6 a table tag absent from the policy is ineligible for external and requires no placeholder', () => {
   const rows = withRowPolicy([...parseLayoutTable(realModule), { owner: 'swe-new-row' }]);
-  assert.deepEqual(rows.at(-1), { owner: 'swe-new-row', external: false, placeholder: null });
+  assert.deepEqual(rows.at(-1), { owner: 'swe-new-row', external: false, placeholder: null, path: '' });
   assert.throws(() => parseLayoutConfig(rowsWith('swe-new-row', 'external: jira/X'), rows, FILE), /:3: external is not allowed/);
   assert.deepEqual(parseLayoutConfig(rowsWith('swe-new-row', 'path: docs/new/'), rows, FILE), { 'swe-new-row': { path: 'docs/new/' } });
 });
@@ -705,6 +705,47 @@ test('a row key written with its leading # is an error, not a silent comment', (
   );
 });
 
+test('no two rows may resolve to the same location', () => {
+  // A row's effective path is its override or, failing that, its default, so a relocation
+  // onto a directory another row still holds by default collides just as a pair of
+  // relocations does. The location compared is the path minus a per-record final segment:
+  // rows storing a record each under one directory collide there, while two rows that each
+  // collapse to a single fixed file may share a parent, which the decision file allows.
+  const collisions = [
+    ['two relocations onto one directory', lines('  swe-technical-debts:', '    path: docs/notes/<slug>.md', '  swe-future-work:', '    path: docs/notes/<YYYY-MM-DD>-<slug>.md'), 4, '#swe-technical-debts'],
+    ['a relocation onto another row\'s default directory', lines('  swe-future-work:', '    path: docs/technical-debts/<YYYY-MM-DD>-<slug>.md'), 2, '#swe-technical-debts'],
+    ['a single file inside another row\'s default directory', lines('  swe-future-work:', '    path: docs/technical-debts/FUTURE.md'), 2, '#swe-technical-debts'],
+    ['a directory holding another row\'s records', lines('  swe-future-work:', '    path: docs/epics/'), 2, '#swe-epic'],
+  ];
+  for (const [label, body, line, includes] of collisions) {
+    assertRejected(lines('rows:', body), { line, includes }, label);
+  }
+
+  // An external row is served by a tracker, so it holds no location to collide with.
+  assert.deepEqual(
+    parse(lines('rows:', '  swe-technical-debts:', '    external: jira/ENG', '  swe-future-work:', '    path: docs/technical-debts/<slug>.md')),
+    { 'swe-technical-debts': { external: 'jira/ENG' }, 'swe-future-work': { path: 'docs/technical-debts/<slug>.md' } },
+  );
+  // Two rows each collapsed to one fixed file: a shared parent, distinct locations.
+  assert.deepEqual(
+    parse(lines('rows:', '  swe-technical-debts:', '    path: docs/DEBTS.md', '  swe-future-work:', '    path: docs/FUTURE.md')),
+    { 'swe-technical-debts': { path: 'docs/DEBTS.md' }, 'swe-future-work': { path: 'docs/FUTURE.md' } },
+  );
+  const everyDefault = parseLayoutTable(realModule).map(({ owner, path }) => lines(`  ${owner}:`, `    path: ${path}`));
+  assert.equal(Object.keys(parse(lines('rows:', ...everyDefault))).length, 5, 'every shipped default restated at once');
+});
+
+test('a row whose records are directories rejects a path that is not one', () => {
+  // #swe-epic mandates children inside each epic directory, so a file per epic cannot
+  // hold them. Read from the map's own trailing slash rather than declared in ROW_POLICY.
+  assertRejected(rowsWith('swe-epic', 'path: docs/epics/<slug>.md'), { line: 3, includes: 'name a directory' }, 'epic as a file');
+  assertRejected(rowsWith('swe-epic', 'path: team/<slug>-epic.md'), { line: 3, includes: 'name a directory' }, 'relocated epic as a file');
+  assert.deepEqual(pathCase('swe-epic', 'team/epics/<slug>/'), { 'swe-epic': { path: 'team/epics/<slug>/' } });
+  // A row whose records are files may still be relocated to a directory: it names where
+  // the records live, which is what dropping the placeholder declares.
+  assert.deepEqual(pathCase('swe-technical-debts', 'docs/debts/'), { 'swe-technical-debts': { path: 'docs/debts/' } });
+});
+
 test('a placeholder may not name a directory the config has not pinned down', () => {
   // Two properties, both about directories a reader resolves rather than reads:
   // the first segment is literal, so the repository root is never a placeholder's to
@@ -734,7 +775,7 @@ test('a placeholder may not name a directory the config has not pinned down', ()
   for (const { owner, path } of parseLayoutTable(realModule)) {
     assert.deepEqual(parse(rowsWith(owner, `path: ${path}`)), { [owner]: { path } }, `shipped default for ${owner}`);
   }
-  for (const value of ['docs/epics/<slug>/', 'docs/<slug>/notes.md', 'docs/debts/<slug>']) {
+  for (const value of ['docs/debts/<slug>/', 'docs/<slug>/notes.md', 'docs/debts/<slug>']) {
     assert.deepEqual(pathCase('swe-technical-debts', value), { 'swe-technical-debts': { path: value } }, value);
   }
 });
