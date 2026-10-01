@@ -705,16 +705,36 @@ test('a row key written with its leading # is an error, not a silent comment', (
   );
 });
 
-test('a placeholder may not be the only thing keeping a path out of a dot directory', () => {
-  // Each rule is applied to the path with its placeholders elided as well as
-  // substituted: a reader resolving one to nothing must not land somewhere the
+test('a placeholder may not name a directory the config has not pinned down', () => {
+  // Two properties, both about directories a reader resolves rather than reads:
+  // the first segment is literal, so the repository root is never a placeholder's to
+  // choose; and every directory segment is checked with placeholders elided as well as
+  // substituted, since a reader resolving one to nothing must not land somewhere the
   // literal form would have been refused.
-  for (const value of ['<slug>.git/hooks/pre-commit', 'docs/<slug>.ssh/x.md', 'docs/<slug>.<slug>./x.md']) {
-    assertRejected(rowsWith('swe-technical-debts', `path: ${value}`), { line: 3, includes: 'placeholder is elided' }, value);
+  const rejected = [
+    ['<slug>/', 'top-level directory'],
+    ['<slug>/x.md', 'top-level directory'],
+    ['my<slug>/x.md', 'top-level directory'],
+    ['<slug>.git/', 'placeholder is elided'],
+    ['<slug>.git/hooks/pre-commit', 'placeholder is elided'],
+    ['<slug>node_modules/x.md', 'placeholder is elided'],
+    ['docs/<slug>.git/', 'placeholder is elided'],
+    ['docs/<slug>.ssh/x.md', 'placeholder is elided'],
+    ['docs/<slug>.<slug>./x.md', 'placeholder is elided'],
+    ['docs/<slug>node_modules/x.md', 'placeholder is elided'],
+  ];
+  for (const [value, includes] of rejected) {
+    assertRejected(rowsWith('swe-technical-debts', `path: ${value}`), { line: 3, includes }, value);
   }
   assertRejected(rowsWith('swe-technical-debts', 'path: docs/package.json/x.md'),
     { line: 3, includes: 'instruction or manifest file' }, 'protected name in a directory segment');
+
+  // A placeholder naming a directory *under* literal ones is the shipped epics shape
+  // and stays accepted: resolve `<slug>` to anything and the write is still contained.
   for (const { owner, path } of parseLayoutTable(realModule)) {
     assert.deepEqual(parse(rowsWith(owner, `path: ${path}`)), { [owner]: { path } }, `shipped default for ${owner}`);
+  }
+  for (const value of ['docs/epics/<slug>/', 'docs/<slug>/notes.md', 'docs/debts/<slug>']) {
+    assert.deepEqual(pathCase('swe-technical-debts', value), { 'swe-technical-debts': { path: value } }, value);
   }
 });

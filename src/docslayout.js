@@ -75,6 +75,7 @@ export function parseLayoutTable(moduleText) {
 export const MAX_CONFIG_BYTES = 64 * 1024;
 const MAX_PATH_LENGTH = 120;
 const PLACEHOLDER_TOKENS = ['<name>', '<slug>', '<decision-slug>', '<YYYY-MM-DD>'];
+const PLACEHOLDER_OPEN = '<';
 const PLACEHOLDER_SUBSTITUTE = '0';
 const LITERAL_PATH = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*\/?$/;
 const EXTERNAL_LABEL = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,39}$/;
@@ -169,21 +170,24 @@ const pathProblem = (value, placeholder) => {
     ];
   }
   // The rules above pass on the substituted path, so they are re-applied to the path
-  // with its placeholders ELIDED, over every segment rather than the last:
-  // `AGENTS<name>.md` substitutes to `AGENTS0.md` and `<slug>.git/hooks/pre-commit` to
-  // `0.git/hooks/pre-commit`, but a reader resolving the placeholder to nothing lands on
-  // the protected file and inside `.git`. A dot-leading elided directory covers `..` as
-  // well, so elision cannot forge a traversal the literal form would have been refused.
+  // with its placeholders ELIDED: `AGENTS<name>.md` substitutes to `AGENTS0.md` and
+  // `docs/<slug>.git/` to `docs/0.git/`, but a reader resolving the placeholder to
+  // nothing lands on the protected file and inside `.git`. A dot-leading elided segment
+  // covers `..` as well, so elision cannot forge a traversal the literal form would have
+  // been refused. The final segment is a directory exactly when the path ends in a
+  // slash; a final FILE name is exempt, because eliding a placeholder legitimately
+  // leaves a dotted remainder there (`docs/<name>.md` -> `docs/.md`).
   const segmentsOf = (s) => s.split('/').filter(Boolean);
   const elided = segmentsOf(PLACEHOLDER_TOKENS.reduce((acc, token) => acc.replaceAll(token, ''), value));
-  if (elided.slice(0, -1).some((segment) => segment.startsWith('.'))) {
+  const elidedDirs = value.endsWith('/') ? elided : elided.slice(0, -1);
+  if (elidedDirs.some((segment) => segment.startsWith('.') || segment === FORBIDDEN_SEGMENT)) {
     return [
-      'path reaches a dot directory once a placeholder is elided',
-      'keep every directory segment literal, so no directory name depends on a placeholder',
+      `path reaches a dot directory or ${FORBIDDEN_SEGMENT} once a placeholder is elided`,
+      'give every directory segment literal text of its own',
     ];
   }
-  // Checked before the root rule below, so naming a protected file says so rather than
-  // blaming depth.
+  // Checked before the rules below, so naming a protected file says so rather than
+  // blaming the path's shape.
   for (const segment of [...segmentsOf(substituted), ...elided]) {
     if (PROTECTED_BASENAMES.has(segment.toLowerCase())) {
       return ['path names an instruction or manifest file', 'those files cannot be a remap target'];
@@ -193,6 +197,18 @@ const pathProblem = (value, placeholder) => {
   // chooses, including the protected ones the denylist just refused.
   if (!value.includes('/')) {
     return ['path names a file at the repository root', 'put a documentation path under a directory'];
+  }
+  // The same holds a level up, for a DIRECTORY the agent resolves: the checks above bound
+  // what a placeholder can reach only where some literal text pins the segment down, and
+  // the root is the one segment where resolving to `.git` or `node_modules` hits the real
+  // thing. A placeholder below a literal root stays contained, so `docs/epics/<slug>/` --
+  // the shipped epics default -- is unaffected. Any `<` left here opens a known token:
+  // the unknown-placeholder rule above has already rejected every other use.
+  if ((segmentsOf(value)[0] ?? '').includes(PLACEHOLDER_OPEN)) {
+    return [
+      'path lets a placeholder name a top-level directory',
+      'start the path with a literal directory, so the repository root is pinned down',
+    ];
   }
   if (placeholder !== null && !value.includes(placeholder)) {
     return [`path drops the ${placeholder} placeholder this row requires`, `keep ${placeholder} in the new path`];
@@ -397,7 +413,6 @@ export function applyLayoutOverrides({ moduleText, overrides }) {
 
 // A prefix of one segment is the docs root, which the map does not own.
 const MIN_PREFIX_SEGMENTS = 2;
-const PLACEHOLDER_OPEN = '<';
 
 /**
  * Derive the directory prefixes the map owns, by parsing the map itself -- each
