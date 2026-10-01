@@ -19,6 +19,20 @@ agentsmith                        (bare: TTY -> interactive wizard; non-TTY -> e
 Writes the generated instructions (and, unless `--no-tools`, the tool adapters) under the resolved scope's base directory.
 Prints the intended-effects plan, gates it through the confirmation rules below, then applies it and writes the install manifest.
 
+`install` takes one input beyond its flags: `<base>/.agentsmith/docs-layout.yaml`, the project's docs-layout remap (its shape and both row forms are in the [README](../../README.md#remapping-the-documentation-layout)).
+It is read after the scope's base is resolved and before any output is generated, so a bad config cannot produce a half-written tree; it is never created, modified, recorded in the install manifest, or removed by `uninstall`.
+An absent file, or one holding only comments and an empty `rows:`, means no overrides and changes nothing.
+A malformed one is a hard error: `<file>:<line>: <what is wrong>; <what is allowed>` on stderr, exit `1`, before the plan is printed and before anything is written, and the message never echoes the offending value.
+The same exit `1` fires when a non-blank config is present and the `#swe-docs-layout` rule is not in the generated instruction set — the arm that turns a silently non-applied override into a loud failure.
+
+On an install plan for any scope other than `user`, `install` asks `git check-ignore` whether that file is ignored and warns on stderr when it is, since the README's gitignore recipes deny `.agentsmith/` wholesale:
+
+```text
+agentsmith: warning -- .agentsmith/docs-layout.yaml is gitignored, so teammates will not get this layout. Add '!.agentsmith/docs-layout.yaml' after '.agentsmith/*' in .gitignore (see README).
+```
+
+The probe is advisory: the exit code stays `0`, and it is silent when the file is absent, already tracked, or git is unreachable.
+
 - `--scope <user|project|PATH>` -- which base directory the install tree roots at. Default `project`.
 - `--mode <single|split>` -- one inlined file vs. the lean core plus one file per on-demand bundle. Default `split`.
 - `--placement <root|nested>` -- core file at the base root vs. nested under `.agentsmith/` with a root stub. Default `nested`.
@@ -63,6 +77,10 @@ Generates the core content and prints it to stdout; writes nothing.
 It stays verb-free because every in-repo consumer invokes `node bin/cli.js --stdout` with no verb (the build script, tests, the triage UI, review prompts, the instruction-review skill), so keeping it top-level means zero call-site churn.
 
 Being a pure generate-and-print query, `--stdout` accepts only `--mode` and rejects scope or disk flags (`--scope`, `--placement`, `--clean`, `--yes`, `--dry-run`); combining it with them is a flag-validation error.
+
+It **reads no `.agentsmith/docs-layout.yaml`**, so it always prints the default `#swe-docs-layout` table, whatever config sits in the working directory.
+That follows from having no scope axis to read a config against, and it is what keeps agentsmith's own layout config out of the in-repo consumers above — the plugin build and the instruction-integrity test would otherwise take this repo's config as an input.
+`install --dry-run`, and the installed `.agentsmith/AGENTS.md`, are the two ways to see a remapped set.
 
 ```bash
 agentsmith --stdout
@@ -116,6 +134,16 @@ agentsmith plan:
 
 The scope reads `user`, `project`, or `folder` (a `--scope PATH`), matching what the flag takes; the path is always the resolved absolute base, whichever form was given.
 Deletes are listed in full, never truncated behind an ellipsis.
+
+An install plan whose scope carries a docs-layout config gains one further line, below the scope line, naming every effective remap:
+
+```text
+  layout  2 row(s) remapped from .agentsmith/docs-layout.yaml: swe-design-decisions -> docs/adr/<decision-slug>.md, swe-technical-debts -> external -- jira/ENG
+```
+
+It exists because the plan is otherwise blind to a content change inside a generated file: every other line names a path, not what goes in it.
+Rows appear in the order the config lists them, an external row reads `external -- <label>`, and the line is silent when there is no config or it yields no overrides.
+It is emitted on install plans only — an uninstall writes no map — and `install --clean` therefore carries it once, on the install plan it confirms after the uninstall plan.
 
 The gate then branches on whether the command is destructive:
 

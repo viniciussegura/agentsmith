@@ -1,12 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, writeFileSync, readFileSync, rmSync, mkdirSync, symlinkSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { cpSync, mkdtempSync, existsSync, writeFileSync, readFileSync, rmSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
+import { buildOutputs } from '../src/build.js';
+import { resolveSections } from '../src/sections.js';
+import { sourceRevision } from '../src/revision.js';
+import { makeListModules } from '../bin/cli.js';
 
 const cli = resolve(fileURLToPath(import.meta.url), '../../bin/cli.js');
+const pkgRoot = resolve(cli, '../..');
 
 function run(cwd, args = []) {
   execFileSync('node', [cli, 'install', ...args], { cwd });
@@ -375,4 +381,426 @@ test('install/uninstall never touch a simulated plugin-cache path', () => {
     execFileSync('node', [cli, 'uninstall', '--yes'], { cwd: dir });
     assert.equal(readFileSync(pluginFile, 'utf8'), 'PLUGIN', 'plugin cache untouched by install+uninstall');
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+// --- .agentsmith/docs-layout.yaml: the CLI properties (C1-C3, C5, C6, C9) -------
+// Project-dependent rule content: see the design decision `project-dependent-rule-content`.
+
+const CONFIG_REL = '.agentsmith/docs-layout.yaml';
+const CONFIG_HELP_LINE = 'reads .agentsmith/docs-layout.yaml to remap the docs layout; see README';
+const PLAN_MARKER = 'agentsmith plan:';
+// A value chosen not to occur in any message text, so the no-echo assertion cannot
+// be satisfied by a message that legitimately names a field, a tag or a rule word.
+const NEVER_IN_A_MESSAGE = 'zzqx-offending-value';
+
+// Spawn env built from a whitelist rather than inherited, so `--scope user` can
+// never reach the real ~/.agentsmith and no host git config can change a result.
+// GIT_CONFIG_NOSYSTEM is preferred over GIT_CONFIG_SYSTEM, which needs git >= 2.32.
+function isolatedEnv(t, home) {
+  const gitConfig = join(makeTempDir(t, 'agentsmith-gitcfg-'), 'gitconfig');
+  writeFileSync(gitConfig, '');
+  const env = { HOME: home, USERPROFILE: home, GIT_CONFIG_GLOBAL: gitConfig, GIT_CONFIG_NOSYSTEM: '1' };
+  // Carried through because a child node (and git) needs them on some platforms;
+  // none of them can redirect the config read or the probe.
+  for (const key of ['PATH', 'Path', 'SystemRoot', 'windir', 'SystemDrive', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR']) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  return env;
+}
+
+function writeConfig(base, text) {
+  const file = join(base, CONFIG_REL);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+  return file;
+}
+
+// A launchable copy of the package, so a test can vary the rule sources without
+// touching the repo. It sits outside any git repo, so sourceRevision takes its
+// documented no-git fallback identically in the child and in an in-process reference.
+const PKG_ENTRIES = ['bin', 'src', 'instructions', 'manifest.json', 'package.json'];
+function copyPackage(t) {
+  const dir = makeTempDir(t, 'agentsmith-pkg-');
+  for (const entry of PKG_ENTRIES) cpSync(join(pkgRoot, entry), join(dir, entry), { recursive: true });
+  return dir;
+}
+
+// Remove the external-note block from a rule module, line-based and deliberately
+// independent of src/docslayout.js: this is C1's reference side, derived from the
+// current source rather than frozen as a committed snapshot of a live rule module.
+const NOTE_OPEN = '<!-- agentsmith:external-note -->';
+const NOTE_CLOSE = '<!-- /agentsmith:external-note -->';
+function withoutNoteBlock(text) {
+  const lines = text.split('\n');
+  const open = lines.findIndex((l) => l.startsWith(NOTE_OPEN));
+  const close = lines.findIndex((l) => l.startsWith(NOTE_CLOSE));
+  if (open === -1 || close < open) return text;
+  const from = open > 0 && lines[open - 1] === '' ? open - 1 : open;
+  return [...lines.slice(0, from), ...lines.slice(close + 1)].join('\n');
+}
+
+const NO_CONFIG_ARGS = ['install', '--no-tools', '--yes'];
+
+test('C1: with no config, install writes exactly what a tree without the note block writes', (t) => {
+  const pkg = copyPackage(t);
+  const dir = makeTempDir(t, 'agentsmith-c1-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+
+  const ruleRel = 'instructions/core/swe/swe-docs-layout.md';
+  const ruleText = readFileSync(join(pkg, ruleRel), 'utf8');
+  assert.notEqual(withoutNoteBlock(ruleText), ruleText, 'the rule source carries the note block -- else this proves nothing');
+
+  execFileSync(process.execPath, [join(pkg, 'bin/cli.js'), ...NO_CONFIG_ARGS], { cwd: dir, env: isolatedEnv(t, home) });
+  assert.ok(!existsSync(join(dir, CONFIG_REL)), 'install never writes the config itself');
+
+  // Reference: the same tree, block removed, assembled by buildOutputs -- which the
+  // transform never reaches, since it is applied to the module texts handed to it.
+  const mf = JSON.parse(readFileSync(join(pkg, 'manifest.json'), 'utf8'));
+  const pkgVersion = JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8')).version;
+  const { coreModules, bundles } = resolveSections({ sections: mf.sections, listModules: makeListModules(pkg) });
+  const { commit, date } = sourceRevision({ pkgRoot: pkg, pkgVersion });
+  const stripped = (rel) => withoutNoteBlock(readFileSync(join(pkg, rel), 'utf8'));
+  const reference = buildOutputs({
+    preamble: readFileSync(join(pkg, mf.preamble), 'utf8'),
+    modules: coreModules.map(({ path, demote }) => ({ text: stripped(path), demote })),
+    bundles: bundles.map((b) => ({
+      name: b.name,
+      title: b.title,
+      when: b.when,
+      modules: b.modules.map(({ path, demote }) => ({ text: stripped(path), demote })),
+    })),
+    source: mf.source,
+    commit,
+    date,
+    layout: 'lean',
+    placement: 'nested',
+    output: mf.output,
+  });
+
+  assert.equal(readFileSync(join(dir, reference.corePath), 'utf8'), reference.coreContent, 'core file byte-identical');
+  assert.ok(reference.bundles.length > 0, 'the comparison covers at least one bundle');
+  for (const bundle of reference.bundles) {
+    assert.equal(readFileSync(join(dir, bundle.path), 'utf8'), bundle.content, `bundle byte-identical: ${bundle.path}`);
+  }
+  assert.equal(readFileSync(join(dir, reference.stub.path), 'utf8'), reference.stub.content, 'stub byte-identical');
+  assert.ok(!reference.coreContent.includes(NOTE_OPEN), 'no marker reaches the emitted core');
+});
+
+test('C2: a malformed config exits 1 before any write and before any plan', (t) => {
+  const dir = makeTempDir(t, 'agentsmith-c2-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  writeConfig(dir, [
+    'rows:',
+    '  swe-design-decisions:',
+    `    path: /${NEVER_IN_A_MESSAGE}/<decision-slug>.md`,
+    '',
+  ].join('\n'));
+
+  const r = spawnSync(process.execPath, [cli, ...NO_CONFIG_ARGS], { cwd: dir, env: isolatedEnv(t, home), encoding: 'utf8' });
+
+  assert.equal(r.status, 1, 'exit 1');
+  assert.match(r.stderr, /\.agentsmith\/docs-layout\.yaml:3:/, 'the message locates the file and the offending line');
+  assert.match(r.stderr, /no output was generated/, 'the message says no output was generated');
+  assert.ok(!r.stderr.includes(NEVER_IN_A_MESSAGE), 'no fragment of the offending value on stderr');
+  assert.ok(!r.stdout.includes(NEVER_IN_A_MESSAGE), 'no fragment of the offending value on stdout');
+  assert.ok(!r.stderr.includes(PLAN_MARKER), 'no plan printed');
+  assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'no core written');
+  assert.ok(!existsSync(join(dir, 'AGENTS.md')), 'no stub written');
+  assert.ok(!existsSync(join(dir, '.agentsmith/agents')), 'no bundles written');
+  assert.ok(!existsSync(join(dir, '.agentsmith/.install-manifest.json')), 'no manifest written');
+});
+
+test('C3: a config present while no module defines the rule exits 1', (t) => {
+  const pkg = copyPackage(t);
+  const dir = makeTempDir(t, 'agentsmith-c3-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+
+  // Rename the rule's own tag: the table still parses, but nothing self-selects, so
+  // every override would be silently dropped -- the failure this feature removes.
+  const rule = join(pkg, 'instructions/core/swe/swe-docs-layout.md');
+  const renamed = readFileSync(rule, 'utf8').replace('# #swe-docs-layout ', '# #swe-docs-elsewhere ');
+  assert.ok(renamed.includes('#swe-docs-elsewhere'), 'the heading tag was actually renamed');
+  writeFileSync(rule, renamed);
+  writeConfig(dir, 'rows:\n  swe-design-decisions:\n    path: docs/adr/<decision-slug>.md\n');
+
+  const r = spawnSync(process.execPath, [join(pkg, 'bin/cli.js'), ...NO_CONFIG_ARGS], { cwd: dir, env: isolatedEnv(t, home), encoding: 'utf8' });
+
+  assert.equal(r.status, 1, 'exit 1');
+  assert.match(r.stderr, /#swe-docs-layout rule is not in the generated instruction set/, 'the message says the rule was not found');
+  assert.match(r.stderr, /no output was generated/, 'the message says no output was generated');
+  assert.ok(!r.stderr.includes(PLAN_MARKER), 'no plan printed');
+  assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'no core written');
+});
+
+test('C5: --scope user reads the config under the redirected home, not the cwd', (t) => {
+  const dir = makeTempDir(t, 'agentsmith-c5-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  writeConfig(home, 'rows:\n  swe-design-decisions:\n    path: docs/adr/<decision-slug>.md\n');
+  // A config in the cwd that would fail every parse rule: a user-scope run must not read it.
+  writeConfig(dir, 'not-a-key\n');
+
+  execFileSync(process.execPath, [cli, 'install', '--scope', 'user', '--no-tools', '--yes'], { cwd: dir, env: isolatedEnv(t, home) });
+
+  const core = readFileSync(join(home, '.agentsmith/AGENTS.md'), 'utf8');
+  assert.match(core, /\| `docs\/adr\/<decision-slug>\.md` \| the standing/, 'the home config was read and applied');
+  assert.ok(!core.includes('`docs/design-decisions/<decision-slug>.md`'), 'the default path is gone from the map');
+  assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'nothing written to the cwd');
+});
+
+test('C6: --stdout output is unchanged by a config in the cwd', (t) => {
+  const plain = makeTempDir(t, 'agentsmith-c6a-');
+  const configured = makeTempDir(t, 'agentsmith-c6b-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  writeConfig(configured, 'rows:\n  swe-design-decisions:\n    path: docs/adr/<decision-slug>.md\n  swe-technical-debts:\n    external: jira/ENG\n');
+
+  const stdoutOf = (cwd) => {
+    const r = spawnSync(process.execPath, [cli, '--stdout'], { cwd, env: isolatedEnv(t, home), encoding: 'utf8', maxBuffer: 1024 * 1024 * 16 });
+    assert.equal(r.status, 0, 'exit 0');
+    return r.stdout;
+  };
+
+  const baseline = stdoutOf(plain);
+  assert.ok(baseline.length > 0, 'the query printed something');
+  assert.equal(stdoutOf(configured), baseline, '--stdout reads no config');
+  assert.ok(!baseline.includes('docs/adr/'), 'the override did not reach the printed set');
+  assert.ok(!baseline.includes(NOTE_OPEN) && !baseline.includes(NOTE_CLOSE), 'no note marker in the printed set');
+});
+
+test('C6: --stdout still emits both build warnings with a config present', (t) => {
+  const pkg = copyPackage(t);
+  const dir = makeTempDir(t, 'agentsmith-c6c-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  // The real tree raises neither warning, so plant one of each: the warnings are
+  // anchored to buildOutputs and must still run before the --stdout exit.
+  const planted = join(pkg, 'instructions/core/swe/swe-reuse.md');
+  writeFileSync(planted, `${readFileSync(planted, 'utf8')}\nPlanted: #c6-planted-dangling, and #be-api-first from a core rule.\n`);
+  writeConfig(dir, 'rows:\n  swe-future-work:\n    external: github/issues\n');
+
+  const r = spawnSync(process.execPath, [join(pkg, 'bin/cli.js'), '--stdout'], { cwd: dir, env: isolatedEnv(t, home), encoding: 'utf8', maxBuffer: 1024 * 1024 * 16 });
+
+  assert.equal(r.status, 0, 'exit 0');
+  assert.ok(r.stdout.length > 0, 'the query still printed');
+  assert.match(r.stderr, /warning -- unresolved #tag references: [^\n]*c6-planted-dangling/, 'dangling-tag warning still emitted');
+  assert.match(r.stderr, /warning -- core rule references a bundle-only #tag: [^\n]*be-api-first/, 'cross-boundary warning still emitted');
+});
+
+test('C9: install --help carries the config line', () => {
+  const out = execFileSync(process.execPath, [cli, 'install', '--help'], { encoding: 'utf8' });
+  assert.ok(out.includes(CONFIG_HELP_LINE), 'the discovery line is in install --help');
+});
+
+
+// --- C4 and C7: the plan line and the gitignore probe ---------------------------
+
+const TWO_ROW_CONFIG = 'rows:\n  swe-design-decisions:\n    path: docs/adr/<decision-slug>.md\n  swe-technical-debts:\n    external: jira/ENG\n';
+const LAYOUT_LINE = '  layout  2 row(s) remapped from .agentsmith/docs-layout.yaml: swe-design-decisions -> docs/adr/<decision-slug>.md, swe-technical-debts -> external -- jira/ENG';
+const IGNORE_WARNING = "agentsmith: warning -- .agentsmith/docs-layout.yaml is gitignored, so teammates will not get this layout. Add '!.agentsmith/docs-layout.yaml' after '.agentsmith/*' in .gitignore (see README).";
+const README_RECIPE = '.agentsmith/*\n!.agentsmith/docs-layout.yaml\n';
+
+const agentsmith = (cwd, args, env) => spawnSync(process.execPath, [cli, ...args], { cwd, env, encoding: 'utf8' });
+const countOf = (text, needle) => text.split(needle).length - 1;
+
+// Every case variant of PATH is dropped, then PATH is pointed at an empty directory.
+// Dropping it alone is not enough on Windows: the OS re-supplies the machine PATH to a
+// child that has none, so git would still resolve and the test would prove nothing.
+function withPathToEmptyDir(env, emptyDir) {
+  const rest = Object.entries(env).filter(([key]) => key.toLowerCase() !== 'path');
+  return { ...Object.fromEntries(rest), PATH: emptyDir };
+}
+
+function gitRepo(t, prefix, env, gitignore) {
+  const dir = makeTempDir(t, prefix);
+  const init = spawnSync('git', ['init', '-q'], { cwd: dir, env, encoding: 'utf8' });
+  assert.equal(init.status, 0, `git init in the temp dir: ${init.stderr}`);
+  if (gitignore !== undefined) writeFileSync(join(dir, '.gitignore'), gitignore);
+  return dir;
+}
+
+const checkIgnored = (dir, env) => spawnSync('git', ['check-ignore', '-q', '--', join(dir, CONFIG_REL)], { cwd: dir, env }).status;
+
+test('C4: an install plan carries the layout line once; the config stays out of the manifest', (t) => {
+  const dir = makeTempDir(t, 'agentsmith-c4a-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  writeConfig(dir, TWO_ROW_CONFIG);
+
+  const r = agentsmith(dir, NO_CONFIG_ARGS, isolatedEnv(t, home));
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(countOf(r.stderr, LAYOUT_LINE), 1, 'the layout line appears exactly once');
+  assert.ok(r.stderr.split('\n').includes(LAYOUT_LINE), 'in the external -- <label> form, on its own line');
+  assert.ok(r.stderr.indexOf(LAYOUT_LINE) > r.stderr.indexOf(PLAN_MARKER), 'inside the plan');
+  const manifestText = readFileSync(join(dir, '.agentsmith/.install-manifest.json'), 'utf8');
+  assert.ok(!manifestText.includes('docs-layout.yaml'), 'the config is never in the manifest');
+  assert.ok(existsSync(join(dir, CONFIG_REL)), 'the config is still on disk');
+});
+
+test('C4: no config means no layout line', (t) => {
+  const dir = makeTempDir(t, 'agentsmith-c4b-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const r = agentsmith(dir, NO_CONFIG_ARGS, isolatedEnv(t, home));
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!r.stderr.includes('  layout  '), 'silent when nothing is remapped');
+});
+
+test('C4: an uninstall plan carries no layout line and leaves the config in place', (t) => {
+  const dir = makeTempDir(t, 'agentsmith-c4c-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  writeConfig(dir, TWO_ROW_CONFIG);
+  assert.equal(agentsmith(dir, NO_CONFIG_ARGS, env).status, 0);
+
+  const r = agentsmith(dir, ['uninstall', '--yes'], env);
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.stderr.includes(PLAN_MARKER), 'the uninstall plan was printed');
+  assert.ok(!r.stderr.includes('  layout  '), 'no layout line on an uninstall plan');
+  assert.ok(existsSync(join(dir, CONFIG_REL)), 'uninstall leaves the config on disk');
+  assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'the uninstall really ran');
+});
+
+test('C4: install --clean carries the layout line once, on the install plan it confirms second', (t) => {
+  const dir = makeTempDir(t, 'agentsmith-c4d-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  writeConfig(dir, TWO_ROW_CONFIG);
+  assert.equal(agentsmith(dir, NO_CONFIG_ARGS, env).status, 0);
+
+  const r = agentsmith(dir, [...NO_CONFIG_ARGS, '--clean'], env);
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(countOf(r.stderr, PLAN_MARKER), 2, 'two plans: uninstall, then install');
+  assert.equal(countOf(r.stderr, LAYOUT_LINE), 1, 'the layout line appears exactly once');
+  assert.ok(r.stderr.indexOf(LAYOUT_LINE) > r.stderr.lastIndexOf(PLAN_MARKER), 'and it sits on the second (install) plan');
+  assert.ok(existsSync(join(dir, CONFIG_REL)), 'install --clean leaves the config on disk');
+  const core = readFileSync(join(dir, '.agentsmith/AGENTS.md'), 'utf8');
+  assert.match(core, /external -- `jira\/ENG`/, 'the clean install wrote the remapped map the line disclosed');
+});
+
+test('C7: a present, gitignored config warns on stderr and exits 0', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const dir = gitRepo(t, 'agentsmith-c7a-', env, '.agentsmith/*\n');
+  writeConfig(dir, TWO_ROW_CONFIG);
+
+  const r = agentsmith(dir, NO_CONFIG_ARGS, env);
+
+  assert.equal(r.status, 0, 'a warning never fails the run');
+  assert.equal(countOf(r.stderr, IGNORE_WARNING), 1, 'the exact warning, once');
+  assert.ok(!r.stdout.includes('gitignored'), 'not on stdout');
+});
+
+test('C7: the warning precedes the confirmation, so --dry-run shows it without writing', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const dir = gitRepo(t, 'agentsmith-c7b-', env, '.agentsmith/*\n');
+  writeConfig(dir, TWO_ROW_CONFIG);
+
+  const r = agentsmith(dir, ['install', '--no-tools', '--dry-run'], env);
+
+  assert.equal(r.status, 0);
+  assert.equal(countOf(r.stderr, IGNORE_WARNING), 1);
+  assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'nothing was written');
+});
+
+test('C7: no config means no warning, even in an ignoring repo', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const dir = gitRepo(t, 'agentsmith-c7c-', env, '.agentsmith/*\n');
+
+  const r = agentsmith(dir, NO_CONFIG_ARGS, env);
+
+  assert.equal(r.status, 0);
+  assert.ok(!r.stderr.includes('gitignored'));
+});
+
+test('C7: a tracked config is silent even when a pattern matches it', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const dir = gitRepo(t, 'agentsmith-c7d-', env, '.agentsmith/*\n');
+  writeConfig(dir, TWO_ROW_CONFIG);
+  const add = spawnSync('git', ['add', '-f', '--', CONFIG_REL], { cwd: dir, env, encoding: 'utf8' });
+  assert.equal(add.status, 0, add.stderr);
+  assert.equal(checkIgnored(dir, env), 1, 'git reports a tracked file as not ignored');
+
+  const r = agentsmith(dir, NO_CONFIG_ARGS, env);
+
+  assert.equal(r.status, 0);
+  assert.ok(!r.stderr.includes('gitignored'));
+});
+
+test("C7: the README's re-admit recipe reads the config as not ignored, and silences the warning", (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const dir = gitRepo(t, 'agentsmith-c7e-', env, '.agentsmith/*\n');
+  writeConfig(dir, TWO_ROW_CONFIG);
+  assert.equal(checkIgnored(dir, env), 0, 'without the re-admit line the config is ignored');
+
+  writeFileSync(join(dir, '.gitignore'), README_RECIPE);
+  assert.equal(checkIgnored(dir, env), 1, 'with the recipe, git reports the config not ignored');
+
+  const r = agentsmith(dir, NO_CONFIG_ARGS, env);
+  assert.equal(r.status, 0);
+  assert.ok(!r.stderr.includes('gitignored'), 'the documented fix silences the warning');
+});
+
+test('C7: git unavailable is silent and non-fatal', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const dir = gitRepo(t, 'agentsmith-c7f-', env, '.agentsmith/*\n');
+  writeConfig(dir, TWO_ROW_CONFIG);
+  assert.equal(countOf(agentsmith(dir, ['install', '--no-tools', '--dry-run'], env).stderr, IGNORE_WARNING), 1, 'the same repo warns when git is reachable');
+
+  const r = agentsmith(dir, NO_CONFIG_ARGS, withPathToEmptyDir(env, makeTempDir(t, 'agentsmith-nogit-')));
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!r.stderr.includes('gitignored'), 'no warning without git');
+  assert.ok(existsSync(join(dir, '.agentsmith/AGENTS.md')), 'the install still completed');
+});
+
+test('C7: a config outside any git repo is a silent skip', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const dir = makeTempDir(t, 'agentsmith-c7g-');
+  // Stops git walking up into a repo that happens to contain the temp dir.
+  const env = { ...isolatedEnv(t, home), GIT_CEILING_DIRECTORIES: dirname(dir) };
+  writeConfig(dir, TWO_ROW_CONFIG);
+
+  const r = agentsmith(dir, NO_CONFIG_ARGS, env);
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!r.stderr.includes('gitignored'));
+});
+
+test('C7: an uninstall is silent, and install --clean warns once, on its install plan', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const dir = gitRepo(t, 'agentsmith-c7h-', env, '.agentsmith/*\n');
+  writeConfig(dir, TWO_ROW_CONFIG);
+  assert.equal(agentsmith(dir, NO_CONFIG_ARGS, env).status, 0);
+
+  const clean = agentsmith(dir, [...NO_CONFIG_ARGS, '--clean'], env);
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.equal(countOf(clean.stderr, IGNORE_WARNING), 1, 'one warning across both plans');
+  assert.ok(clean.stderr.indexOf(IGNORE_WARNING) > clean.stderr.indexOf('DELETE'), 'after the uninstall plan');
+
+  const uninstall = agentsmith(dir, ['uninstall', '--yes'], env);
+  assert.equal(uninstall.status, 0, uninstall.stderr);
+  assert.ok(!uninstall.stderr.includes('gitignored'), 'no warning on an uninstall');
+});
+
+test('C7: --scope user skips the probe entirely', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const init = spawnSync('git', ['init', '-q'], { cwd: home, env, encoding: 'utf8' });
+  assert.equal(init.status, 0, init.stderr);
+  writeFileSync(join(home, '.gitignore'), '.agentsmith/*\n');
+  writeConfig(home, TWO_ROW_CONFIG);
+  assert.equal(checkIgnored(home, env), 0, 'a probe of this config would warn');
+  const dir = makeTempDir(t, 'agentsmith-c7i-');
+
+  const r = agentsmith(dir, ['install', '--scope', 'user', '--no-tools', '--yes'], env);
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!r.stderr.includes('gitignored'), 'no probe at user scope');
+  assert.ok(r.stderr.includes(LAYOUT_LINE), 'the layout line is still disclosed');
 });

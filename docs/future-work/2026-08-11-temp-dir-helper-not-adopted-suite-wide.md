@@ -5,13 +5,15 @@ Recorded 2026-08-11, during the temp-directory cleanup fix (`fix/test-temp-dir-c
 ## What
 
 `test-helpers/tmp-dir.mjs` exports `makeTempDir(t, prefix)`, which creates a temp directory and registers its removal on the `node:test` context.
-Three test files use it: `test/spec-review-guard.test.js`, `test/review-persist.test.js`, `test/triage-server.test.mjs`.
+Five test files use it: `test/spec-review-guard.test.js`, `test/review-persist.test.js`, `test/triage-server.test.mjs`, and -- added by the 2026-09-30 docs-layout-config unit -- `test/cli.test.js` and `test/docslayout.test.js`.
 
-Nine others still create temp directories with a local `try`/`finally`, roughly 45 `mkdtempSync` call sites in total:
+Nine still create temp directories with a local `try`/`finally`, roughly 54 `mkdtempSync` call sites in total.
+**`test/cli.test.js` now carries both idioms**: its pre-existing tests use `mkdtempSync` with inline `try`/`finally`, while the docs-layout-config tests appended to it use `makeTempDir`.
+That is a sharper form of the same defect this note records -- two implementations of one concept inside a single file -- and it makes converting that file more valuable, not less, because the target idiom is already present to copy.
 
 | File | `mkdtempSync` calls | Shape |
 | --- | --- | --- |
-| `test/cli.test.js` | 30 | inline `try`/`finally` per test |
+| `test/cli.test.js` | 31 | mixed: inline `try`/`finally` per test, plus `makeTempDir` in the docs-layout-config tests |
 | `test/round-guard.test.mjs` | 4 | inline `try`/`finally` per test |
 | `test/execute.test.js` | 2 | inline `try`/`finally` per test |
 | `test/list-modules.test.js` | 2 | inline `try`/`finally` per test |
@@ -37,7 +39,8 @@ The next new test file is where that guess gets made, and copying the `try`/`fin
 Migrate the nine to `makeTempDir(t, prefix)` in a follow-up branch, deleting `inTempDirs` and `tmp()` as their call sites convert.
 Each test signature gains the `t` parameter; each `try`/`finally` collapses to a single call.
 
-Convert `test/cli.test.js` on its own -- at 30 call sites it is two thirds of the work and carries all of the review risk.
+Convert `test/cli.test.js` on its own -- at 31 call sites it is over half the work and carries all of the review risk.
+It is also the only file where the target idiom already sits beside the one being replaced, so the conversion is a local pattern match rather than a fresh decision.
 
 ## Constraints
 

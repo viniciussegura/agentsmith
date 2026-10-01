@@ -52,26 +52,31 @@ A plugin-only install ships the commands but not the binary; its `npx` fallback 
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
 Before writing anything, it prints the intended-effects plan — naming the scope and the absolute base directory every path is relative to — and, on a TTY without `--yes`, asks for confirmation.
+Where the project carries a `.agentsmith/docs-layout.yaml` ([Remapping the documentation layout](#remapping-the-documentation-layout)), `install` reads it and the plan names every remapped row.
 
 **Gitignore the working state.** `install` does not modify your `.gitignore`, and everything agentsmith writes under `.agentsmith/` besides the generated instructions is per-machine working state — the working-spec store (`#ai-plan`), the review-board issue store, scratch, and the install manifest.
-Several rules depend on these never being committed; the working-spec store in particular is defeated entirely if it lands in version control.
+The one stated exception is `.agentsmith/docs-layout.yaml`: a team decision you author and commit, which `install` only ever reads.
+Several rules depend on the working state never being committed; the working-spec store in particular is defeated entirely if it lands in version control.
 
-If you do **not** commit the generated instructions, ignore the directory:
+If you do **not** commit the generated instructions, deny the directory and re-admit the layout config:
 
 ```gitignore
-.agentsmith/
+.agentsmith/*
+!.agentsmith/docs-layout.yaml
 ```
 
-If you **do** commit them (so teammates and CI get the set without running the installer), deny the directory and re-admit just those two paths:
+If you **do** commit them (so teammates and CI get the set without running the installer), re-admit the generated paths too:
 
 ```gitignore
 .agentsmith/*
 !.agentsmith/AGENTS.md
 !.agentsmith/agents/
+!.agentsmith/docs-layout.yaml
 ```
 
 Note the `/*` — `.agentsmith/` on its own cannot be paired with `!` exceptions, because git will not re-include a file whose parent directory is excluded.
-Both forms are deny-by-default, so a working-state directory added by a future version is ignored without your `.gitignore` needing an edit.
+Both forms are deny-by-default, so a working-**state** directory added by a future version is ignored without your `.gitignore` needing an edit.
+A *committed* file a later version adds does need the edit — the `!.agentsmith/docs-layout.yaml` line is exactly that case.
 
 ```bash
 agentsmith install                    # project scope, default mode/placement
@@ -104,6 +109,41 @@ agentsmith --stdout --mode single
 The adapter install is non-destructive: it writes only the adapter's own files
 (e.g. `.claude/skills/spec-review-board/`) and never touches the rest of your
 `.claude/`.
+
+### Remapping the documentation layout
+
+The `#swe-docs-layout` rule ships a table of five documentation locations, each defaulting to a directory under `docs/`.
+A project whose real layout differs declares it in `.agentsmith/docs-layout.yaml`, and `install` emits that table describing the project's layout instead of agentsmith's defaults — so every rule citing the map tells an agent the truth about this repo.
+
+The file is yours: `install` reads it, never creates or modifies it, and `uninstall` leaves it in place.
+Rows are keyed by the bare owner tag of the row being remapped, and each row declares exactly one of two forms:
+
+- **`path:`** — *relocated*: this record type lives at a different path in the repo.
+- **`external:`** — *external*: this record type is served by a tracker, so an item is registered there instead of a file being written here. Only two rows are eligible: `swe-technical-debts` and `swe-future-work`.
+
+```yaml
+# .agentsmith/docs-layout.yaml
+rows:
+  swe-design-decisions:
+    path: docs/adr/<decision-slug>.md
+  swe-technical-debts:
+    external: jira/ENG
+```
+
+Indentation is exact: `rows:` at column 0, a row key at two spaces, a field at four.
+With that file in place, `agentsmith install` discloses the remap on the plan it asks you to confirm:
+
+```text
+  layout  2 row(s) remapped from .agentsmith/docs-layout.yaml: swe-design-decisions -> docs/adr/<decision-slug>.md, swe-technical-debts -> external -- jira/ENG
+```
+
+The emitted table then reads `` `docs/adr/<decision-slug>.md` `` for the design-decisions row and ``external -- `jira/ENG` `` for the technical-debts row, and the map gains a paragraph telling an agent to register, scan, update, and close in that tracker wherever the owner rule names a file.
+
+Parsing is deny-by-default: an unknown key, an unknown owner tag, a row declaring both forms or neither, a duplicate row, wrong indentation, or a path or label outside the allowed characters is an error naming the file and line, exit `1`, with nothing written.
+The config arrives with any clone or pull request and its values become instruction text an agent reads, so that strictness is a security boundary rather than an ergonomic check.
+`agentsmith --stdout` deliberately reads no config and always prints the defaults; `agentsmith install --dry-run` is the way to preview a remapped set.
+
+Because both gitignore recipes above deny `.agentsmith/` wholesale, the config needs its `!.agentsmith/docs-layout.yaml` re-admit or teammates never receive it — `install` warns when git reports the file ignored.
 
 **Coexisting with a project instruction file.** A project may ship its own instruction file alongside the generated set; on conflict the project file wins (except the safety baseline). When a project file restates a rule the generated set already owns, reference its `#tag` rather than paraphrasing it -- a paraphrase silently goes stale when the canonical rule is edited.
 
