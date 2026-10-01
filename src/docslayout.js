@@ -22,7 +22,11 @@ export const ROW_POLICY = {
   'swe-future-work': { external: true, placeholder: null },
   'swe-reference-spec': { external: false, placeholder: '<name>' },
   'swe-design-decisions': { external: false, placeholder: '<decision-slug>' },
-  'swe-epic': { external: false, placeholder: null },
+  // `<slug>` is required, not optional: #swe-epic mandates fixed children per
+  // epic directory (README.md, roadmap.md, open-questions.md), so a path without
+  // the slug collapses every epic into one directory and the second overwrites
+  // the first. It is a directory-per-record row, not a file-per-record one.
+  'swe-epic': { external: false, placeholder: '<slug>' },
 };
 
 const fail = (why) => new Error(`${MODULE_NAME}: ${why}`);
@@ -79,6 +83,7 @@ const PROTECTED_BASENAMES = new Set(['agents.md', 'claude.md', 'gemini.md', 'pac
 const ROWS_KEY = 'rows:';
 const TOP_LEVEL_KEY = /^[A-Za-z_][\w-]*:/;
 const ROW_KEY = /^([a-z][a-z0-9-]*):$/;
+const HASHED_ROW_KEY = /^[ \t]*#[a-z][a-z0-9-]*:[ \t]*$/;
 const FIELD_LINE = /^([a-z]+):(?: +(.*))?$/;
 const ROW_INDENT = 2;
 const FIELD_INDENT = 4;
@@ -163,9 +168,21 @@ const pathProblem = (value, placeholder) => {
       'use segments of letters, digits, dot, underscore and hyphen, each starting with a letter or digit, with no .. and no node_modules',
     ];
   }
-  const basename = substituted.split('/').filter(Boolean).at(-1).toLowerCase();
-  if (PROTECTED_BASENAMES.has(basename)) {
-    return ['path names an instruction or manifest file', 'those files cannot be a remap target'];
+  // The denylist is checked against the segment with placeholders ELIDED as well as
+  // substituted: `AGENTS<name>.md` substitutes to `AGENTS0.md` and slips past, but a
+  // reader resolving `<name>` to nothing lands on the protected file. Checked before
+  // the root rule below, so naming a protected file says so rather than blaming depth.
+  const finalSegment = (s) => s.split('/').filter(Boolean).at(-1) ?? '';
+  const elided = PLACEHOLDER_TOKENS.reduce((acc, token) => acc.replaceAll(token, ''), value);
+  for (const candidate of [finalSegment(substituted), finalSegment(elided)]) {
+    if (PROTECTED_BASENAMES.has(candidate.toLowerCase())) {
+      return ['path names an instruction or manifest file', 'those files cannot be a remap target'];
+    }
+  }
+  // A bare placeholder at the repository root resolves to any filename the agent
+  // chooses, including the protected ones the denylist just refused.
+  if (!value.includes('/')) {
+    return ['path names a file at the repository root', 'put a documentation path under a directory'];
   }
   if (placeholder !== null && !value.includes(placeholder)) {
     return [`path drops the ${placeholder} placeholder this row requires`, `keep ${placeholder} in the new path`];
@@ -174,13 +191,21 @@ const pathProblem = (value, placeholder) => {
 };
 
 /** @returns {[string, string] | null} */
-const externalProblem = (value) =>
-  EXTERNAL_LABEL.test(value)
-    ? null
-    : [
-        'external label is not valid',
-        'use 1 to 40 characters of letters, digits, dot, underscore, slash and hyphen, starting with a letter or digit, with no spaces',
-      ];
+const externalProblem = (value) => {
+  if (!EXTERNAL_LABEL.test(value)) {
+    return [
+      'external label is not valid',
+      'use 1 to 40 characters of letters, digits, dot, underscore, slash and hyphen, starting with a letter or digit, with no spaces',
+    ];
+  }
+  // The charset admits `/` and `.`, so a label can read exactly like a path. The
+  // note tells the agent a label is a hint and not an address, but a label shaped
+  // like a traversal is the one most likely to be treated as one anyway.
+  if (value.includes('..') || value.split('/').includes(FORBIDDEN_SEGMENT)) {
+    return ['external label looks like a filesystem path', 'name the system or its project key, with no .. and no node_modules'];
+  }
+  return null;
+};
 
 /**
  * Parse `.agentsmith/docs-layout.yaml` with deny-by-default rules.
@@ -229,6 +254,13 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
 
   lines.forEach((raw, index) => {
     const lineNo = index + 1;
+    // A row key written with its leading `#` is a mistake, not a comment, and it is
+    // the mistake the surfaces invite: every other agentsmith surface -- including
+    // this module's own unknown-tag message -- spells these tags as `#swe-...`.
+    // Swallowing it as a comment yields a silent no-op remap.
+    if (HASHED_ROW_KEY.test(raw)) {
+      throw error(lineNo, 'row key is written with a leading #', 'write the owner tag bare, without the #');
+    }
     if (raw === '' || /^\s*#/.test(raw)) return;
 
     const leading = /^[ \t]*/.exec(raw)[0];

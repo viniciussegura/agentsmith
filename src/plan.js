@@ -66,7 +66,9 @@ export function buildUninstallPlan({ base, absolute, scope, manifestPaths, coreP
   return { base, absolute, scope, ops, manifestPaths: [] };
 }
 
-// One rendering of the external form, matching the table cell (#swe-terminology).
+// One wording for the external form, `external -- <label>`, shared with the table
+// cell (#swe-terminology). The cell wraps the label in a code span; plan output is
+// plain text, so the backticks are the cell's and not part of the wording.
 const describeRemap = (override) => ('external' in override ? `external -- ${override.external}` : override.path);
 
 const REL = (p) => p.replace(/\\/g, '/');
@@ -101,7 +103,7 @@ export function renderPlan(plan) {
     const entries = Object.entries(plan.layout.overrides);
     lines.push(`  layout  ${entries.length} row(s) remapped from ${plan.layout.file}: ${entries.map(([tag, o]) => `${tag} -> ${describeRemap(o)}`).join(', ')}`);
   }
-  if (writes.length) lines.push(`  write  ${writes.length} file(s): ${writes.slice(0, 3).join(', ')}${writes.length > 3 ? ', ...' : ''}`);
+  if (writes.length) lines.push(`  write   ${writes.length} file(s): ${writes.slice(0, 3).join(', ')}${writes.length > 3 ? ', ...' : ''}`);
   for (const u of updates) lines.push(`  update  ${u}`);
   // Deletes are the dangerous class -- list every one so a destructive confirmation
   // never hides a file behind a truncating '...'. Writes stay capped (safe, additive).

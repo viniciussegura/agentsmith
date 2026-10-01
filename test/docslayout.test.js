@@ -59,7 +59,7 @@ test('ROW_POLICY carries the shipped eligibility and required placeholders', () 
     'swe-future-work': { external: true, placeholder: null },
     'swe-reference-spec': { external: false, placeholder: '<name>' },
     'swe-design-decisions': { external: false, placeholder: '<decision-slug>' },
-    'swe-epic': { external: false, placeholder: null },
+    'swe-epic': { external: false, placeholder: '<slug>' },
   });
 });
 
@@ -122,23 +122,23 @@ test('U5 every malformed config shape is rejected with the exact line and a non-
   const cases = [
     ['unknown top-level key', lines('# c', 'rows:', `${SYNTHETIC}: x`), 3, 'unknown top-level key'],
     ['unknown tag', lines('rows:', `  ${SYNTHETIC}:`, '    path: docs/a/'), 2, `valid tags are ${VALID_TAGS}`],
-    ['unknown field', rowsWith('swe-epic', `${SYNTHETIC}: x`), 3, 'unknown field'],
+    ['unknown field', rowsWith('swe-technical-debts', `${SYNTHETIC}: x`), 3, 'unknown field'],
     ['both fields', rowsWith('swe-future-work', 'path: docs/a/', `external: ${SYNTHETIC}`), 4, 'both path and external'],
-    ['neither field', lines('rows:', '  swe-epic:', '  swe-future-work:', '    path: docs/a/'), 2, 'neither path nor external'],
-    ['neither field at end of file', lines('rows:', '', '  swe-epic:'), 3, 'neither path nor external'],
-    ['duplicate row key', lines('rows:', '  swe-epic:', `    path: docs/${SYNTHETIC}/`, '  swe-epic:', '    path: docs/b/'), 4, 'duplicate row key'],
-    ['duplicate field', rowsWith('swe-epic', `path: docs/${SYNTHETIC}/`, 'path: docs/b/'), 4, 'duplicate field'],
+    ['neither field', lines('rows:', '  swe-technical-debts:', '  swe-future-work:', '    path: docs/a/'), 2, 'neither path nor external'],
+    ['neither field at end of file', lines('rows:', '', '  swe-technical-debts:'), 3, 'neither path nor external'],
+    ['duplicate row key', lines('rows:', '  swe-technical-debts:', `    path: docs/${SYNTHETIC}/`, '  swe-technical-debts:', '    path: docs/b/'), 4, 'duplicate row key'],
+    ['duplicate field', rowsWith('swe-technical-debts', `path: docs/${SYNTHETIC}/`, 'path: docs/b/'), 4, 'duplicate field'],
     ['duplicate rows key', lines('rows:', 'rows:'), 2, 'duplicate rows: key'],
-    ['row key at 3 spaces', lines('rows:', '   swe-epic:'), 2, 'wrong indentation'],
-    ['field at 5 spaces', lines('rows:', '  swe-epic:', `     path: docs/${SYNTHETIC}/`), 3, 'wrong indentation'],
-    ['field at 2 spaces', lines('rows:', '  swe-epic:', `  path: docs/${SYNTHETIC}/`), 3, 'not a recognized entry'],
+    ['row key at 3 spaces', lines('rows:', '   swe-technical-debts:'), 2, 'wrong indentation'],
+    ['field at 5 spaces', lines('rows:', '  swe-technical-debts:', `     path: docs/${SYNTHETIC}/`), 3, 'wrong indentation'],
+    ['field at 2 spaces', lines('rows:', '  swe-technical-debts:', `  path: docs/${SYNTHETIC}/`), 3, 'not a recognized entry'],
     ['field with no row', lines('rows:', `    path: docs/${SYNTHETIC}/`), 2, 'wrong indentation'],
     ['tab indent on a row key', lines('rows:', `\t${SYNTHETIC}:`), 2, 'tab'],
-    ['tab indent on a field', lines('rows:', '  swe-epic:', `\t\tpath: docs/${SYNTHETIC}/`), 3, 'tab'],
+    ['tab indent on a field', lines('rows:', '  swe-technical-debts:', `\t\tpath: docs/${SYNTHETIC}/`), 3, 'tab'],
     ['junk line at top level', lines('', `${SYNTHETIC} ${SYNTHETIC}`), 2, 'not a recognized entry'],
-    ['junk row key with a value', lines('rows:', `  swe-epic: ${SYNTHETIC}`), 2, 'not a recognized entry'],
-    ['junk field line', rowsWith('swe-epic', `- ${SYNTHETIC}`), 3, 'not a recognized entry'],
-    ['value continued on a new line', lines('rows:', '  swe-epic:', '    path: docs/a/', SYNTHETIC), 4, 'not a recognized entry'],
+    ['junk row key with a value', lines('rows:', `  swe-technical-debts: ${SYNTHETIC}`), 2, 'not a recognized entry'],
+    ['junk field line', rowsWith('swe-technical-debts', `- ${SYNTHETIC}`), 3, 'not a recognized entry'],
+    ['value continued on a new line', lines('rows:', '  swe-technical-debts:', '    path: docs/a/', SYNTHETIC), 4, 'not a recognized entry'],
     ['over-size file', '# padding\n'.repeat(Math.ceil(MAX_CONFIG_BYTES / 10) + 1), 1, 'larger than 64 KiB'],
     ...['swe-reference-spec', 'swe-epic', 'swe-design-decisions'].map((tag) => [
       `external on ineligible ${tag}`,
@@ -250,7 +250,7 @@ test('U6 an empty path or external value is rejected', () => {
 });
 
 test('U6 a newline ends the value, so the continuation is rejected on its own line', () => {
-  assertRejected(lines(rowsWith('swe-epic', 'path: docs/a/'), `${SYNTHETIC}/b`), { line: 4, includes: 'not a recognized entry' }, 'newline');
+  assertRejected(lines(rowsWith('swe-technical-debts', 'path: docs/a/'), `${SYNTHETIC}/b`), { line: 4, includes: 'not a recognized entry' }, 'newline');
 });
 
 test('U6 rejected external labels', () => {
@@ -646,4 +646,56 @@ test('C8 the lints can fail over this harness: a core reference to a bundle-only
   const bundleTexts = built.bundles.map((b) => b.content);
   assert.deepEqual(danglingTags({ coreText: built.coreContent, bundleTexts }), ['no-such-tag-xyz']);
   assert.ok(coreToBundleRefs({ coreText: built.coreContent, bundleTexts }).some((c) => c.tag === 'be-api-first'));
+});
+
+// Regressions from the PR #26 code review. Each defect below shipped because no
+// property probed the policy table's edges, so each gets one here.
+
+test('a path hiding a protected name behind a placeholder is rejected', () => {
+  // `AGENTS<name>.md` substitutes to `AGENTS0.md` and passed the denylist, but a
+  // reader resolving `<name>` to nothing lands on the file the denylist protects.
+  for (const value of ['AGENTS<name>.md', 'CLAUDE.md<name>', 'docs/x/AGENTS<name>.md', 'docs/x/<name>CLAUDE.md']) {
+    assertRejected(rowsWith('swe-reference-spec', `path: ${value}`),
+      { line: 3, includes: 'instruction or manifest file' }, value);
+  }
+});
+
+test('a path with no directory segment is rejected', () => {
+  // A bare placeholder at the repository root resolves to any filename at all.
+  for (const value of ['<name>', 'README.md']) {
+    assertRejected(rowsWith('swe-reference-spec', `path: ${value}`),
+      { line: 3, includes: 'repository root' }, value);
+  }
+});
+
+test('the swe-epic row requires <slug>, because an epic is a directory per record', () => {
+  assertRejected(rowsWith('swe-epic', 'path: docs/initiatives/'),
+    { line: 3, includes: 'drops the <slug> placeholder' }, 'epic without a slug');
+  assert.deepEqual(
+    parse(rowsWith('swe-epic', 'path: docs/initiatives/<slug>/')),
+    { 'swe-epic': { path: 'docs/initiatives/<slug>/' } },
+  );
+});
+
+test('an external label shaped like a filesystem path is rejected', () => {
+  for (const value of ['a/../../../etc/passwd', 'node_modules', 'x/..']) {
+    assertRejected(rowsWith('swe-technical-debts', `external: ${value}`),
+      { line: 3, includes: 'looks like a filesystem path' }, value);
+  }
+  assert.deepEqual(
+    parse(rowsWith('swe-technical-debts', 'external: jira/ENG')),
+    { 'swe-technical-debts': { external: 'jira/ENG' } },
+  );
+});
+
+test('a row key written with its leading # is an error, not a silent comment', () => {
+  // Swallowing it as a comment yielded exit 0 and a silently unremapped install,
+  // and every agentsmith surface -- including this module's own unknown-tag
+  // message -- spells these tags as `#swe-...`, so it is the invited mistake.
+  assertRejected(lines('rows:', '  #swe-design-decisions:', '    path: docs/adr/<decision-slug>.md'),
+    { line: 2, includes: 'row key is written with a leading #' }, 'hashed row key');
+  assert.deepEqual(
+    parse(lines('rows:', '  # a note', '  swe-future-work:', '    path: docs/later/')),
+    { 'swe-future-work': { path: 'docs/later/' } },
+  );
 });

@@ -239,8 +239,13 @@ async function main() {
     if (cmd.scope.kind === 'path' && existsSync(base) && !statSync(base).isDirectory()) {
       process.stderr.write(`agentsmith: error -- --scope path is not a directory: ${base}\n`); process.exit(1);
     }
-    const allTexts = [...coreTexts, ...bundleTexts.flatMap((b) => b.modules)].map((m) => m.text);
-    ({ overrides, file: layoutFile } = readLayoutOverrides(base, allTexts));
+    // Install only. An uninstall writes no map, so reading the config there would
+    // let a stale or malformed one -- a tag agentsmith renamed in a later release,
+    // say -- block the user from removing an install it does not consult.
+    if (cmd.kind === 'install') {
+      const allTexts = [...coreTexts, ...bundleTexts.flatMap((b) => b.modules)].map((m) => m.text);
+      ({ overrides, file: layoutFile } = readLayoutOverrides(base, allTexts));
+    }
   }
 
   // The single application site: every module text, core and bundle, is mapped

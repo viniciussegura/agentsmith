@@ -804,3 +804,38 @@ test('C7: --scope user skips the probe entirely', (t) => {
   assert.ok(!r.stderr.includes('gitignored'), 'no probe at user scope');
   assert.ok(r.stderr.includes(LAYOUT_LINE), 'the layout line is still disclosed');
 });
+
+// Regression from the PR #26 code review: the config read was gated on
+// `cmd.kind !== 'stdout'` rather than on install, so a stale or malformed config
+// blocked `uninstall` -- which reads no config and writes no map -- leaving the
+// user unable to remove an install without hand-editing a file it never consults.
+// A renamed owner tag is the realistic way to get there: the design decision
+// records that renaming one is a breaking change for consumers.
+test('C4: uninstall ignores a malformed config rather than refusing to run', (t) => {
+  const dir = makeTempDir(t, 'agentsmith-c4e-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  assert.equal(agentsmith(dir, NO_CONFIG_ARGS, env).status, 0);
+  writeConfig(dir, 'rows:\n  swe-renamed-by-a-later-release:\n    path: docs/x/<name>.md\n');
+
+  const r = agentsmith(dir, ['uninstall', '--yes'], env);
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'the uninstall really ran');
+  assert.ok(existsSync(join(dir, CONFIG_REL)), 'uninstall leaves the config on disk');
+  assert.ok(!r.stderr.includes('unknown row tag'), 'uninstall did not validate the config');
+});
+
+// The same config must still stop an install, which does read it.
+test('C2: the same malformed config still fails an install', (t) => {
+  const dir = makeTempDir(t, 'agentsmith-c2b-');
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  writeConfig(dir, 'rows:\n  swe-renamed-by-a-later-release:\n    path: docs/x/<name>.md\n');
+
+  const r = agentsmith(dir, NO_CONFIG_ARGS, env);
+
+  assert.equal(r.status, 1, r.stderr);
+  assert.ok(r.stderr.includes('unknown row tag'), r.stderr);
+  assert.ok(!existsSync(join(dir, '.agentsmith/AGENTS.md')), 'nothing was written');
+});
