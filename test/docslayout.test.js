@@ -722,6 +722,10 @@ test('no two rows may resolve to the same location', () => {
     ['a file and a directory of the same name', lines('  swe-technical-debts:', '    path: docs/notes', '  swe-future-work:', '    path: docs/notes/<slug>.md'), 4, '#swe-technical-debts'],
     ['locations differing only in case', lines('  swe-technical-debts:', '    path: docs/Notes/<slug>.md', '  swe-future-work:', '    path: docs/notes/<slug>.md'), 4, '#swe-technical-debts'],
     ['single files differing only in case', lines('  swe-technical-debts:', '    path: docs/DEBTS.md', '  swe-future-work:', '    path: docs/debts.md'), 4, '#swe-technical-debts'],
+    // A placeholder anywhere, not only in the file name, decides where records live: this
+    // one writes into a directory per record under `docs/`, so `<slug>` resolving to
+    // `reference-spec` lands in that row's directory.
+    ['a placeholder in a directory position', lines('  swe-technical-debts:', '    path: docs/<slug>/index.md'), 2, '#swe-reference-spec'],
   ];
   for (const [label, body, line, includes] of collisions) {
     assertRejected(lines('rows:', body), { line, includes }, label);
@@ -789,6 +793,10 @@ test('a placeholder may not name a directory the config has not pinned down', ()
     ['<slug>node_modules/x.md', 'placeholder is elided'],
     ['docs/<slug>.git/', 'placeholder is elided'],
     ['docs/<slug>.ssh/x.md', 'placeholder is elided'],
+    // A final segment that is a bare placeholder elides to nothing. Checked per segment,
+    // so it cannot shift an earlier segment into the exempt final position.
+    ['docs/<slug>.git/<name>', 'placeholder is elided'],
+    ['docs/node_modules<slug>/<name>', 'placeholder is elided'],
     ['docs/<slug>.<slug>./x.md', 'placeholder is elided'],
     ['docs/<slug>node_modules/x.md', 'placeholder is elided'],
   ];
@@ -803,7 +811,7 @@ test('a placeholder may not name a directory the config has not pinned down', ()
   for (const { owner, path } of parseLayoutTable(realModule)) {
     assert.deepEqual(parse(rowsWith(owner, `path: ${path}`)), { [owner]: { path } }, `shipped default for ${owner}`);
   }
-  for (const value of ['docs/debts/<slug>/', 'docs/<slug>/notes.md', 'docs/debts/<slug>']) {
+  for (const value of ['docs/debts/<slug>/', 'docs/debts/<slug>/notes.md', 'docs/debts/<slug>']) {
     assert.deepEqual(pathCase('swe-technical-debts', value), { 'swe-technical-debts': { path: value } }, value);
   }
 });

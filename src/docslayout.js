@@ -185,10 +185,17 @@ const pathProblem = (value, { placeholder = null, path: defaultPath = '' }) => {
   // been refused. The final segment is a directory exactly when the path ends in a
   // slash; a final FILE name is exempt, because eliding a placeholder legitimately
   // leaves a dotted remainder there (`docs/<name>.md` -> `docs/.md`).
-  const segmentsOf = (s) => s.split('/').filter(Boolean);
-  const elided = segmentsOf(PLACEHOLDER_TOKENS.reduce((acc, token) => acc.replaceAll(token, ''), value));
-  const elidedDirs = value.endsWith('/') ? elided : elided.slice(0, -1);
-  if (elidedDirs.some((segment) => segment.startsWith('.') || segment === FORBIDDEN_SEGMENT)) {
+  // Elided per segment, never from the path as a whole: a segment that is a bare
+  // placeholder elides to nothing, and dropping it shifts every later segment up a
+  // position, so `docs/<slug>.git/<name>` would leave `.git` in the final position the
+  // rule below exempts.
+  const segments = (value.endsWith('/') ? value.slice(0, -1) : value).split('/');
+  const elide = (segment) => PLACEHOLDER_TOKENS.reduce((acc, token) => acc.replaceAll(token, ''), segment);
+  // A final FILE name is exempt, because eliding a placeholder legitimately leaves a dotted
+  // remainder there (`docs/<name>.md` -> `docs/.md`); a directory is not. An all-placeholder
+  // directory elides to nothing, which names one record rather than reaching anywhere.
+  const directories = (value.endsWith('/') ? segments : segments.slice(0, -1)).map(elide);
+  if (directories.some((segment) => segment !== '' && (segment.startsWith('.') || segment === FORBIDDEN_SEGMENT))) {
     return [
       `path reaches a dot directory or ${FORBIDDEN_SEGMENT} once a placeholder is elided`,
       'give every directory segment literal text of its own',
@@ -196,7 +203,8 @@ const pathProblem = (value, { placeholder = null, path: defaultPath = '' }) => {
   }
   // Checked before the rules below, so naming a protected file says so rather than
   // blaming the path's shape.
-  for (const segment of [...segmentsOf(substituted), ...elided]) {
+  const substituteOne = (segment) => PLACEHOLDER_TOKENS.reduce((acc, token) => acc.replaceAll(token, PLACEHOLDER_SUBSTITUTE), segment);
+  for (const segment of segments.flatMap((s) => [substituteOne(s), elide(s)])) {
     if (PROTECTED_BASENAMES.has(segment.toLowerCase())) {
       return ['path names an instruction or manifest file', 'those files cannot be a remap target'];
     }
@@ -212,7 +220,7 @@ const pathProblem = (value, { placeholder = null, path: defaultPath = '' }) => {
   // thing. A placeholder below a literal root stays contained, so `docs/epics/<slug>/` --
   // the shipped epics default -- is unaffected. Any `<` left here opens a known token:
   // the unknown-placeholder rule above has already rejected every other use.
-  if ((segmentsOf(value)[0] ?? '').includes(PLACEHOLDER_OPEN)) {
+  if ((segments[0] ?? '').includes(PLACEHOLDER_OPEN)) {
     return [
       'path lets a placeholder name a top-level directory',
       'start the path with a literal directory, so the repository root is pinned down',
@@ -385,10 +393,16 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
   // directory at that location, while any other shape claims files. That is the whole
   // difference between `docs/<slug>/`, which would read the other rows' default
   // directories as its own records, and `docs/<YYYY-MM-DD>-<slug>.md`, which leaves them be.
+  // Keyed on the FIRST segment carrying a placeholder, not the last: everything before it is
+  // fixed and is the location, everything from it on is one record's own. A placeholder in a
+  // directory position is what makes `docs/<slug>/index.md` a directory per record under
+  // `docs/` rather than the single fixed file its file name suggests.
   const locationOf = (path) => {
     const segments = (path.endsWith('/') ? path.slice(0, -1) : path).split('/');
-    if (!segments.at(-1).includes(PLACEHOLDER_OPEN)) return { at: path.toLowerCase(), directories: false };
-    return { at: `${segments.slice(0, -1).join('/')}/`.toLowerCase(), directories: path.endsWith('/') };
+    const named = segments.findIndex((segment) => segment.includes(PLACEHOLDER_OPEN));
+    if (named === -1) return { at: path.toLowerCase(), directories: false };
+    const at = `${segments.slice(0, named).join('/')}/`.toLowerCase();
+    return { at, directories: named < segments.length - 1 || path.endsWith('/') };
   };
   // Nesting one record directory inside another is not in itself a collision -- the whole
   // map nests under `docs/`, and the map owns those directories rather than the root (see

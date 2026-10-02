@@ -41,7 +41,8 @@ Two facts about a row are policy rather than table data -- whether it may be `ex
 Both live in a per-row policy constant, `ROW_POLICY` in [`src/docslayout.js`](../../src/docslayout.js), keyed by the same bare owner tag and deny-by-default: a tag absent from it is ineligible for `external` and requires no placeholder.
 A third fact is table data and stays there: a default path ending in `/` declares that the row stores each record as its own directory, so an override of that row must end in `/` too.
 Validation also compares the rows against each other -- a row keeps its default path until overridden, and no two may resolve to one location, since the owner rules tell an agent to scan a directory for every record of one type.
-What a row claims at its location follows from that same trailing slash: a row whose records are directories claims every directory there, one whose records are files claims the files, which is why a row may sit flat in `docs/` only in the second form.
+A row's location is the fixed part of its path, up to its first placeholder; everything from that placeholder on names one record.
+What the row claims at that location follows from whether the naming segment is a directory -- because a slash follows it, or because more segments do: a row whose records are directories claims every directory there, one whose records are files claims the files, which is why a row may sit flat in `docs/` only in the second form.
 
 The external-row redirect above is conditional rule text, carried in the rule source between `<!-- agentsmith:external-note -->` and `<!-- /agentsmith:external-note -->`.
 The generator keeps the enclosed text and drops the two marker lines when at least one row is `external`; otherwise it strips the block whole -- markers, text, and the blank line above it -- which is the case for every project with no config, so the paragraph costs the default output nothing.
