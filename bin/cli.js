@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync, statSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -13,6 +14,14 @@ import { buildInstallPlan, buildUninstallPlan, renderPlan } from '../src/plan.js
 import { applyPlan } from '../src/execute.js';
 import { confirm, runWizard, makeSeam } from '../src/prompt.js';
 import { SETTINGS_REL, CLAUDE_MD_REL, hasOwnedHooks } from '../src/settings.js';
+import {
+  applyLayoutOverrides,
+  definesLayoutTag,
+  parseLayoutConfig,
+  parseLayoutTable,
+  readLayoutConfig,
+  withRowPolicy,
+} from '../src/docslayout.js';
 
 // Resolve sources relative to the package, not the consumer's cwd.
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,6 +61,9 @@ Flags:
   --clean                      uninstall then reinstall this scope in one run (destructive)
   --yes                        skip the confirmation prompt (durable authorization)
   --dry-run                    print the plan and exit 0 without writing
+
+Config:
+  reads .agentsmith/docs-layout.yaml to remap the docs layout; see README
 
 Example:
   agentsmith install --scope user`,
@@ -127,6 +139,53 @@ for (const b of bundles) {
 
 const { commit, date } = sourceRevision({ pkgRoot, pkgVersion });
 
+// Bounded so a hung git never stalls install (#swe-async); the probe is advisory.
+const GITIGNORE_PROBE_TIMEOUT_MS = 5000;
+
+const NO_OUTPUT = 'no output was generated';
+const LAYOUT_RULE_MISSING =
+  'the #swe-docs-layout rule is not in the generated instruction set, so .agentsmith/docs-layout.yaml cannot be applied';
+
+// Read and validate <base>/.agentsmith/docs-layout.yaml, exiting 1 on any problem
+// before a byte of output is generated. `knownRows` come from the rule module the
+// transform self-selects, so a typo'd tag is rejected against the shipped table
+// rather than silently ignored -- deny-by-default, including the arm where a
+// config exists but the rule is not in the emitted set.
+// Self-selection is observed as applyLayoutOverrides changing the text: on the map
+// module the transform is never a no-op, because the external-note block is always
+// resolved, and on every other module it is the identity.
+// Project-dependent rule content: see the design decision `project-dependent-rule-content`.
+function readLayoutOverrides(base, moduleTexts) {
+  const die = (why) => {
+    process.stderr.write(`agentsmith: error -- ${why}${why.includes(NO_OUTPUT) ? '' : `; ${NO_OUTPUT}`}\n`);
+    process.exit(1);
+  };
+  let config;
+  try { config = readLayoutConfig({ base }); } catch (e) { die(e.message); }
+  if (config.text.trim() === '') return { file: config.file, overrides: {} };
+  const mapText = moduleTexts.find(definesLayoutTag);
+  if (mapText === undefined) die(LAYOUT_RULE_MISSING);
+  try { return { file: config.file, overrides: parseLayoutConfig(config.text, withRowPolicy(parseLayoutTable(mapText)), config.file) }; }
+  catch (e) { die(e.message); }
+}
+
+// Warn when git reports the config ignored: the README's recipe ignores .agentsmith/
+// wholesale, so teammates would never receive the layout. Advisory only -- exit 0
+// (ignored) warns; exit 1 (not ignored), git missing, exit 128, a timeout or any
+// other failure is a silent skip. No shell: the path is a single argv element.
+function warnIfConfigIgnored(base, file) {
+  const configPath = join(base, file);
+  if (!existsSync(configPath)) return;
+  try {
+    execFileSync('git', ['check-ignore', '-q', '--', configPath], {
+      cwd: base, timeout: GITIGNORE_PROBE_TIMEOUT_MS, stdio: 'ignore', windowsHide: true,
+    });
+  } catch { return; }
+  process.stderr.write(
+    `agentsmith: warning -- ${file} is gitignored, so teammates will not get this layout. Add '!${file}' after '.agentsmith/*' in .gitignore (see README).\n`,
+  );
+}
+
 // computeAdapterPlan wraps listToolSources + planToolInstall (dev adds devtools/claude).
 function computeAdapterPlan(dev) {
   const sources = listToolSources(join(pkgRoot, 'tools'), 'tools');
@@ -151,14 +210,55 @@ async function main() {
   // core location (absent on uninstall/stdout -> nested default).
   const layout = cmd.flags.mode === 'single' ? 'full' : 'lean';
   const placement = cmd.flags.placement ?? 'nested';
+
+  // Module texts are read before the scope block below, because the config read
+  // takes its known rows from the layout table in the rule source, and because
+  // buildOutputs is handed the already-transformed texts (one application site).
+  const coreTexts = coreModules.map(({ path, demote }) => ({ text: read(path), demote }));
+  const bundleTexts = bundles.map((b) => ({
+    name: b.name,
+    title: b.title,
+    when: b.when,
+    modules: b.modules.map(({ path, demote }) => ({ text: read(path), demote })),
+  }));
+
+  // Scope -> base + absolute, and the docs-layout config, both hoisted above
+  // buildOutputs so a malformed config exits before any output exists. The block is
+  // guarded because parseArgs gives kind 'stdout' no scope field at all, and because
+  // --stdout is a pure generate-and-print query that reads no config
+  // (docs/reference-spec/cli.md): overrides stay empty on that path.
+  let isUser = false;
+  let base;
+  let absolute = false;
+  let overrides = {};
+  let layoutFile;
+  if (cmd.kind !== 'stdout') {
+    isUser = cmd.scope.kind === 'user';
+    base = isUser ? homedir() : cmd.scope.kind === 'path' ? resolve(process.cwd(), cmd.scope.path) : process.cwd();
+    absolute = isUser || cmd.scope.kind === 'path';
+    if (cmd.scope.kind === 'path' && existsSync(base) && !statSync(base).isDirectory()) {
+      process.stderr.write(`agentsmith: error -- --scope path is not a directory: ${base}\n`); process.exit(1);
+    }
+    // Install only. An uninstall writes no map, so reading the config there would
+    // let a stale or malformed one -- a tag agentsmith renamed in a later release,
+    // say -- block the user from removing an install it does not consult.
+    if (cmd.kind === 'install') {
+      const allTexts = [...coreTexts, ...bundleTexts.flatMap((b) => b.modules)].map((m) => m.text);
+      ({ overrides, file: layoutFile } = readLayoutOverrides(base, allTexts));
+    }
+  }
+
+  // The single application site: every module text, core and bundle, is mapped
+  // through the transform, which self-selects on the tag.
+  const remap = ({ text, demote }) => ({ text: applyLayoutOverrides({ moduleText: text, overrides }), demote });
   const built = buildOutputs({
     preamble: read(manifest.preamble),
-    modules: coreModules.map(({ path, demote }) => ({ text: read(path), demote })),
-    bundles: bundles.map((b) => ({
+    modules: coreTexts.map(remap),
+    bundles: bundleTexts.map((b) => ({
       name: b.name,
       title: b.title,
       when: b.when,
-      modules: b.modules.map(({ path, demote }) => ({ text: read(path), demote })),
+      modules: b.modules.map(remap),
     })),
     source: manifest.source,
     commit,
@@ -183,14 +283,6 @@ async function main() {
   }
 
   if (cmd.kind === 'stdout') { process.stdout.write(built.coreContent); process.exit(0); }
-
-  // Resolve scope -> base + absolute.
-  const isUser = cmd.scope.kind === 'user';
-  const base = isUser ? homedir() : cmd.scope.kind === 'path' ? resolve(process.cwd(), cmd.scope.path) : process.cwd();
-  const absolute = isUser || cmd.scope.kind === 'path';
-  if (cmd.scope.kind === 'path' && existsSync(base) && !statSync(base).isDirectory()) {
-    process.stderr.write(`agentsmith: error -- --scope path is not a directory: ${base}\n`); process.exit(1);
-  }
 
   // Whether settings.json already carries an agentsmith-owned hook, so the plan
   // emits an un-merge only when there is something of ours to remove.
@@ -240,8 +332,11 @@ async function main() {
   const installPlan = buildInstallPlan({
     base, absolute, built, adapterPlan, scope: cmd.scope, flags: cmd.flags,
     prevManifestPaths: readManifest(base).paths, stubExists: existsSync(resolve(base, 'AGENTS.md')),
-    settingsHasOwned,
+    settingsHasOwned, layout: { file: layoutFile, overrides },
   });
+  // Install plans only (on --clean this is the second plan, the one that writes the
+  // remapped map); --scope user never probes, since the user's home is not a repo.
+  if (!isUser) warnIfConfigIgnored(base, layoutFile);
   const decision = await confirm({ plan: installPlan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: false, render: renderPlan });
   if (decision === 'skip') process.exit(0);
   applyPlan(installPlan, { pkgRoot });

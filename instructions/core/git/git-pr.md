@@ -12,7 +12,7 @@ It holds the following, in order, and nothing else:
 2. **Breaking changes** -- present whenever the title carries `!` (#git-title), omitted otherwise: one changelog-style bullet per break, naming what breaks and what a consumer does instead.
    It sits directly under item 1 because it is the highest-stakes thing the body can say and the reader may stop early (#code-prose); being rarely present, promoting it costs nothing when absent.
    This is the PR's form of the commit's `BREAKING CHANGE:` footer, not a second copy of it -- the footer stays on the commit and rides the squash.
-3. **Linked artifacts** -- one bullet per related record (issue, ticket, technical debt, future-work note, epic entry), formatted `<action verb> <reference>`: `fixes #123`, `pays off docs/technical-debts/2026-07-30-scratch-spec-loss.md`.
+3. **Linked artifacts** -- one bullet per related record (issue, ticket, technical debt, future-work note, epic entry), formatted `<action verb> <reference>`: `fixes #123`, `pays off <a technical-debt note>` (#swe-docs-layout).
    Omit the section when there are none.
 4. **Verification** -- one line, and **only** when the unit invoked #swe-done's untestable exception: the blocker it named, and the verification actually performed in place of tests.
    Omitted in every other case, because the tests ran: where CI reports them on the PR a body line restating a green check is a second copy that goes stale (#code-prose), and where there is no CI the local run is already #swe-done's gate.

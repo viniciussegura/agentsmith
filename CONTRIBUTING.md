@@ -27,6 +27,7 @@ src/generate.js    pure: (preamble, modules, source) -> AGENTS.md text
 src/build.js       pure: assembles the lean core, bundle files, and root stub
 src/sections.js    pure: splits manifest sections into core vs on-demand bundles
 src/bundles.js     on-demand index + #tag reference-integrity + ownership coverage lint
+src/docslayout.js  the #swe-docs-layout table, the .agentsmith/docs-layout.yaml remap, the map-citation lint
 src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** install paths
 bin/cli.js         verb-first CLI: install / uninstall, plus the --stdout query
 bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
@@ -50,6 +51,16 @@ test-helpers/      shared test scaffolding; skipped by `node --test` only while
   escapes the prose standard silently. Schema-bound output — a findings JSON, a
   ledger, a directive — is not prose and needs no citation; whether it is local
   or ephemeral does not matter, only whether a human reads it as prose.
+- A rule module may carry conditional text between
+  `<!-- agentsmith:external-note -->` and `<!-- /agentsmith:external-note -->`:
+  the generator unwraps the block (keeping the text, dropping the two marker
+  lines) when a project's docs-layout config marks a row `external`, and strips
+  the block whole otherwise — so the text has a rule-source home without costing
+  the default output a byte. `#swe-docs-layout` is the only rule using it; the
+  contract is in
+  [`docs/reference-spec/documentation-layout.md`](docs/reference-spec/documentation-layout.md)
+  and the rationale in
+  [`docs/design-decisions/project-dependent-rule-content.md`](docs/design-decisions/project-dependent-rule-content.md).
 - To add a rule, drop a `.md` into a section group under `instructions/` (e.g.
   `core/swe/` or `backend/`); it is picked up automatically.
 - Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the

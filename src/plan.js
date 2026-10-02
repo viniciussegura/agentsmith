@@ -2,7 +2,10 @@ import { orphanPaths } from './manifest.js';
 import { SETTINGS_REL, CLAUDE_MD_REL } from './settings.js';
 
 // buildInstallPlan: assemble the ordered op list for an install (pure).
-export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, flags, prevManifestPaths, stubExists, settingsHasOwned }) {
+// `layout` ({ file, overrides }) is the docs-layout remap the operator is about to
+// confirm; it rides on the plan so renderPlan can disclose it. Optional: absent or
+// empty overrides leave the plan exactly as it was.
+export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, flags, prevManifestPaths, stubExists, settingsHasOwned, layout }) {
   const ops = [];
   const manifestPaths = [
     built.corePath,
@@ -40,7 +43,9 @@ export function buildInstallPlan({ base, absolute, built, adapterPlan, scope, fl
   if (flags.tools) ops.push({ kind: 'mergeSettings', path: SETTINGS_REL });
   else if (settingsHasOwned) ops.push({ kind: 'unmergeSettings', path: SETTINGS_REL });
 
-  return { base, absolute, scope, ops, manifestPaths };
+  const plan = { base, absolute, scope, ops, manifestPaths };
+  if (layout && Object.keys(layout.overrides).length) plan.layout = layout;
+  return plan;
 }
 
 // buildUninstallPlan: reverse an install of the same scope (pure).
@@ -60,6 +65,11 @@ export function buildUninstallPlan({ base, absolute, scope, manifestPaths, coreP
   ops.push({ kind: 'prune', paths: ['.agentsmith/.install-manifest.json'] });
   return { base, absolute, scope, ops, manifestPaths: [] };
 }
+
+// One wording for the external form, `external -- <label>`, shared with the table
+// cell (#swe-terminology). The cell wraps the label in a code span; plan output is
+// plain text, so the backticks are the cell's and not part of the wording.
+const describeRemap = (override) => ('external' in override ? `external -- ${override.external}` : override.path);
 
 const REL = (p) => p.replace(/\\/g, '/');
 
@@ -86,6 +96,13 @@ export function renderPlan(plan) {
   // confirmation must never leave the reader guessing WHICH tree it is about to
   // delete from. Both builders always set it, so this is unconditional.
   const lines = ['agentsmith plan:', `  Scope: ${SCOPE_LABEL[plan.scope.kind]} (${plan.base})`];
+  // Install plans only: buildUninstallPlan never sets plan.layout, since an uninstall
+  // writes no map. The content of every generated file is otherwise invisible here,
+  // so this is the operator's disclosure of a remapped layout before the prompt.
+  if (plan.layout) {
+    const entries = Object.entries(plan.layout.overrides);
+    lines.push(`  layout  ${entries.length} row(s) remapped from ${plan.layout.file}: ${entries.map(([tag, o]) => `${tag} -> ${describeRemap(o)}`).join(', ')}`);
+  }
   if (writes.length) lines.push(`  write   ${writes.length} file(s): ${writes.slice(0, 3).join(', ')}${writes.length > 3 ? ', ...' : ''}`);
   for (const u of updates) lines.push(`  update  ${u}`);
   // Deletes are the dangerous class -- list every one so a destructive confirmation

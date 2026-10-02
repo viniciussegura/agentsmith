@@ -1,6 +1,6 @@
 # #swe-entity Entity model upkeep
 
-Core entities (_aka_ core concepts or core abstractions) are documented in the entity model, `docs/reference-spec/entity-model.md` -- the canonical member of the reference spec (#swe-reference-spec) -- and follow rule #swe-terminology.
+Core entities (_aka_ core concepts or core abstractions) are documented in the entity model, the `entity-model` reference-spec document (#swe-docs-layout) -- the canonical member of the reference spec (#swe-reference-spec) -- and follow rule #swe-terminology.
 This file presents a human-readable description of the current model, expressed as pure TypeScript types and interfaces.
 The description reflects how users should understand the model.
 It is **NOT** documentation of how the model is implemented (_e.g._ not a database schema).

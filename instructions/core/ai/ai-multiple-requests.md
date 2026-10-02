@@ -7,7 +7,7 @@ When one user message carries three or more actionable items, or items that will
 3. Every item maps to a working spec (#ai-plan) or a task-list entry; none stays unassigned.
 4. `@<item-slug>` is conversation shorthand only.
    **Never** write it into a committed artifact -- it resolves against a gitignored file.
-5. On landing an item, close its line with where it landed: `- [x] @<item-slug> [[commit <sha>]]`, `- [x] @<item-slug> [[docs/future-work/<file>.md]]`.
+5. On landing an item, close its line with where it landed: `- [x] @<item-slug> [[commit <sha>]]`, `- [x] @<item-slug> [[<a future-work note>]]` (#swe-docs-layout).
    A logged deferral counts as landed; a silent drop does not.
 
 The session is not done (#ai-done) until every line in `annotated.md` is checked.
