@@ -137,7 +137,7 @@ It does **not** check supersession-chain acyclicity: our relations live in free-
 Per-run scratch under `.agentsmith/tmp/review-board/<round-id>/` (gitignored). Machine files are JSON; `persist.mjs` consumes them and writes the store.
 
 - `round.json` -- the `ReviewRoundInfo` for the round (written by Setup).
-- `findings/<role>.json` -- `{ role, new: Issue[], reconcile: Reconcile[] }`. `new` are this round's findings under pre-minted ids; `reconcile` are transitions on the role's dirty prior issues.
+- `findings/<role>.json` -- `{ new: Issue[], reconcile: Reconcile[] }`; the owning role is the id's `<role>` segment, not a field. `new` are this round's findings under pre-minted ids; `reconcile` are transitions on the role's dirty prior issues.
 - `verdicts/<finding-id>.json` -- `{ id, verdict: "accept" | "reject", rationale }`, one per new finding.
 - `pm-directive.json` -- the PM's structured directive (below); absent means no consolidation.
 - `pm-input.json` -- written by `persist.mjs summary`, read by the PM reduce.

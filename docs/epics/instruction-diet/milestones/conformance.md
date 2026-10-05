@@ -6,7 +6,7 @@ Four small fixes, all mechanical, shipped together on `fix/self-conformance`.
 
 **Outcome.** No personal email address in any committed file; the plugin manifests carry the owner name only.
 **Depends on.** --
-**Acceptance.** `git grep -n '@gmail.com\|@hotmail.com'` matches only the rule that names the pattern.
+**Acceptance.** The personal-address grep that `#swe-environment` prescribes matches only that rule.
 **State.** in-progress
 
 ## conformance-2 `sentinel-debt`

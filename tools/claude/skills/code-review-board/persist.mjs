@@ -118,6 +118,34 @@ export function assertRoundRecord(record, source) {
   );
 }
 
+// Issue fields a reviewer must emit; the rest are set by persist or optional (issue-format.md).
+const FINDING_REQUIRED = ['id', 'title', 'description', 'priority', 'priorityRationale'];
+
+/**
+ * Throw unless every `new` finding across the findings files is well-formed: an id that
+ * parses as `<roundId>#<role>-<n>` with a non-epic role (the id is what names the issue's
+ * directory), and every required Issue field present. Checked before any write and
+ * reporting every problem at once, for the same reason assertRoundRecord does: the
+ * defect this catches surfaced only at the post-write lint, as `issues/undefined/`.
+ * @param {Array<{ new?: unknown[] }>} findings
+ */
+export function assertFindings(findings) {
+  const problems = [];
+  for (const f of findings) {
+    for (const raw of f?.new || []) {
+      const id = raw?.id;
+      const parts = parseId(id);
+      if (!parts) problems.push(`finding id \`${id}\` is malformed (expected \`<roundId>#<role>-<n>\`)`);
+      else if (parts.role === 'epic') problems.push(`finding id \`${id}\` uses the reserved \`epic\` role segment`);
+      const missing = FINDING_REQUIRED.filter((k) => raw?.[k] === undefined || raw?.[k] === null || raw?.[k] === '');
+      if (missing.length) problems.push(`finding \`${id}\` is missing required field(s): ${missing.join(', ')}`);
+    }
+  }
+  if (problems.length) {
+    throw new Error(`findings do not match Issue (issue-format.md) -- ${problems.join('; ')}`);
+  }
+}
+
 // ---------- apply ----------
 
 /**
@@ -133,6 +161,7 @@ export function persistApply({ store, roundId, scratchDir }) {
   const round = readJson(roundPathIn);
   assertRoundRecord(round, roundPathIn);
   const findings = readDirJson(join(scratch, 'findings'));
+  assertFindings(findings);
   const verdicts = readDirJson(join(scratch, 'verdicts'));
   const directive = existsSync(join(scratch, 'pm-directive.json'))
     ? readJson(join(scratch, 'pm-directive.json'))
@@ -296,6 +325,7 @@ const summarize = (o, role) => ({ id: o.id, title: o.title, priority: o.priority
 export function persistSummary({ store, roundId, scratchDir }) {
   const scratch = scratchDir || defaultScratchDir(store, roundId);
   const findings = readDirJson(join(scratch, 'findings'));
+  assertFindings(findings);
   const verdicts = readDirJson(join(scratch, 'verdicts'));
   const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
 

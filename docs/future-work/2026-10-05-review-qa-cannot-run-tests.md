@@ -16,4 +16,3 @@ The round of 2026-08-11 graded from a static trace; a failing suite would have p
 
 - Reviewers are read-only by design so the containment guard (`round-guard.mjs`) stays meaningful; any execution tool is scoped to the test command, never a general shell.
 - Every other reviewer persona keeps the read-only tool set.
-- Recorded on closing the 2026-08-11 role-field note, which carried this as an observation.
