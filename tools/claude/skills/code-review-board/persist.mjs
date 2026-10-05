@@ -13,8 +13,12 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, sep } from 'node:path';
 import { argv, stdout, stderr, exit } from 'node:process';
-import { lintStore, idToSafe } from './lint.mjs';
+import { lintStore, idToSafe, parseId } from './lint.mjs';
 import { isMain } from './is-main.mjs';
+
+// The owning role is the id's `<role>` segment (`<roundId>#<role>-<n>`, issue-format.md);
+// a findings file declares no role field of its own.
+const roleOf = (id) => parseId(id)?.role;
 
 // ---------- io helpers ----------
 
@@ -143,9 +147,9 @@ export function persistApply({ store, roundId, scratchDir }) {
 
   // 1) Verified-new issues.
   for (const f of findings) {
-    const roleDir = f.role;
     for (const raw of f.new || []) {
       if (!accepted.has(raw.id) || pmRejected.has(raw.id)) continue;
+      const roleDir = roleOf(raw.id);
       const issue = {
         ...raw,
         kind: 'issue',
@@ -306,7 +310,7 @@ export function persistSummary({ store, roundId, scratchDir }) {
   const fresh = [];
   for (const f of findings) {
     for (const n of f.new || []) {
-      if (accepted.has(n.id)) fresh.push(summarize(n, f.role));
+      if (accepted.has(n.id)) fresh.push(summarize(n, roleOf(n.id)));
     }
   }
 

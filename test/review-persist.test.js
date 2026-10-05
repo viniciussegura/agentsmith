@@ -292,3 +292,29 @@ test('apply counts issues and epics separately from the round record', (t) => {
   assert.equal(res.errors.length, 0, res.errors.join('\n'));
   assert.deepEqual(res.counts, { issues: 2, epics: 1, rounds: 1 });
 });
+
+test('apply derives the issue directory from the id when a finding carries no role field', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
+  writeJson(join(scratchDir, 'findings', 'qa.json'), {
+    new: [newFinding('r1#qa-1')],
+    reconcile: [],
+  });
+  writeJson(join(scratchDir, 'verdicts', 'r1--qa-1.json'), { id: 'r1#qa-1', verdict: 'accept', rationale: 'real' });
+
+  const res = persistApply({ store, scratchDir, roundId });
+
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+  assert.ok(!existsSync(join(store, 'issues', 'undefined')), 'issue filed under issues/undefined/');
+  assert.equal(readdirSync(join(store, 'issues', 'qa')).length, 1);
+});
+
+test('summary attributes a role-less new finding to the role in its id', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
+  writeJson(join(scratchDir, 'findings', 'db.json'), { new: [newFinding('r1#db-1')], reconcile: [] });
+  writeJson(join(scratchDir, 'verdicts', 'r1--db-1.json'), { id: 'r1#db-1', verdict: 'accept', rationale: 'real' });
+
+  const out = persistSummary({ store, scratchDir, roundId });
+
+  assert.equal(out.new.length, 1);
+  assert.equal(out.new[0].role, 'db');
+});

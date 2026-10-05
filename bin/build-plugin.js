@@ -29,7 +29,8 @@ const plugin = {
 
 const marketplace = {
   name: 'agentsmith',
-  owner: { name: 'Vinicius Segura', email: 'viniciussegura@gmail.com' },
+  // Name only: a committed file carries no personal email address (#swe-environment).
+  owner: { name: 'Vinicius Segura' },
   plugins: [
     {
       // Relative source: resolves to <repo-root>/tools/claude for both the git-slug
