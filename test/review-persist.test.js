@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { persistApply, persistSummary } from '../tools/claude/skills/code-review-board/persist.mjs';
+import { persistApply, persistSummary, FINDING_REQUIRED } from '../tools/claude/skills/code-review-board/persist.mjs';
 import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
 
 // Build a round scratch dir + empty store; return { store, scratchDir, roundId }.
@@ -165,7 +165,9 @@ test('summary projects carried-forward open issues and accepted new findings', (
   const out = persistSummary({ store, scratchDir, roundId });
 
   const onDisk = JSON.parse(readFileSync(join(scratchDir, 'pm-input.json'), 'utf8'));
-  assert.deepEqual(onDisk, out);
+  const { warnings, ...projected } = out;
+  assert.deepEqual(onDisk, projected);
+  assert.deepEqual(warnings, []);
   assert.equal(out.carried.length, 1);
   assert.equal(out.carried[0].id, 'r1#swe-1');
   assert.equal(out.new.length, 1);
@@ -315,25 +317,60 @@ test('summary attributes a role-less new finding to the role in its id', (t) => 
   assert.equal(out.new[0].role, 'db');
 });
 
-test('apply fails closed on a malformed finding id before writing anything', (t) => {
+test('apply fails closed on malformed accepted findings, naming the file and every problem', (t) => {
   const { store, scratchDir, roundId } = scaffold(t);
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
-    new: [newFinding('r1-swe-1'), newFinding('r1#epic-1'), { id: 'r1#swe-2' }],
+    new: [
+      newFinding('r1-swe-1'),
+      newFinding('r1#epic-1'),
+      { id: 'r1#swe-2' },
+      newFinding('r9#swe-3'),
+      newFinding('r1#swe-4', { priority: 'P1', title: 42, location: 'drifted' }),
+    ],
     reconcile: [],
   });
-  for (const id of ['r1-swe-1', 'r1#epic-1', 'r1#swe-2']) {
+  for (const id of ['r1-swe-1', 'r1#epic-1', 'r1#swe-2', 'r9#swe-3', 'r1#swe-4']) {
     writeJson(join(scratchDir, 'verdicts', `${id.replace('#', '--')}.json`), { id, verdict: 'accept', rationale: 'real' });
   }
 
-  assert.throws(
-    () => persistApply({ store, scratchDir, roundId }),
-    (e) => /r1-swe-1/.test(e.message) && /r1#epic-1/.test(e.message) && /r1#swe-2/.test(e.message) && /title/.test(e.message),
-  );
+  assert.throws(() => persistApply({ store, scratchDir, roundId }), (e) => {
+    for (const expected of ['swe.json', 'r1-swe-1', 'r1#epic-1', 'r1#swe-2', 'title', 'r9#swe-3', 'priority', 'location']) {
+      assert.ok(e.message.includes(expected), `message lacks ${expected}: ${e.message}`);
+    }
+    return true;
+  });
   assert.ok(!existsSync(join(store, 'issues')), 'store was written despite malformed findings');
 });
 
-test('summary fails closed on a malformed finding id', (t) => {
+test('a malformed finding the verifier rejected is a warning, not a halt', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
+  writeJson(join(scratchDir, 'findings', 'swe.json'), {
+    new: [newFinding('r1#swe-1'), newFinding('garbage')],
+    reconcile: [],
+  });
+  writeJson(join(scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+  writeJson(join(scratchDir, 'verdicts', 'garbage.json'), { id: 'garbage', verdict: 'reject', rationale: 'noise' });
+
+  const res = persistApply({ store, scratchDir, roundId });
+
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+  assert.equal(readdirSync(join(store, 'issues', 'swe')).length, 1);
+  assert.equal(res.warnings.filter((w) => w.includes('garbage') && w.includes('swe.json')).length, 1);
+});
+
+test('summary fails closed on a malformed accepted finding and warns on a rejected one', (t) => {
   const { store, scratchDir, roundId } = scaffold(t);
   writeJson(join(scratchDir, 'findings', 'swe.json'), { new: [newFinding('nohash')], reconcile: [] });
+  writeJson(join(scratchDir, 'verdicts', 'nohash.json'), { id: 'nohash', verdict: 'accept', rationale: 'real' });
   assert.throws(() => persistSummary({ store, scratchDir, roundId }), /nohash/);
+
+  writeJson(join(scratchDir, 'verdicts', 'nohash.json'), { id: 'nohash', verdict: 'reject', rationale: 'noise' });
+  const out = persistSummary({ store, scratchDir, roundId });
+  assert.equal(out.new.length, 0);
+  assert.equal(out.warnings.filter((w) => w.includes('nohash')).length, 1);
+});
+
+test('reviewer-common.md states every field the gate requires', () => {
+  const prose = readFileSync(join('tools', 'claude', 'skills', 'code-review-board', 'reviewer-common.md'), 'utf8');
+  for (const field of FINDING_REQUIRED) assert.ok(prose.includes('`' + field + '`'), `reviewer-common.md does not name ${field}`);
 });

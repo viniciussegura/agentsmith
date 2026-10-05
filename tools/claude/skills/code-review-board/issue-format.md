@@ -58,6 +58,9 @@ interface ReviewRoundInfo {
 `persist.mjs apply` names its output `rounds/<id>.json`, so it validates this record **before any write** and fails naming every missing required field and every unknown one together -- the failure it catches is a drifted field name (`selectedRoles` for `roles`), which is only legible when both halves are reported.
 Build the record with `roundRecord()` from `round-args.mjs` rather than by hand, so the field names cannot drift from this interface in the first place.
 
+Both `summary` and `apply` gate every `new` finding the same way, before any write: the id parses as `<roundId>#<role>-<n>` for **this** round with a non-epic role, the five required fields (`id`, `title`, `description`, `priority`, `priorityRationale`) are present and well-typed, `priority` is a band above, and no field outside `Issue` is present.
+A malformed finding the verifier accepted fails the step, naming its file and every problem; one the verifier rejected is reported as a warning, since it is never written.
+
 ## Status lifecycle
 
 | status | meaning | set by |

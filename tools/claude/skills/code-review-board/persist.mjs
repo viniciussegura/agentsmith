@@ -48,10 +48,15 @@ function defaultScratchDir(store, roundId) {
 }
 
 function readDirJson(dir) {
+  return readDirJsonNamed(dir).map((n) => n.data);
+}
+
+// Same, keeping each file's name: a validation message must say which file a finding came from.
+function readDirJsonNamed(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((e) => e.endsWith('.json'))
-    .map((e) => readJson(join(dir, e)));
+    .map((e) => ({ file: e, data: readJson(join(dir, e)) }));
 }
 
 function walk(dir, fn) {
@@ -118,32 +123,64 @@ export function assertRoundRecord(record, source) {
   );
 }
 
-// Issue fields a reviewer must emit; the rest are set by persist or optional (issue-format.md).
-const FINDING_REQUIRED = ['id', 'title', 'description', 'priority', 'priorityRationale'];
+// The Issue fields a reviewer must emit, the ones it may, and the priority bands (issue-format.md).
+export const FINDING_REQUIRED = ['id', 'title', 'description', 'priority', 'priorityRationale'];
+const FINDING_OPTIONAL = ['kind', 'status', 'lastConfirmedCommit', 'locations', 'relatedIssues', 'closedInRound', 'promotedTo', 'closingComments'];
+const FINDING_STRING = ['id', 'title', 'description', 'priorityRationale'];
+const PRIORITIES = new Set(['low', 'medium', 'high']);
+const FINDING_KNOWN = new Set([...FINDING_REQUIRED, ...FINDING_OPTIONAL]);
+
+const isBlank = (v) => v === undefined || v === null || v === '';
+
+/** Every way one raw `new` finding fails the Issue contract, as messages; empty when it conforms. */
+function findingProblems(raw, roundId) {
+  const problems = [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return ['is not a JSON object'];
+  const parts = parseId(raw.id);
+  if (!parts) problems.push('id is malformed (expected `<roundId>#<role>-<n>`)');
+  else {
+    if (parts.role === 'epic') problems.push('id uses the reserved `epic` role segment');
+    if (parts.roundId !== roundId) problems.push(`id names round \`${parts.roundId}\`, not this round \`${roundId}\``);
+  }
+  const missing = FINDING_REQUIRED.filter((k) => isBlank(raw[k]));
+  if (missing.length) problems.push(`missing required field(s): ${missing.join(', ')}`);
+  const unknown = Object.keys(raw).filter((k) => !FINDING_KNOWN.has(k));
+  if (unknown.length) problems.push(`unknown field(s): ${unknown.join(', ')}`);
+  const notString = FINDING_STRING.filter((k) => !isBlank(raw[k]) && typeof raw[k] !== 'string');
+  if (notString.length) problems.push(`non-string field(s): ${notString.join(', ')}`);
+  if (!isBlank(raw.priority) && !PRIORITIES.has(raw.priority)) {
+    problems.push(`priority \`${raw.priority}\` is not one of ${[...PRIORITIES].join(' | ')}`);
+  }
+  return problems;
+}
 
 /**
- * Throw unless every `new` finding across the findings files is well-formed: an id that
- * parses as `<roundId>#<role>-<n>` with a non-epic role (the id is what names the issue's
- * directory), and every required Issue field present. Checked before any write and
- * reporting every problem at once, for the same reason assertRoundRecord does: the
- * defect this catches surfaced only at the post-write lint, as `issues/undefined/`.
- * @param {Array<{ new?: unknown[] }>} findings
+ * Gate the round's `new` findings against the Issue contract before any write, for the
+ * same reason assertRoundRecord does: the defect this catches used to surface only at the
+ * post-write lint, as `issues/undefined/`. Every problem is reported at once, with the
+ * findings file it came from. A malformed finding the verifier ACCEPTED would be written,
+ * so it throws; one the verifier REJECTED is never written, so it is returned as a warning
+ * rather than halting the round -- but never dropped silently (#swe-errors).
+ * @param {Array<{ file: string, data: { new?: unknown[] } }>} named  findings files, by name
+ * @param {{ roundId: string, accepted: Set<string> }} ctx
+ * @returns {string[]} warnings for rejected malformed findings
  */
-export function assertFindings(findings) {
-  const problems = [];
-  for (const f of findings) {
-    for (const raw of f?.new || []) {
+export function assertFindings(named, { roundId, accepted }) {
+  const errors = [];
+  const warnings = [];
+  for (const { file, data } of named) {
+    for (const raw of data?.new || []) {
+      const problems = findingProblems(raw, roundId);
+      if (!problems.length) continue;
       const id = raw?.id;
-      const parts = parseId(id);
-      if (!parts) problems.push(`finding id \`${id}\` is malformed (expected \`<roundId>#<role>-<n>\`)`);
-      else if (parts.role === 'epic') problems.push(`finding id \`${id}\` uses the reserved \`epic\` role segment`);
-      const missing = FINDING_REQUIRED.filter((k) => raw?.[k] === undefined || raw?.[k] === null || raw?.[k] === '');
-      if (missing.length) problems.push(`finding \`${id}\` is missing required field(s): ${missing.join(', ')}`);
+      const line = `finding \`${id}\` in findings/${file}: ${problems.join('; ')}`;
+      (accepted.has(id) ? errors : warnings).push(line);
     }
   }
-  if (problems.length) {
-    throw new Error(`findings do not match Issue (issue-format.md) -- ${problems.join('; ')}`);
+  if (errors.length) {
+    throw new Error(`accepted findings do not match Issue (issue-format.md) -- ${errors.join(' | ')}`);
   }
+  return warnings.map((w) => `rejected ${w}`);
 }
 
 // ---------- apply ----------
@@ -160,14 +197,14 @@ export function persistApply({ store, roundId, scratchDir }) {
   const roundPathIn = join(scratch, 'round.json');
   const round = readJson(roundPathIn);
   assertRoundRecord(round, roundPathIn);
-  const findings = readDirJson(join(scratch, 'findings'));
-  assertFindings(findings);
   const verdicts = readDirJson(join(scratch, 'verdicts'));
+  const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
+  const namedFindings = readDirJsonNamed(join(scratch, 'findings'));
+  const findingWarnings = assertFindings(namedFindings, { roundId: round.id, accepted });
+  const findings = namedFindings.map((n) => n.data);
   const directive = existsSync(join(scratch, 'pm-directive.json'))
     ? readJson(join(scratch, 'pm-directive.json'))
     : {};
-
-  const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
   const pmRejected = new Set((directive.rejections || []).map((r) => r.id));
   const priorityOf = new Map((directive.priorityOverrides || []).map((p) => [p.id, p]));
   const dupOf = new Map((directive.duplicates || []).map((d) => [d.id, d]));
@@ -220,7 +257,7 @@ export function persistApply({ store, roundId, scratchDir }) {
 
   // 5) Validate.
   const { errors, warnings } = lintStore({ root: store });
-  return { written, errors, warnings, counts: countWritten({ store, written }) };
+  return { written, errors, warnings: [...findingWarnings, ...warnings], counts: countWritten({ store, written }) };
 }
 
 // Tally what reached the store, by partition. Reported unconditionally (zeros
@@ -320,14 +357,15 @@ const summarize = (o, role) => ({ id: o.id, title: o.title, priority: o.priority
  * Project the PM's input: carried-forward OPEN issues (from the store) plus this
  * round's accepted new findings (scratch minus rejects). Writes pm-input.json.
  * @param {{ store: string, roundId: string, scratchDir?: string }} input
- * @returns {{ roundId: string, carried: object[], new: object[] }}
+ * @returns {{ roundId: string, carried: object[], new: object[], warnings: string[] }}
  */
 export function persistSummary({ store, roundId, scratchDir }) {
   const scratch = scratchDir || defaultScratchDir(store, roundId);
-  const findings = readDirJson(join(scratch, 'findings'));
-  assertFindings(findings);
   const verdicts = readDirJson(join(scratch, 'verdicts'));
   const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
+  const namedFindings = readDirJsonNamed(join(scratch, 'findings'));
+  const warnings = assertFindings(namedFindings, { roundId, accepted });
+  const findings = namedFindings.map((n) => n.data);
 
   const carried = [];
   walk(join(store, 'issues'), (abs) => {
@@ -346,7 +384,7 @@ export function persistSummary({ store, roundId, scratchDir }) {
 
   const out = { roundId, carried, new: fresh };
   writeJson(join(scratch, 'pm-input.json'), out);
-  return out;
+  return { ...out, warnings };
 }
 
 // ---------- CLI ----------
@@ -369,8 +407,9 @@ if (invokedDirectly) {
       );
       if (errors.length) exit(1);
     } else if (cmd === 'summary') {
-      persistSummary({ store, roundId });
-      stdout.write('review-board persist summary: ok\n');
+      const { warnings } = persistSummary({ store, roundId });
+      for (const w of warnings) stderr.write(`warning: ${w}\n`);
+      stdout.write(`review-board persist summary: ok -- ${warnings.length} warning(s)\n`);
     } else {
       stderr.write('usage: persist.mjs <summary|apply> <store-dir> <round-id>\n');
       exit(2);
