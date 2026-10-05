@@ -58,8 +58,9 @@ interface ReviewRoundInfo {
 `persist.mjs apply` names its output `rounds/<id>.json`, so it validates this record **before any write** and fails naming every missing required field and every unknown one together -- the failure it catches is a drifted field name (`selectedRoles` for `roles`), which is only legible when both halves are reported.
 Build the record with `roundRecord()` from `round-args.mjs` rather than by hand, so the field names cannot drift from this interface in the first place.
 
-Both `summary` and `apply` gate every `new` finding the same way, before any write: the id parses as `<roundId>#<role>-<n>` for **this** round with a non-epic role, the five required fields (`id`, `title`, `description`, `priority`, `priorityRationale`) are present and well-typed, `priority` is a band above, and no field outside `Issue` is present.
-A malformed finding the verifier accepted fails the step, naming its file and every problem; one the verifier rejected is reported as a warning, since it is never written.
+Both `summary` and `apply` gate every `new` finding the same way, before any write: the id parses as `<roundId>#<role>-<n>` for **this** round with a non-epic role, the five required fields (`id`, `title`, `description`, `priority`, `priorityRationale`) are present and well-typed, `priority` is a band above, `locations`/`relatedIssues` are arrays, `kind`/`status` if present are `issue`/`open`, and no other field is present -- the closed-state fields (`closedInRound`, `promotedTo`, `closingComments`) are persist's and `/review-promote`'s to set, never a reviewer's.
+A malformed finding the verifier accepted fails the step, naming its file, position, and every problem; one the verifier rejected is reported as a warning, since it is never written.
+`apply` gates `pm-directive.json` the same way before any write (known sections only, required entry fields, priorities in band, epic ids with the `epic` role for this round), and refuses a `round.json` whose `id` is not the round being applied.
 
 ## Status lifecycle
 

@@ -125,7 +125,9 @@ export function assertRoundRecord(record, source) {
 
 // The Issue fields a reviewer must emit, the ones it may, and the priority bands (issue-format.md).
 export const FINDING_REQUIRED = ['id', 'title', 'description', 'priority', 'priorityRationale'];
-const FINDING_OPTIONAL = ['kind', 'status', 'lastConfirmedCommit', 'locations', 'relatedIssues', 'closedInRound', 'promotedTo', 'closingComments'];
+// A reviewer may pre-set these; the closed-state fields (closedInRound, promotedTo,
+// closingComments) are set by persist or /review-promote, so on a NEW finding they are unknown.
+const FINDING_OPTIONAL = ['kind', 'status', 'lastConfirmedCommit', 'locations', 'relatedIssues'];
 const FINDING_STRING = ['id', 'title', 'description', 'priorityRationale'];
 const PRIORITIES = new Set(['low', 'medium', 'high']);
 const FINDING_KNOWN = new Set([...FINDING_REQUIRED, ...FINDING_OPTIONAL]);
@@ -151,6 +153,11 @@ function findingProblems(raw, roundId) {
   if (!isBlank(raw.priority) && !PRIORITIES.has(raw.priority)) {
     problems.push(`priority \`${raw.priority}\` is not one of ${[...PRIORITIES].join(' | ')}`);
   }
+  if (!isBlank(raw.kind) && raw.kind !== 'issue') problems.push(`kind \`${raw.kind}\` is not \`issue\``);
+  if (!isBlank(raw.status) && raw.status !== 'open') problems.push(`status \`${raw.status}\` is not \`open\` (a new finding opens open)`);
+  if (!isBlank(raw.lastConfirmedCommit) && typeof raw.lastConfirmedCommit !== 'string') problems.push('lastConfirmedCommit is not a string');
+  if (!isBlank(raw.locations) && !Array.isArray(raw.locations)) problems.push('locations is not an array');
+  if (!isBlank(raw.relatedIssues) && !Array.isArray(raw.relatedIssues)) problems.push('relatedIssues is not an array');
   return problems;
 }
 
@@ -169,18 +176,66 @@ export function assertFindings(named, { roundId, accepted }) {
   const errors = [];
   const warnings = [];
   for (const { file, data } of named) {
-    for (const raw of data?.new || []) {
+    (data?.new || []).forEach((raw, i) => {
       const problems = findingProblems(raw, roundId);
-      if (!problems.length) continue;
+      if (!problems.length) return;
       const id = raw?.id;
-      const line = `finding \`${id}\` in findings/${file}: ${problems.join('; ')}`;
+      const line = `finding findings/${file} new[${i}] (id \`${id}\`): ${problems.join('; ')}`;
       (accepted.has(id) ? errors : warnings).push(line);
-    }
+    });
   }
   if (errors.length) {
     throw new Error(`accepted findings do not match Issue (issue-format.md) -- ${errors.join(' | ')}`);
   }
   return warnings.map((w) => `rejected ${w}`);
+}
+
+// pm-directive.json (issue-format.md): every section the PM may emit, and what each entry needs.
+const DIRECTIVE_SECTIONS = new Set(['epics', 'priorityOverrides', 'duplicates', 'rejections']);
+const DIRECTIVE_ENTRY_REQUIRED = {
+  epics: ['id', 'title'],
+  priorityOverrides: ['id', 'priority'],
+  duplicates: ['id', 'canonical'],
+  rejections: ['id'],
+};
+
+/**
+ * Throw unless the PM directive is well-formed, before any write: an epic id that parses with
+ * the `epic` role for THIS round, required entry fields present, and priorities in band.
+ * Without this, applyEpics threw after issues were already written and reconciled -- the
+ * post-write failure the findings gate exists to end.
+ * @param {unknown} directive
+ * @param {{ roundId: string, source: string }} ctx
+ */
+export function assertDirective(directive, { roundId, source }) {
+  if (!directive || typeof directive !== 'object' || Array.isArray(directive)) {
+    throw new Error(`PM directive (${source}) is not a JSON object`);
+  }
+  const problems = [];
+  const unknown = Object.keys(directive).filter((k) => !DIRECTIVE_SECTIONS.has(k));
+  if (unknown.length) problems.push(`unknown section(s): ${unknown.join(', ')}`);
+  for (const section of DIRECTIVE_SECTIONS) {
+    const entries = directive[section];
+    if (entries === undefined) continue;
+    if (!Array.isArray(entries)) { problems.push(`${section} is not an array`); continue; }
+    entries.forEach((e, i) => {
+      const at = `${section}[${i}]`;
+      if (!e || typeof e !== 'object') { problems.push(`${at} is not an object`); return; }
+      const missing = DIRECTIVE_ENTRY_REQUIRED[section].filter((k) => isBlank(e[k]));
+      if (missing.length) problems.push(`${at} missing required field(s): ${missing.join(', ')}`);
+      if (!isBlank(e.priority) && !PRIORITIES.has(e.priority)) problems.push(`${at} priority \`${e.priority}\` is not one of ${[...PRIORITIES].join(' | ')}`);
+      if (section === 'epics' && !isBlank(e.id)) {
+        const parts = parseId(e.id);
+        if (!parts) problems.push(`${at} id \`${e.id}\` is malformed (expected \`<roundId>#epic-<n>\`)`);
+        else {
+          if (parts.role !== 'epic') problems.push(`${at} id \`${e.id}\` does not use the \`epic\` role segment`);
+          if (parts.roundId !== roundId) problems.push(`${at} id names round \`${parts.roundId}\`, not this round \`${roundId}\``);
+        }
+        if (!isBlank(e.children) && !Array.isArray(e.children)) problems.push(`${at} children is not an array`);
+      }
+    });
+  }
+  if (problems.length) throw new Error(`PM directive (${source}) does not match issue-format.md -- ${problems.join('; ')}`);
 }
 
 // ---------- apply ----------
@@ -197,14 +252,17 @@ export function persistApply({ store, roundId, scratchDir }) {
   const roundPathIn = join(scratch, 'round.json');
   const round = readJson(roundPathIn);
   assertRoundRecord(round, roundPathIn);
+  if (round.id !== roundId) {
+    throw new Error(`round record (${roundPathIn}) is for round \`${round.id}\`, but round \`${roundId}\` is being applied`);
+  }
   const verdicts = readDirJson(join(scratch, 'verdicts'));
   const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
   const namedFindings = readDirJsonNamed(join(scratch, 'findings'));
   const findingWarnings = assertFindings(namedFindings, { roundId: round.id, accepted });
   const findings = namedFindings.map((n) => n.data);
-  const directive = existsSync(join(scratch, 'pm-directive.json'))
-    ? readJson(join(scratch, 'pm-directive.json'))
-    : {};
+  const directivePath = join(scratch, 'pm-directive.json');
+  const directive = existsSync(directivePath) ? readJson(directivePath) : {};
+  assertDirective(directive, { roundId, source: directivePath });
   const pmRejected = new Set((directive.rejections || []).map((r) => r.id));
   const priorityOf = new Map((directive.priorityOverrides || []).map((p) => [p.id, p]));
   const dupOf = new Map((directive.duplicates || []).map((d) => [d.id, d]));

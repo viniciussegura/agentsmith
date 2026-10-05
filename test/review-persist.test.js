@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { persistApply, persistSummary, FINDING_REQUIRED } from '../tools/claude/skills/code-review-board/persist.mjs';
 import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
+
+const repoRoot = resolve(fileURLToPath(import.meta.url), '../..');
 
 // Build a round scratch dir + empty store; return { store, scratchDir, roundId }.
 function scaffold(t, roundId = 'r1') {
@@ -371,6 +374,67 @@ test('summary fails closed on a malformed accepted finding and warns on a reject
 });
 
 test('reviewer-common.md states every field the gate requires', () => {
-  const prose = readFileSync(join('tools', 'claude', 'skills', 'code-review-board', 'reviewer-common.md'), 'utf8');
+  const prose = readFileSync(resolve(repoRoot, 'tools', 'claude', 'skills', 'code-review-board', 'reviewer-common.md'), 'utf8');
   for (const field of FINDING_REQUIRED) assert.ok(prose.includes('`' + field + '`'), `reviewer-common.md does not name ${field}`);
+});
+
+// One accepted, well-formed finding plus whatever the caller adds; returns the scaffold.
+function acceptedRound(t, extraFindings = [], directive = null) {
+  const sc = scaffold(t);
+  const all = [newFinding('r1#swe-1'), ...extraFindings];
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: all, reconcile: [] });
+  for (const f of all) {
+    writeJson(join(sc.scratchDir, 'verdicts', `${String(f.id).replace('#', '--')}.json`), { id: f.id, verdict: 'accept', rationale: 'real' });
+  }
+  if (directive) writeJson(join(sc.scratchDir, 'pm-directive.json'), directive);
+  return sc;
+}
+
+function assertHaltsBeforeWrite(sc, ...expected) {
+  assert.throws(() => persistApply(sc), (e) => {
+    for (const x of expected) assert.ok(e.message.includes(x), `message lacks ${x}: ${e.message}`);
+    return true;
+  });
+  assert.ok(!existsSync(join(sc.store, 'issues')), 'store was written despite the malformed input');
+  assert.ok(!existsSync(join(sc.store, 'epics')), 'epics were written despite the malformed input');
+}
+
+test('a PM priority override outside the bands halts before any write', (t) => {
+  const sc = acceptedRound(t, [], { priorityOverrides: [{ id: 'r1#swe-1', priority: 'P1', rationale: 'x' }] });
+  assertHaltsBeforeWrite(sc, 'pm-directive.json', 'priorityOverrides', 'P1');
+});
+
+test('a new finding carrying closed-state fields is refused', (t) => {
+  const sc = acceptedRound(t, [newFinding('r1#swe-2', { closedInRound: 'r0', closingComments: 'done', promotedTo: 'JIRA-1' })]);
+  assertHaltsBeforeWrite(sc, 'r1#swe-2', 'closedInRound', 'closingComments', 'promotedTo');
+});
+
+test('optional fields are checked by shape, not just by name', (t) => {
+  const sc = acceptedRound(t, [newFinding('r1#swe-2', { locations: 'src/a.js', kind: 'epic', lastConfirmedCommit: 7, status: 'fixed' })]);
+  assertHaltsBeforeWrite(sc, 'r1#swe-2', 'locations', 'kind', 'lastConfirmedCommit', 'status');
+});
+
+test('a malformed PM directive halts before issues are written', (t) => {
+  const sc = acceptedRound(t, [], {
+    epics: [{ title: 'No id' }, { id: 'r1#swe-9', title: 'Wrong role' }, { id: 'r9#epic-1', title: 'Other round' }],
+    duplicates: [{ id: 'r1#swe-1' }],
+    bogus: true,
+  });
+  assertHaltsBeforeWrite(sc, 'pm-directive.json', 'epics[0]', 'epics[1]', 'epics[2]', 'duplicates[0]', 'canonical', 'bogus');
+});
+
+test('apply refuses a round.json whose id differs from the round being applied', (t) => {
+  const sc = acceptedRound(t);
+  const round = JSON.parse(readFileSync(join(sc.scratchDir, 'round.json'), 'utf8'));
+  writeJson(join(sc.scratchDir, 'round.json'), { ...round, id: 'r2' });
+  assertHaltsBeforeWrite(sc, 'round.json', 'r2', 'r1');
+});
+
+test('id-less findings are reported by their position in the file', (t) => {
+  const sc = scaffold(t);
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: [{ title: 'a' }, { title: 'b' }], reconcile: [] });
+  const out = persistSummary(sc);
+  assert.equal(out.warnings.length, 2);
+  assert.ok(out.warnings[0].includes('new[0]'), out.warnings[0]);
+  assert.ok(out.warnings[1].includes('new[1]'), out.warnings[1]);
 });
