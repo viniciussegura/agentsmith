@@ -13,7 +13,9 @@ Edges the hand-rolled gate still leaves open, to be closed by the schema rather 
 - directive ids are not resolved -- a mistyped `canonical` fails only at post-write lint, and an override, rejection, or duplicate naming no accepted finding is a silent no-op;
 - the same accepted id in two findings files writes twice and lint sees one file;
 - whitespace-only strings count as present in the gate but not in `lint.mjs`;
-- a non-string id is reported twice, and `apply` mixes `round.id` and `roundId` after proving them equal.
+- a non-string id is reported twice;
+- directive ids outside `epics` (overrides, duplicates, rejections) are not resolved against the accepted findings;
+- a finding's id role is not matched to the findings file it came from, so `swe.json` may carry a `qa` id.
 
 ## Why it matters
 

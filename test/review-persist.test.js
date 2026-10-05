@@ -462,3 +462,37 @@ test('a malformed reconcile entry halts before any write', (t) => {
   assert.equal(readFileSync(seeded, 'utf8'), before, 'the seeded issue was touched');
   assert.ok(!existsSync(join(store, 'rounds')), 'the round record was written');
 });
+
+test('a findings file whose root is not { new, reconcile } is refused by name, never read as zero findings', (t) => {
+  const roots = [
+    [newFinding('r1#swe-1')],
+    { findings: [newFinding('r1#swe-1')] },
+    { new: {}, reconcile: [] },
+    { new: [newFinding('r1#swe-1')] },
+  ];
+  for (const bad of roots) {
+    const sc = scaffold(t);
+    writeJson(join(sc.scratchDir, 'findings', 'swe.json'), bad);
+    writeJson(join(sc.scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+    for (const run of [persistSummary, persistApply]) {
+      assert.throws(() => run(sc), (e) => {
+        assert.ok(e.message.includes('findings/swe.json'), `${run.name} did not name the file: ${e.message}`);
+        assert.ok(!(e instanceof TypeError), `${run.name} crashed instead of gating: ${e.message}`);
+        return true;
+      }, `${run.name} accepted root ${JSON.stringify(bad).slice(0, 40)}`);
+    }
+    assert.ok(!existsSync(join(sc.store, 'issues')));
+  }
+});
+
+test('summary gates round.json and reconcile entries the same way apply does', (t) => {
+  const sc = scaffold(t, 'r2');
+  writeJson(join(sc.store, 'issues', 'swe', 'r1--swe-1-old.json'), newFinding('r1#swe-1'));
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: [], reconcile: [{ id: 'r1#swe-1', transition: 'fix' }] });
+  assert.throws(() => persistSummary(sc), /reconcile\[0\].*`fix`/);
+
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: [], reconcile: [] });
+  const round = JSON.parse(readFileSync(join(sc.scratchDir, 'round.json'), 'utf8'));
+  writeJson(join(sc.scratchDir, 'round.json'), { ...round, id: 'r9' });
+  assert.throws(() => persistSummary(sc), /round\.json.*r9.*r2/);
+});

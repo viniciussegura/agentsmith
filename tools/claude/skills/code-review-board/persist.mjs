@@ -162,21 +162,42 @@ function findingProblems(raw, roundId) {
 }
 
 /**
- * Gate the round's `new` findings against the Issue contract before any write, for the
- * same reason assertRoundRecord does: the defect this catches used to surface only at the
- * post-write lint, as `issues/undefined/`. Every problem is reported at once, with the
- * findings file it came from. A malformed finding the verifier ACCEPTED would be written,
- * so it throws; one the verifier REJECTED is never written, so it is returned as a warning
- * rather than halting the round -- but never dropped silently (#swe-errors).
+ * Gate the findings files against the documented contract before any write: each file is
+ * `{ new: Issue[], reconcile: Reconcile[] }` and nothing else, and each `new` finding matches
+ * the Issue interface (issue-format.md). Every problem is reported at once, with the file it
+ * came from. A malformed finding the verifier ACCEPTED would be written, so it throws; one the
+ * verifier REJECTED is never written, so it is returned as a warning rather than halting the
+ * round -- but never dropped silently (#swe-errors). A malformed FILE throws regardless: none
+ * of its findings can be trusted to have reached the verifier.
  * @param {Array<{ file: string, data: { new?: unknown[] } }>} named  findings files, by name
  * @param {{ roundId: string, accepted: Set<string> }} ctx
  * @returns {string[]} warnings for rejected malformed findings
  */
+const FINDINGS_FILE_KEYS = new Set(['new', 'reconcile']);
+
+/** Every way a findings FILE fails `{ new: [], reconcile: [] }`; empty when it conforms. */
+function findingsFileProblems(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return ['root is not a JSON object'];
+  const problems = [];
+  for (const k of FINDINGS_FILE_KEYS) {
+    if (data[k] === undefined) problems.push(`missing \`${k}\` array`);
+    else if (!Array.isArray(data[k])) problems.push(`\`${k}\` is not an array`);
+  }
+  const unknown = Object.keys(data).filter((k) => !FINDINGS_FILE_KEYS.has(k));
+  if (unknown.length) problems.push(`unknown key(s): ${unknown.join(', ')}`);
+  return problems;
+}
+
 export function assertFindings(named, { roundId, accepted }) {
   const errors = [];
   const warnings = [];
   for (const { file, data } of named) {
-    (data?.new || []).forEach((raw, i) => {
+    const fileProblems = findingsFileProblems(data);
+    if (fileProblems.length) {
+      errors.push(`findings/${file}: ${fileProblems.join('; ')} (expected { new: Issue[], reconcile: Reconcile[] })`);
+      continue;
+    }
+    data.new.forEach((raw, i) => {
       const problems = findingProblems(raw, roundId);
       if (!problems.length) return;
       const id = raw?.id;
@@ -185,7 +206,7 @@ export function assertFindings(named, { roundId, accepted }) {
     });
   }
   if (errors.length) {
-    throw new Error(`accepted findings do not match Issue (issue-format.md) -- ${errors.join(' | ')}`);
+    throw new Error(`findings do not match issue-format.md -- ${errors.join(' | ')}`);
   }
   return warnings.map((w) => `rejected ${w}`);
 }
@@ -200,10 +221,9 @@ const DIRECTIVE_ENTRY_REQUIRED = {
 };
 
 /**
- * Throw unless the PM directive is well-formed, before any write: an epic id that parses with
- * the `epic` role for THIS round, required entry fields present, and priorities in band.
- * Without this, applyEpics threw after issues were already written and reconciled -- the
- * post-write failure the findings gate exists to end.
+ * Throw unless the PM directive is well-formed, before any write: known sections only, an epic
+ * id that parses with the `epic` role for THIS round, required entry fields present, and
+ * priorities in band. applyEpics runs after issues are written, so it relies on this gate.
  * @param {unknown} directive
  * @param {{ roundId: string, source: string }} ctx
  */
@@ -243,8 +263,8 @@ const RECONCILE_TRANSITIONS = new Set(['fixed', 'deprecated', 'superseded', 'reo
 
 /**
  * Throw unless every reconcile entry names an issue that exists in the store and a known
- * transition. Checked before any write: a mistyped id or transition used to be skipped with
- * nothing reported, leaving the issue the reviewer meant to close open (#swe-errors).
+ * transition, before any write. An entry that cannot be applied is an error, never a skip:
+ * a skipped transition leaves the issue the reviewer meant to close open (#swe-errors).
  * @param {Array<{ file: string, data: { reconcile?: unknown[] } }>} named
  * @param {Map<string, unknown>} index  the store index (issue id -> record)
  */
@@ -273,21 +293,30 @@ export function assertReconcile(named, index) {
  * @param {{ store: string, roundId: string, scratchDir?: string }} input
  * @returns {{ written: string[], errors: string[], warnings: string[], counts: { issues: number, epics: number, rounds: number } }}
  */
-export function persistApply({ store, roundId, scratchDir }) {
-  const scratch = scratchDir || defaultScratchDir(store, roundId);
-  // Parse AND validate ALL inputs up front so malformed scratch fails before any write.
-  const roundPathIn = join(scratch, 'round.json');
-  const round = readJson(roundPathIn);
-  assertRoundRecord(round, roundPathIn);
+/**
+ * Read and gate the scratch both `summary` and `apply` consume -- round record, verdicts,
+ * findings files, reconcile entries -- so the two steps refuse the same input and the reduce
+ * never runs on scratch that apply will reject. Throws before anything is written.
+ * @param {{ store: string, roundId: string, scratch: string }} input
+ */
+function gateScratch({ store, roundId, scratch }) {
+  const roundPath = join(scratch, 'round.json');
+  const round = readJson(roundPath);
+  assertRoundRecord(round, roundPath);
   if (round.id !== roundId) {
-    throw new Error(`round record (${roundPathIn}) is for round \`${round.id}\`, but round \`${roundId}\` is being applied`);
+    throw new Error(`round record (${roundPath}) is for round \`${round.id}\`, but round \`${roundId}\` is being persisted`);
   }
   const verdicts = readDirJson(join(scratch, 'verdicts'));
   const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
   const namedFindings = readDirJsonNamed(join(scratch, 'findings'));
-  const findingWarnings = assertFindings(namedFindings, { roundId, accepted });
+  const warnings = assertFindings(namedFindings, { roundId, accepted });
   assertReconcile(namedFindings, indexStore(store));
-  const findings = namedFindings.map((n) => n.data);
+  return { round, accepted, findings: namedFindings.map((n) => n.data), warnings };
+}
+
+export function persistApply({ store, roundId, scratchDir }) {
+  const scratch = scratchDir || defaultScratchDir(store, roundId);
+  const { round, accepted, findings, warnings: findingWarnings } = gateScratch({ store, roundId, scratch });
   const directivePath = join(scratch, 'pm-directive.json');
   const directive = existsSync(directivePath) ? readJson(directivePath) : {};
   assertDirective(directive, { roundId, source: directivePath });
@@ -446,11 +475,7 @@ const summarize = (o, role) => ({ id: o.id, title: o.title, priority: o.priority
  */
 export function persistSummary({ store, roundId, scratchDir }) {
   const scratch = scratchDir || defaultScratchDir(store, roundId);
-  const verdicts = readDirJson(join(scratch, 'verdicts'));
-  const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
-  const namedFindings = readDirJsonNamed(join(scratch, 'findings'));
-  const warnings = assertFindings(namedFindings, { roundId, accepted });
-  const findings = namedFindings.map((n) => n.data);
+  const { accepted, findings, warnings } = gateScratch({ store, roundId, scratch });
 
   const carried = [];
   walk(join(store, 'issues'), (abs) => {
