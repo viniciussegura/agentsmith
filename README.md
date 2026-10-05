@@ -132,6 +132,7 @@ rows:
 
 Indentation is exact: `rows:` at column 0, a row key at two spaces, a field at four.
 Comments follow YAML: a `#` at the start of a line, or after whitespace anywhere on one, runs to the end of the line.
+Values are written unquoted.
 With that file in place, `agentsmith install` discloses the remap on the plan it asks you to confirm:
 
 ```text

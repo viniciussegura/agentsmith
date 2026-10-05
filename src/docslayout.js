@@ -1,6 +1,6 @@
 // Project-dependent rule content: see the design decision `project-dependent-rule-content`.
 
-import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
 const MODULE_NAME = '#swe-docs-layout';
@@ -87,6 +87,7 @@ const ROW_KEY = /^([a-z][a-z0-9-]*):$/;
 const HASHED_ROW_KEY = /^[ \t]*#([a-z][a-z0-9-]*):[ \t]*$/;
 const TRAILING_COMMENT = /[ \t]+#.*$/;
 const FIELD_LINE = /^([a-z]+):(?: +(.*))?$/;
+const QUOTED_VALUE = /^["']/;
 const ROW_INDENT = 2;
 const FIELD_INDENT = 4;
 const INDENT_RULE = 'rows: at column 0, a row key at exactly 2 spaces, a field at exactly 4 spaces';
@@ -121,21 +122,32 @@ const isStrictlyInside = (base, target) => {
 /**
  * Read `<base>/.agentsmith/docs-layout.yaml` without following a symlink out of `base`.
  * The resolved config path must lie strictly inside the resolved base; the base itself is refused.
- * Throws when the path resolves outside the base, the file is present but unreadable, or it exceeds
- * `MAX_CONFIG_BYTES`. A file that is simply absent yields empty text, which parses to no overrides.
+ * Throws when the path resolves outside the base, the file is present but unreadable or unresolvable,
+ * or it exceeds `MAX_CONFIG_BYTES`. A file that is simply absent yields empty text, which parses to
+ * no overrides.
  *
- * @param {{ base: string, resolve?: (path: string) => string }} options
+ * @param {{ base: string, resolve?: (path: string) => string, lstat?: (path: string) => unknown }} options
  *   `resolve` is the path resolver (default `fs.realpathSync`); it throws `ENOENT` for an absent path.
+ *   `lstat` does not follow a link (default `fs.lstatSync`), which is what separates an absent path
+ *   from one whose own entry is present but does not resolve.
  * @returns {{ file: string, text: string }} The config's base name and its text; `text` is `''` when absent.
  */
-export function readLayoutConfig({ base, resolve = realpathSync }) {
+export function readLayoutConfig({ base, resolve = realpathSync, lstat = lstatSync }) {
   const configPath = join(base, CONFIG_RELATIVE_PATH);
   const file = CONFIG_RELATIVE_PATH.replaceAll(sep, '/');
   let resolved;
   try {
     resolved = resolve(configPath);
   } catch (err) {
-    if (err?.code === 'ENOENT') return { file, text: '' };
+    if (err?.code === 'ENOENT') {
+      // A broken symlink reports ENOENT though its own directory entry is there, which lstat
+      // sees because it does not follow the link. Reading that as an absent config would hand
+      // back the default layout in silence, for a path the user put there deliberately.
+      let entryExists = true;
+      try { lstat(configPath); } catch { entryExists = false; }
+      if (!entryExists) return { file, text: '' };
+      throw fail(`${file} is a link that does not resolve; no output was generated`);
+    }
     throw fail(`${file} cannot be resolved (${err?.code ?? 'unknown error'}); no output was generated`);
   }
   let realBase;
@@ -368,6 +380,9 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
         throw error(lineNo, 'external is not allowed for this row', `eligible rows are ${eligible}`);
       }
       if (value === '') throw error(lineNo, `${field} value is empty`, `give ${field} a value`);
+      // The charsets below refuse a quote anyway, but for the character rather than the
+      // quoting, which reads as a complaint about the path instead of about two keystrokes.
+      if (QUOTED_VALUE.test(value)) throw error(lineNo, `${field} value is quoted`, `write the ${field} unquoted`);
       const problem = field === 'path' ? pathProblem(value, current.policy) : externalProblem(value);
       if (problem !== null) throw error(lineNo, ...problem);
       current.override = { [field]: value };

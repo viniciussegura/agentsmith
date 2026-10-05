@@ -12,6 +12,7 @@ import {
   MAX_CONFIG_BYTES,
   ROW_POLICY,
   applyLayoutOverrides,
+  definesLayoutTag,
   deriveMappedPrefixes,
   mappedPrefixLint,
   MAPPED_PREFIX_EXCEPTIONS,
@@ -244,6 +245,16 @@ test('U6 rejected path values', () => {
   }
 });
 
+test('U6 a quoted value is rejected as quoted, rather than for the quote character', () => {
+  // The charsets already refused these, but for the quote rather than the quoting, which
+  // told the author to change the path when the fix is to drop two characters.
+  for (const value of ['"docs/adr/<decision-slug>.md"', "'docs/adr/<decision-slug>.md'"]) {
+    assertRejected(rowsWith('swe-design-decisions', `path: ${value}`), { line: 3, includes: 'path value is quoted' }, value);
+  }
+  assertRejected(rowsWith('swe-technical-debts', 'external: "jira/ENG"'), { line: 3, includes: 'external value is quoted' }, 'quoted label');
+  assert.deepEqual(pathCase('swe-design-decisions', 'docs/adr/<decision-slug>.md'), { 'swe-design-decisions': { path: 'docs/adr/<decision-slug>.md' } });
+});
+
 test('U6 an empty path or external value is rejected', () => {
   assertRejected(rowsWith('swe-technical-debts', 'path:'), { line: 3, includes: 'path value is empty' }, 'empty path');
   assertRejected(rowsWith('swe-technical-debts', 'external:'), { line: 3, includes: 'external value is empty' }, 'empty external');
@@ -401,6 +412,19 @@ test('U10 an absent config yields empty text that parses to no overrides, with n
   }
 });
 
+test('U10 a config path that is present but does not resolve is refused, not treated as absent', (t) => {
+  // A broken symlink: the directory entry is there, so lstat sees it, while realpath reports
+  // ENOENT. Treating that as no config would hand back the default layout without a word.
+  const { base, configPath } = scopeWithConfig(t, CONFIG_TEXT);
+  const gone = (p) => {
+    if (p === configPath) throw Object.assign(new Error('gone'), { code: 'ENOENT' });
+    return p;
+  };
+  assert.throws(() => readLayoutConfig({ base, resolve: gone }), /is a link that does not resolve; no output was generated/);
+  // Absent for real: lstat agrees with the resolver, and that stays no config, not an error.
+  assert.equal(readLayoutConfig({ base: makeTempDir(t, 'docslayout-absent-') }).text, '');
+});
+
 test('U10 a present but unreadable config is refused rather than treated as absent', (t) => {
   const base = makeTempDir(t, 'docslayout-');
   mkdirSync(join(base, CONFIG_DIR, CONFIG_NAME), { recursive: true });
@@ -422,6 +446,20 @@ const withoutBlock = (text) => {
 };
 const noteText = (text) => text.slice(text.indexOf(OPEN_MARKER) + OPEN_MARKER.length + 1, text.indexOf(CLOSE_MARKER));
 const tableLines = (text) => text.split('\n').filter((l) => l.startsWith('|'));
+
+test('the map module is identified by its heading, independent of the external-note block', () => {
+  // What identifies the map module to the CLI, which reads the config only once it has
+  // found that module. Asserted here because the alternative -- inferring it from the
+  // transform returning something other than its input -- holds only while the note block
+  // is there to resolve, and nothing stops a later edit removing the block.
+  const stripped = withoutBlock(realModule);
+  assert.ok(definesLayoutTag(realModule));
+  assert.ok(definesLayoutTag(stripped), 'still the map once the note block is gone');
+  assert.equal(applyLayoutOverrides({ moduleText: stripped, overrides: {} }), stripped, 'and the transform is then a no-op on it');
+  for (const text of ['# #swe-docs-layoutish Other\n', '# #swe-other Rule\n\n## #swe-docs-layout\n', 'no heading at all\n', '']) {
+    assert.equal(definesLayoutTag(text), false, JSON.stringify(text));
+  }
+});
 
 test('U2 a module not defining #swe-docs-layout is returned untouched, core or bundle hosted', () => {
   const overrides = { 'swe-epic': { path: 'work/<slug>/' } };

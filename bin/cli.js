@@ -147,13 +147,10 @@ const LAYOUT_RULE_MISSING =
   'the #swe-docs-layout rule is not in the generated instruction set, so .agentsmith/docs-layout.yaml cannot be applied';
 
 // Read and validate <base>/.agentsmith/docs-layout.yaml, exiting 1 on any problem
-// before a byte of output is generated. `knownRows` come from the rule module the
-// transform self-selects, so a typo'd tag is rejected against the shipped table
-// rather than silently ignored -- deny-by-default, including the arm where a
-// config exists but the rule is not in the emitted set.
-// Self-selection is observed as applyLayoutOverrides changing the text: on the map
-// module the transform is never a no-op, because the external-note block is always
-// resolved, and on every other module it is the identity.
+// before a byte of output is generated. `knownRows` come from the module that defines
+// #swe-docs-layout, which `definesLayoutTag` identifies by its heading, so a typo'd tag
+// is rejected against the shipped table rather than silently ignored -- deny-by-default,
+// including the arm where a config exists but the rule is not in the emitted set.
 // Project-dependent rule content: see the design decision `project-dependent-rule-content`.
 function readLayoutOverrides(base, moduleTexts) {
   const die = (why) => {

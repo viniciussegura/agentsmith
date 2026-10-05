@@ -23,6 +23,7 @@ Prints the intended-effects plan, gates it through the confirmation rules below,
 It is read after the scope's base is resolved and before any output is generated, so a bad config cannot produce a half-written tree; it is never created, modified, recorded in the install manifest, or removed by `uninstall`.
 **`uninstall` does not read it at all.** It writes no map, so validating the config there would let a stale one -- a row tag renamed by a later release, say -- block the user from removing an install that never consults it.
 An absent file, or one holding only comments and an empty `rows:`, means no overrides and changes nothing.
+A path whose own directory entry is present but does not resolve -- a broken symlink -- is an error rather than an absent config: the alternative is handing back the default layout in silence for a file the user put there.
 A malformed one is a hard error: `<file>:<line>: <what is wrong>; <what is allowed>; no output was generated` on stderr, exit `1`, before the plan is printed and before anything is written, and the message never echoes the offending value.
 The same exit `1` fires when a non-blank config is present and the `#swe-docs-layout` rule is not in the generated instruction set — the arm that turns a silently non-applied override into a loud failure.
 
