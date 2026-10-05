@@ -1,31 +1,35 @@
 # conformance -- the repo obeys its own rules
 
-Four small fixes, all mechanical, shipped together on `fix/self-conformance`.
+Four small, mechanical fixes shipped together on one branch.
 
 ## conformance-1 `hide-email`
 
 **Outcome.** No personal email address in any committed file; the plugin manifests carry the owner name only.
 **Depends on.** --
+**Blocks.** --
 **Acceptance.** The personal-address grep that `#swe-environment` prescribes matches only that rule.
 **State.** in-progress
 
 ## conformance-2 `sentinel-debt`
 
-**Outcome.** `#swe-prompt-injection-sentinel` and the `DATA_OPEN`/`DATA_CLOSE` constants state one sentinel form, a test fails when they diverge, and the 2026-07-30 debt note is deleted.
+**Outcome.** The sentinel rule and the review-board implementation state one sentinel form, a test fails when any prose site diverges from it, and the open debt note is closed.
 **Depends on.** --
-**Acceptance.** `docs/technical-debts/` holds no sentinel note; `npm test` has a test reading the rule module against the constants.
+**Blocks.** --
+**Acceptance.** No sentinel debt remains recorded; the suite sweeps every tracked document for the form.
 **State.** in-progress
 
 ## conformance-3 `role-field`
 
-**Outcome.** The code-review store derives an issue's directory from its id, never from an undeclared `role` field, and the 2026-08-11 future-work note is deleted.
+**Outcome.** The code-review store derives an issue's directory from its id and refuses a malformed accepted finding before writing anything; the open future-work note is closed.
 **Depends on.** --
-**Acceptance.** A persist test with findings that carry no `role` field writes under `issues/<role>/`, never `issues/undefined/`.
+**Blocks.** --
+**Acceptance.** A finding with no role field is filed under its role; a malformed accepted finding halts persistence with nothing written.
 **State.** in-progress
 
 ## conformance-4 `protocol-doc`
 
-**Outcome.** `review-board-protocol.md` opens with the round; the Workflow runtime constraints live in `CONTRIBUTING.md` as a build note.
+**Outcome.** The round protocol document opens with the round; the Workflow runtime constraints live in the contributor guide as a build note.
 **Depends on.** --
-**Acceptance.** The protocol document's first section after its preamble is the containment guard or the round.
+**Blocks.** --
+**Acceptance.** The protocol document's first section after its preamble describes the round or its guard.
 **State.** in-progress
