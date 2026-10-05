@@ -736,6 +736,19 @@ test('a row key written with its leading # is an error, not a silent comment', (
     { line: 2, includes: 'row key is written with a leading #' }, 'hashed row key');
   assertRejected(lines('#swe-epic:', 'rows:'),
     { line: 1, includes: 'row key is written with a leading #' }, 'hashed row key at column 0');
+  // A trailing comment must not hide it. Dropping the key as a comment leaves its field
+  // lines behind, which then attach to the row above: with a field-less row above, that row
+  // silently took the remap at exit 0; with a field already there, the error named it.
+  assertRejected(
+    lines('rows:', '  swe-technical-debts:', '  #swe-future-work:   # moved to jira', '    external: jira/ENG'),
+    { line: 3, includes: 'row key is written with a leading #' },
+    'hashed row key with a trailing comment',
+  );
+  assertRejected(
+    lines('rows:', '  swe-technical-debts:', '    path: docs/debts/<slug>.md', '  #swe-future-work: # moved', '    external: jira/ENG'),
+    { line: 4, includes: 'row key is written with a leading #' },
+    'hashed row key with a trailing comment, after a complete row',
+  );
   assert.deepEqual(parse(lines('#rows:', '#  swe-epic:', '#    path: docs/epics/<slug>/')), {}, 'whole config commented out');
   assert.deepEqual(
     parse(lines('rows:', '  # a note', `  #${SYNTHETIC}:`, '  swe-future-work:', '    path: docs/later/')),
@@ -801,8 +814,11 @@ test('a trailing comment is stripped, as YAML strips it', () => {
   // A `#` with no space before it is part of the value, which no allowed charset admits.
   assertRejected(rowsWith('swe-future-work', `path: docs/${SYNTHETIC}#x`), { line: 3, includes: 'not a safe repo-relative path' }, 'hash inside a path');
   assertRejected(rowsWith('swe-future-work', `external: jira/#${SYNTHETIC}`), { line: 3, includes: 'external label is not valid' }, 'hash inside a label');
-  // Stripping must not turn the hashed row key back into a comment.
+  // Stripping must not turn the hashed row key back into a comment: a line whose first
+  // non-space character is the `#` is a comment in full and is left intact.
   assertRejected(lines('rows:', '  #swe-future-work:'), { line: 2, includes: 'leading #' }, 'hashed row key');
+  assert.deepEqual(parse(lines('rows:', '  # swe-future-work: # moved', '  swe-epic:', '    path: docs/epics/<slug>/')), { 'swe-epic': { path: 'docs/epics/<slug>/' } }, 'a space after the # is still a comment');
+  assert.deepEqual(parse(lines('# one # two', 'rows:')), {}, 'a comment containing a second #');
 });
 
 test('a row whose records are directories rejects a path that is not one', () => {

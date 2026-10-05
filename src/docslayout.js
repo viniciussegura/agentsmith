@@ -85,7 +85,9 @@ const ROWS_KEY = 'rows:';
 const TOP_LEVEL_KEY = /^[A-Za-z_][\w-]*:/;
 const ROW_KEY = /^([a-z][a-z0-9-]*):$/;
 const HASHED_ROW_KEY = /^[ \t]*#([a-z][a-z0-9-]*):[ \t]*$/;
-const TRAILING_COMMENT = /[ \t]+#.*$/;
+// A comment delimiter is a `#` that follows whitespace after content of its own, so a line
+// whose first non-space character is the `#` is a comment in full and is left intact.
+const TRAILING_COMMENT = /^([ \t]*\S.*?)[ \t]+#.*$/;
 const FIELD_LINE = /^([a-z]+):(?: +(.*))?$/;
 const QUOTED_VALUE = /^["']/;
 const ROW_INDENT = 2;
@@ -318,20 +320,22 @@ export function parseLayoutConfig(text, knownRows, file = 'docs-layout.yaml') {
 
   lines.forEach((raw, index) => {
     const lineNo = index + 1;
-    // A row key written with its leading `#` is a mistake, not a comment, and it is
-    // the mistake the surfaces invite: every other agentsmith surface -- including
-    // this module's own unknown-tag message -- spells these tags as `#swe-...`.
-    // Swallowing it as a comment yields a silent no-op remap. Only a known row tag
-    // reads that way: `#rows:` or `#todo:` is an ordinary comment, so commenting the
-    // config out -- the documented way to turn the remap off -- is not an error.
-    const hashedTag = HASHED_ROW_KEY.exec(raw)?.[1];
+    // Stripped as YAML strips it. No allowed value admits a `#`, so one with no whitespace
+    // before it stays part of the value for the charset rules to reject.
+    const line = raw.replace(TRAILING_COMMENT, '$1');
+    // A row key written with its leading `#` is a mistake, not a comment, and it is the
+    // mistake the surfaces invite: every other agentsmith surface -- including this
+    // module's own unknown-tag message -- spells these tags as `#swe-...`. Taking it for a
+    // comment drops the key while its field lines remain, so they attach to the row above
+    // and remap THAT row -- silently, when that row has no field of its own yet.
+    // Checked after the strip, so a trailing comment cannot hide the key; the strip leaves
+    // a whole-line comment alone, so one is still recognised below. Only a known row tag
+    // reads this way: `#rows:` or `#todo:` is an ordinary comment, so commenting the config
+    // out -- the documented way to turn the remap off -- is not an error.
+    const hashedTag = HASHED_ROW_KEY.exec(line)?.[1];
     if (hashedTag !== undefined && known.has(hashedTag)) {
       throw error(lineNo, 'row key is written with a leading #', 'write the owner tag bare, or put a space after the # to comment the line out');
     }
-    // Stripped as YAML strips it, and only after the check above, which must still see a
-    // row key the author commented out. No allowed value admits a `#`, so one with no
-    // whitespace before it stays part of the value for the charset rules to reject.
-    const line = raw.replace(TRAILING_COMMENT, '');
     if (line === '' || /^\s*#/.test(line)) return;
 
     const leading = /^[ \t]*/.exec(line)[0];
