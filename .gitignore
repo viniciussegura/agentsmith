@@ -6,7 +6,12 @@ tmp/
 # The forged core lives at .agentsmith/AGENTS.md; the root AGENTS.md is a
 # write-once consumer stub (never overwritten by a build) and is committed,
 # because this repo's own local rules live in it.
-.agentsmith/
+#
+# The star form, not the bare directory, so the layout config can be re-admitted:
+# git will not re-include a file whose parent directory is excluded. This is the
+# recipe the README gives consumers, applied to this repo too.
+.agentsmith/*
+!.agentsmith/docs-layout.yaml
 
 # caveman /compress backups
 *.original.md

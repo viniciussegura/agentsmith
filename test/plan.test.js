@@ -154,3 +154,34 @@ test('renderPlan lists every delete (no truncation) so a destructive confirm hid
   for (const f of paths) assert.match(out, new RegExp(f), `${f} listed`);
   assert.doesNotMatch(out, /\.\.\./, 'no truncation ellipsis on the delete line');
 });
+
+
+// --- the `layout` line: a remapped docs layout is disclosed before the confirmation ---
+
+const installFlags = { mode: 'split', placement: 'nested', tools: true, dev: false, clean: false, yes: false, dryRun: false };
+const layoutInstall = (layout) => buildInstallPlan({ base: '/b', absolute: false, built, adapterPlan, scope: { kind: 'project' },
+  flags: installFlags, prevManifestPaths: [], stubExists: false, layout });
+
+test('renderPlan discloses a remap on the install plan, external rows as "external -- <label>"', () => {
+  const p = layoutInstall({ file: '.agentsmith/docs-layout.yaml', overrides: {
+    'swe-design-decisions': { path: 'docs/adr/<decision-slug>.md' },
+    'swe-technical-debts': { external: 'jira/ENG' },
+  } });
+  const lines = renderPlan(p).split('\n');
+  assert.ok(lines.includes('  layout  2 row(s) remapped from .agentsmith/docs-layout.yaml: swe-design-decisions -> docs/adr/<decision-slug>.md, swe-technical-debts -> external -- jira/ENG'));
+  assert.equal(lines.filter((l) => l.startsWith('  layout  ')).length, 1);
+});
+
+test('renderPlan emits no layout line without overrides, and output is unchanged', () => {
+  const none = layoutInstall(undefined);
+  const empty = layoutInstall({ file: '.agentsmith/docs-layout.yaml', overrides: {} });
+  assert.ok(!renderPlan(none).includes('layout'));
+  assert.equal(renderPlan(empty), renderPlan(none));
+  assert.ok(!('layout' in empty), 'an empty remap leaves the plan object untouched');
+});
+
+test('an uninstall plan never carries a layout line', () => {
+  const p = buildUninstallPlan({ base: '/b', absolute: false, scope: { kind: 'project' }, manifestPaths: ['.agentsmith/AGENTS.md'],
+    corePath: '.agentsmith/AGENTS.md', stubContent: null, stubOnDiskContent: null, settingsHasOwned: false, hasClaudeMd: false, isUser: false });
+  assert.ok(!renderPlan(p).includes('layout'));
+});

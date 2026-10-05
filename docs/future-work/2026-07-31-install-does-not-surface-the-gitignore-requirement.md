@@ -21,18 +21,20 @@ The blast radius differs, though, and this one is worse. An un-deleted store is 
 The README block was originally an enumeration of the working-state paths -- default-allow, requiring the list to stay complete against a set that grows. It shipped missing two of five. It has since been inverted to deny-by-default, in the two forms a consumer can actually be in:
 
 ```gitignore
-.agentsmith/                 # not committing the generated instructions
+.agentsmith/*                # not committing the generated instructions
+!.agentsmith/docs-layout.yaml
 ```
 
 ```gitignore
 .agentsmith/*                # committing them
 !.agentsmith/AGENTS.md
 !.agentsmith/agents/
+!.agentsmith/docs-layout.yaml
 ```
 
 (The `/*` is load-bearing: git will not re-include a file whose parent directory is excluded, so `.agentsmith/` paired with `!` exceptions silently ignores the core too. Verified both forms against a scratch repo.)
 
-That removes the drift risk entirely -- there is no longer a list of scratch paths to keep current, and a working-state directory added by a future version is covered without any consumer editing anything. What it does not do is reach a consumer who never reads the README.
+That removes the drift risk for working **state** -- there is no longer a list of scratch paths to keep current, and a working-state directory added by a future version is covered without any consumer editing anything. A **committed** file a later version adds still costs an edit, which is why both forms now carry `/*` and re-admit the docs-layout config. What none of it does is reach a consumer who never reads the README.
 
 ## Options
 
@@ -48,6 +50,12 @@ Option 2 via `git check-ignore` is the recommendation -- it is a subprocess call
 - Do not re-implement gitignore matching. Precedence, negation, and parent-directory rules are exactly what the enumeration got wrong once already; ask git.
 - Say nothing when the paths are already ignored. A warning that fires on a correctly-configured project is noise on every install, and trains the operator to skip the plan output -- which is the surface this is trying to use.
 - New user-facing output is public surface (`#swe-public-surface-docs`) and needs its docs in the same change.
+
+## Applied narrowly; this note's own scope stays open
+
+Option 2's `git check-ignore` recommendation now ships, for **one file**: `.agentsmith/docs-layout.yaml`, the docs-layout config a project is meant to commit. `install` probes that path on an install plan, warns on stderr when git reports it ignored, stays silent when the file is absent or already tracked, treats a missing git or a timeout as a silent skip, leaves the exit code at `0`, and skips the probe entirely for `--scope user`.
+
+That settles the mechanism and nothing else. The probe form, the outcome table, and where the warning goes are now shipped, tested, and documented in `docs/reference-spec/cli.md` -- so a later application of the same recommendation is a copy of a working control rather than a fresh design. What is still open is this note's actual subject: the working-spec store and the rest of `.agentsmith/` are unprobed, so a consumer who never reads the README still commits the store with no signal. The remaining decision is scope, not design -- which paths to probe, and whether one warning covers them or each gets its own.
 
 ## Provenance
 
