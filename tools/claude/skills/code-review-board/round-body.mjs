@@ -21,21 +21,24 @@ export async function runRound({ agent, parallel, phase, log, args }) {
     if (!opts.model) throw new Error(`dispatch without explicit model: ${opts.label}`);
     return agent(prompt, opts);
   };
-  // The exit code a CLI dispatch reported. The prompt asks for a final `exit: <code>` line, so the
-  // LAST match wins over anything echoed from the command's own output; the phrasing is lenient
-  // ("exit: 0", "exit code 0", "exited with code 0", "exit status 0") because the reporter is a model.
-  const exitCodeOf = (reply) => {
-    const m = [...String(reply ?? '').matchAll(/exit(?:ed)?(?:\s+with)?(?:\s+(?:code|status))?:?\s*(\d+)/gi)].pop();
-    return m ? Number(m[1]) : null;
+  // A CLI dispatch returns its result through structured output, the same channel the Plan step
+  // uses, so the exit code is a typed field rather than a number fished out of free text.
+  const CLI_RESULT_SCHEMA = {
+    type: 'object',
+    required: ['exitCode', 'output'],
+    properties: { exitCode: { type: 'integer' }, output: { type: 'string' } },
   };
-  // A CLI dispatch is a round step: a non-zero or unreported exit fails the round, since a Workflow
+  // A CLI dispatch is a round step: a non-zero or missing exit code fails the round, since a Workflow
   // that completes is read as success and nothing downstream re-checks the step.
   const cliStep = async (name, cmd, opts) => {
-    const reply = await guarded(`Run: ${cmd}. Report the full stdout/stderr, then a final line \`exit: <code>\`.`, opts);
-    const code = exitCodeOf(reply);
-    if (code === null) throw new Error(`${name} reported no exit code: ${String(reply).slice(0, 200)}`);
-    if (code !== 0) throw new Error(`${name} exited ${code}: ${String(reply).slice(0, 400)}`);
-    return reply;
+    const res = await guarded(
+      `Run: ${cmd}. Return the process exit code as exitCode and the complete stdout and stderr as output.`,
+      { ...opts, schema: CLI_RESULT_SCHEMA },
+    );
+    const code = res?.exitCode;
+    if (!Number.isInteger(code)) throw new Error(`${name} returned no integer exitCode: ${JSON.stringify(res)}`);
+    if (code !== 0) throw new Error(`${name} exited ${code}:\n${res.output ?? ''}`);
+    return res;
   };
 
   // PLAN: the maintainer chooses the consult lenses + per-lens focus, returned via
@@ -87,7 +90,10 @@ export async function runRound({ agent, parallel, phase, log, args }) {
   );
 
   phase('Persist');
-  const persist = await cliStep('persist', persistCmd, { label: 'persist:apply', phase: 'Persist', model: MODEL.persist });
+  // A board with no persist command (instruction: the reduce writes the worksheet itself) runs nothing here.
+  const persist = persistCmd
+    ? await cliStep('persist', persistCmd, { label: 'persist:apply', phase: 'Persist', model: MODEL.persist })
+    : null;
 
   // GUARD: reviewers carry Write, so close the round by asserting no agent wrote outside
   // the gitignored scratch/store. round-guard compares git porcelain to the caller's

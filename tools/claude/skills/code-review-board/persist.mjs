@@ -22,7 +22,14 @@ const roleOf = (id) => parseId(id)?.role;
 
 // ---------- io helpers ----------
 
-const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
+// A parse failure names the file: in a round with eight scratch files a bare SyntaxError locates nothing.
+function readJson(p) {
+  try {
+    return JSON.parse(readFileSync(p, 'utf8'));
+  } catch (err) {
+    throw new Error(`cannot read JSON at ${p}: ${err.message}`);
+  }
+}
 
 function writeJson(p, o) {
   mkdirSync(dirname(p), { recursive: true });
@@ -161,19 +168,9 @@ function findingProblems(raw, roundId) {
   return problems;
 }
 
-/**
- * Gate the findings files against the documented contract before any write: each file is
- * `{ new: Issue[], reconcile: Reconcile[] }` and nothing else, and each `new` finding matches
- * the Issue interface (issue-format.md). Every problem is reported at once, with the file it
- * came from. A malformed finding the verifier ACCEPTED would be written, so it throws; one the
- * verifier REJECTED is never written, so it is returned as a warning rather than halting the
- * round -- but never dropped silently (#swe-errors). A malformed FILE throws regardless: none
- * of its findings can be trusted to have reached the verifier.
- * @param {Array<{ file: string, data: { new?: unknown[] } }>} named  findings files, by name
- * @param {{ roundId: string, accepted: Set<string> }} ctx
- * @returns {string[]} warnings for rejected malformed findings
- */
 const FINDINGS_FILE_KEYS = new Set(['new', 'reconcile']);
+// Retired: the role is the id's segment. Still emitted by pre-gate reviewers, so tolerated with a warning.
+const FINDINGS_FILE_RETIRED_KEYS = new Set(['role']);
 
 /** Every way a findings FILE fails `{ new: [], reconcile: [] }`; empty when it conforms. */
 function findingsFileProblems(data) {
@@ -183,12 +180,26 @@ function findingsFileProblems(data) {
     if (data[k] === undefined) problems.push(`missing \`${k}\` array`);
     else if (!Array.isArray(data[k])) problems.push(`\`${k}\` is not an array`);
   }
-  const unknown = Object.keys(data).filter((k) => !FINDINGS_FILE_KEYS.has(k));
+  const unknown = Object.keys(data).filter((k) => !FINDINGS_FILE_KEYS.has(k) && !FINDINGS_FILE_RETIRED_KEYS.has(k));
   if (unknown.length) problems.push(`unknown key(s): ${unknown.join(', ')}`);
   return problems;
 }
 
-export function assertFindings(named, { roundId, accepted }) {
+/**
+ * Gate the findings files against the documented contract before any write: each file is
+ * `{ new: Issue[], reconcile: Reconcile[] }` and nothing else, and each `new` finding matches
+ * the Issue interface (issue-format.md). Every problem is reported at once, with the file it
+ * came from. A malformed finding the verifier ACCEPTED would be written, so it throws; one the
+ * verifier REJECTED is never written, so it is returned as a warning rather than halting the
+ * round -- but never dropped silently (#swe-errors). A malformed FILE throws regardless: none
+ * of its findings can be trusted to have reached the verifier.
+ * A file that still carries the retired `role` key is warned about, not refused: every pre-gate
+ * round emitted it, and failing the round would discard the other lenses' findings.
+ * @param {Array<{ file: string, data: { new?: unknown[] } }>} named  findings files, by name
+ * @param {{ roundId: string, accepted: Set<string>, judged: Set<string> }} ctx  verdict ids: accepted, and all
+ * @returns {string[]} warnings: malformed findings that were rejected or never verified, and retired keys
+ */
+export function assertFindings(named, { roundId, accepted, judged }) {
   const errors = [];
   const warnings = [];
   for (const { file, data } of named) {
@@ -197,18 +208,22 @@ export function assertFindings(named, { roundId, accepted }) {
       errors.push(`findings/${file}: ${fileProblems.join('; ')} (expected { new: Issue[], reconcile: Reconcile[] })`);
       continue;
     }
+    for (const k of FINDINGS_FILE_RETIRED_KEYS) {
+      if (k in data) warnings.push(`findings/${file}: carries a \`${k}\` key, which nothing reads -- the role is the id's segment`);
+    }
     data.new.forEach((raw, i) => {
       const problems = findingProblems(raw, roundId);
       if (!problems.length) return;
       const id = raw?.id;
       const line = `finding findings/${file} new[${i}] (id \`${id}\`): ${problems.join('; ')}`;
-      (accepted.has(id) ? errors : warnings).push(line);
+      if (accepted.has(id)) errors.push(line);
+      else warnings.push(`${judged.has(id) ? 'rejected' : 'unverified'} ${line}`);
     });
   }
   if (errors.length) {
     throw new Error(`findings do not match issue-format.md -- ${errors.join(' | ')}`);
   }
-  return warnings.map((w) => `rejected ${w}`);
+  return warnings;
 }
 
 // pm-directive.json (issue-format.md): every section the PM may emit, and what each entry needs.
@@ -288,12 +303,6 @@ export function assertReconcile(named, index) {
 // ---------- apply ----------
 
 /**
- * Write the store for a round from its JSON scratch. Never throws on store
- * content; throws only on malformed/unreadable scratch (fail closed before any write).
- * @param {{ store: string, roundId: string, scratchDir?: string }} input
- * @returns {{ written: string[], errors: string[], warnings: string[], counts: { issues: number, epics: number, rounds: number } }}
- */
-/**
  * Read and gate the scratch both `summary` and `apply` consume -- round record, verdicts,
  * findings files, reconcile entries -- so the two steps refuse the same input and the reduce
  * never runs on scratch that apply will reject. Throws before anything is written.
@@ -308,12 +317,19 @@ function gateScratch({ store, roundId, scratch }) {
   }
   const verdicts = readDirJson(join(scratch, 'verdicts'));
   const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
+  const judged = new Set(verdicts.map((v) => v.id));
   const namedFindings = readDirJsonNamed(join(scratch, 'findings'));
-  const warnings = assertFindings(namedFindings, { roundId, accepted });
+  const warnings = assertFindings(namedFindings, { roundId, accepted, judged });
   assertReconcile(namedFindings, indexStore(store));
   return { round, accepted, findings: namedFindings.map((n) => n.data), warnings };
 }
 
+/**
+ * Write the store for a round from its JSON scratch. Never throws on store
+ * content; throws only on malformed/unreadable scratch (fail closed before any write).
+ * @param {{ store: string, roundId: string, scratchDir?: string }} input
+ * @returns {{ written: string[], errors: string[], warnings: string[], counts: { issues: number, epics: number, rounds: number } }}
+ */
 export function persistApply({ store, roundId, scratchDir }) {
   const scratch = scratchDir || defaultScratchDir(store, roundId);
   const { round, accepted, findings, warnings: findingWarnings } = gateScratch({ store, roundId, scratch });

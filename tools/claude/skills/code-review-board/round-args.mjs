@@ -165,9 +165,9 @@ export function instructionArgs(ctx) {
     maintainer: 'ai-engineer',
     plan: { routingSchema: ROUTING_SCHEMA },
     verify: true,
-    // instruction's reduce writes triage.json directly via the maintainer agent;
-    // persist is a no-op CLI marker (the worksheet is the reduce output).
-    persistCmd: 'true',
+    // instruction's reduce writes triage.json directly via the maintainer agent, so there is
+    // no persist command; the driver skips the Persist step on null.
+    persistCmd: null,
     preReduceCmd: null,
     // Injected into every reviewer's fan-out prompt (round-body appends args.reviewNote);
     // codeArgs/specArgs leave it unset so those boards keep repo-specific reviewing.

@@ -496,3 +496,42 @@ test('summary gates round.json and reconcile entries the same way apply does', (
   writeJson(join(sc.scratchDir, 'round.json'), { ...round, id: 'r9' });
   assert.throws(() => persistSummary(sc), /round\.json.*r9.*r2/);
 });
+
+test('a findings file still carrying the retired role key is a warning, never a halt', (t) => {
+  const sc = scaffold(t);
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { role: 'swe', new: [newFinding('r1#swe-1')], reconcile: [] });
+  writeJson(join(sc.scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+
+  const res = persistApply(sc);
+
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+  assert.equal(readdirSync(join(sc.store, 'issues', 'swe')).length, 1, 'the finding was still written');
+  assert.equal(res.warnings.filter((w) => w.includes('findings/swe.json') && w.includes('`role`')).length, 1);
+});
+
+test('an unreadable findings file is reported by path, not as a bare SyntaxError', (t) => {
+  const sc = scaffold(t);
+  mkdirSync(join(sc.scratchDir, 'findings'), { recursive: true });
+  writeFileSync(join(sc.scratchDir, 'findings', 'qa.json'), '{ "new": [ {"id": "r1#qa-1", "title": ');
+  for (const run of [persistSummary, persistApply]) {
+    assert.throws(() => run(sc), (e) => {
+      assert.ok(e.message.includes('qa.json'), `${run.name}: ${e.message}`);
+      return true;
+    });
+  }
+});
+
+test('a malformed finding with no verdict at all is labelled unverified, not rejected', (t) => {
+  const sc = scaffold(t);
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), {
+    new: [newFinding('r1#swe-1'), newFinding('bad-1'), newFinding('bad-2')],
+    reconcile: [],
+  });
+  writeJson(join(sc.scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+  writeJson(join(sc.scratchDir, 'verdicts', 'bad-1.json'), { id: 'bad-1', verdict: 'reject', rationale: 'noise' });
+
+  const out = persistSummary(sc);
+
+  assert.ok(out.warnings.some((w) => w.startsWith('rejected') && w.includes('bad-1')), out.warnings.join('\n'));
+  assert.ok(out.warnings.some((w) => w.startsWith('unverified') && w.includes('bad-2')), out.warnings.join('\n'));
+});

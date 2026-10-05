@@ -123,7 +123,7 @@ over a per-board **args** descriptor, built by the pure builders in `round-args.
   maintainer: <agent name>,            // spec-specialist | project-manager | ai-engineer
   candidateLenses: [<role>...],
   verify: boolean,                     // true for code/instruction, false for spec
-  persistCmd: <CLI string>,            // board persist (or 'true' no-op for instruction)
+  persistCmd: <CLI string | null>,     // board persist; null for instruction, whose reduce writes the worksheet
   preReduceCmd: <CLI string | null>,   // optional pre-reduce summary step (code)
   guardBaseline: <path | null>,        // pre-round porcelain snapshot; present enables Guard
   guardCmd: <CLI string | null>,       // the Guard-phase command, built from skillsDir
