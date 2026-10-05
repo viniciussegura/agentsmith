@@ -5,13 +5,14 @@ import { runRound } from '../tools/claude/skills/code-review-board/round-body.mj
 import { codeArgs, specArgs, instructionArgs, ROUTING_SCHEMA } from '../tools/claude/skills/code-review-board/round-args.mjs';
 
 // Build a recording harness: captures every agent() call + supports parallel/phase/log.
-function harness(routing = { lenses: ['security', 'db'], perLens: {} }) {
+function harness(routing = { lenses: ['security', 'db'], perLens: {} }, { preReduceExit = 0 } = {}) {
   const calls = [];
   const phases = [];
   const agent = async (prompt, opts = {}) => {
     calls.push({ prompt, opts });
     if (!opts.model) throw new Error(`dispatch without explicit model: ${opts.label}`);
     if (opts.schema) return routing;              // the plan/reduce structured return
+    if (opts.label === 'reduce:pre') return `review-board persist summary: ok\nexit: ${preReduceExit}`;
     return `ok:${opts.label}`;
   };
   const parallel = (thunks) => Promise.all(thunks.map((t) => t()));
@@ -164,5 +165,27 @@ test('a dispatch missing model throws (the in-driver assertion)', async () => {
     runRound({ agent, parallel: h.parallel, phase: h.phase, log: h.log,
       args: codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] }) }),
     /dispatch without explicit model/,
+  );
+});
+
+test('a failed pre-reduce summary halts the round before the maintainer reduce', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { preReduceExit: 1 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] });
+  await assert.rejects(
+    () => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }),
+    /summary.*exit(ed)? 1|exit(ed)? 1.*summary/i,
+  );
+  assert.ok(h.calls.some((c) => c.opts.label === 'reduce:pre'), 'the summary step ran');
+  assert.ok(!h.calls.some((c) => c.opts.label === 'reduce'), 'the maintainer reduce must not run on a failed summary');
+  assert.ok(!h.calls.some((c) => c.opts.label === 'persist:apply'), 'persist must not run on a failed summary');
+});
+
+test('a pre-reduce dispatch that reports no exit code is treated as failed', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} });
+  const silent = async (prompt, opts) => (opts.label === 'reduce:pre' ? 'done' : h.agent(prompt, opts));
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] });
+  await assert.rejects(
+    () => runRound({ agent: silent, parallel: h.parallel, phase: h.phase, log: h.log, args }),
+    /exit code/i,
   );
 });

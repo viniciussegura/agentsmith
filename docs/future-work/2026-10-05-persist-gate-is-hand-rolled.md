@@ -4,8 +4,16 @@ Date: 2026-10-05
 
 ## What
 
-`persist.mjs` guards its scratch inputs (round record, findings, PM directive) with three hand-written validators, each a list of per-field checks, while `lint.mjs` re-checks the written store with a fourth and `round-args.mjs` already declares `ROUTING_SCHEMA` as a JSON-Schema object.
+`persist.mjs` guards its scratch inputs (round record, findings, PM directive) with four hand-written validators, each a list of per-field checks, while `lint.mjs` re-checks the written store with a fifth and `round-args.mjs` already declares `ROUTING_SCHEMA` as a JSON-Schema object.
 Replace the hand-rolled checks with one declarative schema per scratch artifact, validated by a single small validator shared by the gate and the lint.
+
+Edges the hand-rolled gate still leaves open, to be closed by the schema rather than one at a time:
+
+- a PM priority override without a `rationale` overwrites the required `priorityRationale` with nothing;
+- directive ids are not resolved -- a mistyped `canonical` fails only at post-write lint, and an override, rejection, or duplicate naming no accepted finding is a silent no-op;
+- the same accepted id in two findings files writes twice and lint sees one file;
+- whitespace-only strings count as present in the gate but not in `lint.mjs`;
+- a non-string id is reported twice, and `apply` mixes `round.id` and `roundId` after proving them equal.
 
 ## Why it matters
 

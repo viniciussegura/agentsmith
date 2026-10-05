@@ -60,7 +60,7 @@ Build the record with `roundRecord()` from `round-args.mjs` rather than by hand,
 
 Both `summary` and `apply` gate every `new` finding the same way, before any write: the id parses as `<roundId>#<role>-<n>` for **this** round with a non-epic role, the five required fields (`id`, `title`, `description`, `priority`, `priorityRationale`) are present and well-typed, `priority` is a band above, `locations`/`relatedIssues` are arrays, `kind`/`status` if present are `issue`/`open`, and no other field is present -- the closed-state fields (`closedInRound`, `promotedTo`, `closingComments`) are persist's and `/review-promote`'s to set, never a reviewer's.
 A malformed finding the verifier accepted fails the step, naming its file, position, and every problem; one the verifier rejected is reported as a warning, since it is never written.
-`apply` gates `pm-directive.json` the same way before any write (known sections only, required entry fields, priorities in band, epic ids with the `epic` role for this round), and refuses a `round.json` whose `id` is not the round being applied.
+`apply` also refuses, before any write, a `reconcile` entry whose id is not in the store or whose transition is not one of the five above, and gates `pm-directive.json` the same way (known sections only, required entry fields, priorities in band, epic ids with the `epic` role for this round), and refuses a `round.json` whose `id` is not the round being applied.
 
 ## Status lifecycle
 

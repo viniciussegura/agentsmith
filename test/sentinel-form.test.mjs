@@ -16,7 +16,10 @@ const KNOWN_SITES = [
   'instructions/core/swe/swe-prompt-injection-sentinel.md',
   'tools/claude/skills/code-review-board/reviewer-common.md',
   'docs/reference-spec/review-board-protocol.md',
+  'tools/claude/skills/code-review-board/round-args.mjs',
 ];
+// This file names the retired form as the pattern it rejects, so it is not a site.
+const SELF = 'test/sentinel-form.test.mjs';
 
 const unwrapped = (text) => text.replace(/\s+/g, ' ');
 const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -24,14 +27,17 @@ const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const OPEN_ANY_SOURCE = new RegExp(`^${escapeRegExp(DATA_OPEN('\u0000')).replace('\u0000', '[^\n]+?')}$`);
 // One fence per match: lazy up to the closing `---`, since the text has had its newlines collapsed.
 const SENTINEL_LINE = /---\s*(BEGIN\s+)?(UNTRUSTED\s+)?(END\s+)?DATA\b[^\n]*?---/gi;
-const trackedMarkdown = () =>
-  execFileSync('git', ['ls-files', '--', '*.md'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
+// Prose and source alike: a JS template string re-spelling the sentinel is the drift the
+// rule's one-shared-constant clause forbids.
+const trackedSources = () =>
+  execFileSync('git', ['ls-files', '--', '*.md', '*.mjs', '*.js'], { cwd: root, encoding: 'utf8' })
+    .split(/\r?\n/).filter((f) => f && f !== SELF);
 
 // #swe-prompt-injection-sentinel: the rule text and the exported constant are one source of
 // truth, and every prose site that re-spells the sentinel must move with them. The sweep
 // finds the sites, so a new one cannot stay invisible by not being listed here.
-test('every tracked markdown file that spells a data sentinel uses the exported form', () => {
-  const sites = trackedMarkdown().filter((f) => SENTINEL_LIKE.test(readFileSync(resolve(root, f), 'utf8')));
+test('every tracked source or document that spells a data sentinel uses the exported form', () => {
+  const sites = trackedSources().filter((f) => SENTINEL_LIKE.test(readFileSync(resolve(root, f), 'utf8')));
   for (const known of KNOWN_SITES) assert.ok(sites.includes(known), `sweep missed ${known}`);
   for (const site of sites) {
     const text = unwrapped(readFileSync(resolve(root, site), 'utf8'));

@@ -438,3 +438,27 @@ test('id-less findings are reported by their position in the file', (t) => {
   assert.ok(out.warnings[0].includes('new[0]'), out.warnings[0]);
   assert.ok(out.warnings[1].includes('new[1]'), out.warnings[1]);
 });
+
+test('a malformed reconcile entry halts before any write', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t, 'r2');
+  const seeded = join(store, 'issues', 'swe', 'r1--swe-1-old.json');
+  writeJson(seeded, { ...newFinding('r1#swe-1', { title: 'Old open' }), lastConfirmedCommit: 'aaa' });
+  const before = readFileSync(seeded, 'utf8');
+  writeJson(join(scratchDir, 'findings', 'swe.json'), {
+    new: [],
+    reconcile: [
+      { id: 'r1#swe-1', transition: 'fix' },
+      { id: 'r1#swe-42', transition: 'fixed' },
+      { transition: 'reopen' },
+    ],
+  });
+
+  assert.throws(() => persistApply({ store, scratchDir, roundId }), (e) => {
+    for (const x of ['swe.json', 'reconcile[0]', '`fix`', 'reconcile[1]', 'r1#swe-42', 'reconcile[2]']) {
+      assert.ok(e.message.includes(x), `message lacks ${x}: ${e.message}`);
+    }
+    return true;
+  });
+  assert.equal(readFileSync(seeded, 'utf8'), before, 'the seeded issue was touched');
+  assert.ok(!existsSync(join(store, 'rounds')), 'the round record was written');
+});

@@ -238,6 +238,33 @@ export function assertDirective(directive, { roundId, source }) {
   if (problems.length) throw new Error(`PM directive (${source}) does not match issue-format.md -- ${problems.join('; ')}`);
 }
 
+// Reconcile transitions a reviewer may emit on a dirty prior issue (issue-format.md).
+const RECONCILE_TRANSITIONS = new Set(['fixed', 'deprecated', 'superseded', 'reopen', 'still-open']);
+
+/**
+ * Throw unless every reconcile entry names an issue that exists in the store and a known
+ * transition. Checked before any write: a mistyped id or transition used to be skipped with
+ * nothing reported, leaving the issue the reviewer meant to close open (#swe-errors).
+ * @param {Array<{ file: string, data: { reconcile?: unknown[] } }>} named
+ * @param {Map<string, unknown>} index  the store index (issue id -> record)
+ */
+export function assertReconcile(named, index) {
+  const problems = [];
+  for (const { file, data } of named) {
+    (data?.reconcile || []).forEach((rc, i) => {
+      const at = `findings/${file} reconcile[${i}]`;
+      if (!rc || typeof rc !== 'object') { problems.push(`${at} is not an object`); return; }
+      if (isBlank(rc.id)) problems.push(`${at} is missing id`);
+      else if (!index.has(rc.id)) problems.push(`${at} names \`${rc.id}\`, which is not in the store`);
+      if (isBlank(rc.transition)) problems.push(`${at} is missing transition`);
+      else if (!RECONCILE_TRANSITIONS.has(rc.transition)) {
+        problems.push(`${at} transition \`${rc.transition}\` is not one of ${[...RECONCILE_TRANSITIONS].join(' | ')}`);
+      }
+    });
+  }
+  if (problems.length) throw new Error(`reconcile entries do not match issue-format.md -- ${problems.join('; ')}`);
+}
+
 // ---------- apply ----------
 
 /**
@@ -258,7 +285,8 @@ export function persistApply({ store, roundId, scratchDir }) {
   const verdicts = readDirJson(join(scratch, 'verdicts'));
   const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
   const namedFindings = readDirJsonNamed(join(scratch, 'findings'));
-  const findingWarnings = assertFindings(namedFindings, { roundId: round.id, accepted });
+  const findingWarnings = assertFindings(namedFindings, { roundId, accepted });
+  assertReconcile(namedFindings, indexStore(store));
   const findings = namedFindings.map((n) => n.data);
   const directivePath = join(scratch, 'pm-directive.json');
   const directive = existsSync(directivePath) ? readJson(directivePath) : {};
@@ -344,8 +372,7 @@ function applyReconcile({ store, round, findings, written }) {
   const index = indexStore(store);
   for (const f of findings) {
     for (const rc of f.reconcile || []) {
-      const rec = index.get(rc.id);
-      if (!rec) continue; // unknown id: nothing to reconcile (lint will not see a phantom).
+      const rec = index.get(rc.id); // present: assertReconcile ran before any write
       const issue = rec.obj;
 
       if (CLOSING.has(rc.transition)) {
