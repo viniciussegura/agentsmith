@@ -364,6 +364,32 @@ test('a committed opt-out disables the named hook only; a working-tree copy does
   expectBlock(run('guard-git-flags', bash('git push --force', dir)), '#git-branch-workflow');
 });
 
+test('a committed opt-out is honoured from a subdirectory, a chained cd, and a not-yet-created directory', (t) => {
+  const dir = repo(t, { branch: 'main' });
+  pointOriginHeadAt(dir, 'main');
+  mkdirSync(join(dir, 'src', 'deep'), { recursive: true });
+  expectBlock(run('guard-default-branch', bash('cd src && git commit -m x', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash('cd src && cd deep && git commit -m x', dir)), '#git-branch-workflow');
+  const fresh = join(dir, 'brand', 'new', 'a.js');
+  const r = run('guard-dated-todos', write(fresh, `// ${M.todo}: later\n`, dir));
+  assert.equal(r.code, BLOCK);
+  assert.equal(r.err.trim().split('\n').length, 1, 'a block in a not-yet-created directory carries no opt-out notice');
+  commitOptOut(dir, 'disabled:\n  - guard-default-branch\n  - guard-dated-todos\n');
+  expectSilent(run('guard-default-branch', bash('cd src && git commit -m x', dir)));
+  expectSilent(run('guard-default-branch', bash('git -C src commit -m x', dir)));
+  expectSilent(run('guard-dated-todos', write(join(dir, 'src', 'a.js'), `// ${M.todo}: later\n`, dir)));
+  expectSilent(run('guard-dated-todos', write(fresh, `// ${M.todo}: later\n`, dir)));
+});
+
+test('guard-default-branch allows the commit-free --abort and --quit forms on the default branch', (t) => {
+  const dir = repo(t, { branch: 'main' });
+  pointOriginHeadAt(dir, 'main');
+  for (const command of ['git merge --abort', 'git cherry-pick --abort', 'git revert --abort', 'git rebase --abort', 'git am --abort', 'git cherry-pick --quit', 'git revert --quit']) {
+    expectSilent(run('guard-default-branch', bash(command, dir)));
+  }
+  expectBlock(run('guard-default-branch', bash('git cherry-pick --continue', dir)), '#git-branch-workflow');
+});
+
 test('a malformed opt-out keeps every hook on with a notice, and is never read for a clean command', (t) => {
   const dir = repo(t, { branch: 'main' });
   pointOriginHeadAt(dir, 'main');

@@ -8,6 +8,10 @@ import { runHook, parseCommand, gitInvocation, resolveDir, runGit, notice } from
 const HOOK = 'guard-default-branch';
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 const COMMIT_CREATING = new Set(['commit', 'merge', 'cherry-pick', 'revert', 'am', 'rebase']);
+// Forms of those subcommands that create no commit: they unwind or abandon an operation in
+// progress, which an agent must be able to do on any branch. `--continue` and `--skip` go on
+// to create commits and stay blocked.
+const COMMIT_FREE_FLAGS = new Set(['--abort', '--quit']);
 const DIR_ENV = ['GIT_DIR', 'GIT_WORK_TREE'];
 const DEFAULT_CANDIDATES = ['main', 'master'];
 
@@ -41,6 +45,7 @@ runHook(HOOK, (payload, verdict) => {
     sawGit = true;
     if (!COMMIT_CREATING.has(inv.sub)) return;
     if (inv.sub === 'merge' && inv.args.includes('--ff-only')) return;
+    if (inv.args.some((a) => COMMIT_FREE_FLAGS.has(a))) return;
     if (inv.dirOverride || DIR_ENV.some((k) => parsed.env.has(k))) {
       verdict.notices.push(notice(HOOK, 'a git command whose repository is chosen by --git-dir, --work-tree, or their environment variables'));
       return;

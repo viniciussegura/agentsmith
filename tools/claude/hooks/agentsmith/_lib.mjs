@@ -14,6 +14,7 @@
 // them is the control.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 export const EXIT_ALLOW = 0;
 export const EXIT_NOTICE = 1;
@@ -309,21 +310,23 @@ export function gitFlagsViolation(inv, env) {
   return null;
 }
 
-// The directory a git segment runs in: -C, else the last literal `cd` in an earlier segment,
-// else the payload cwd. Returns { dir } or { undecidable: reason }.
+// The directory a git segment runs in: the payload cwd, moved by every literal `cd` in an
+// earlier segment in order, then `-C` on the segment itself. Returns { dir } or
+// { undecidable: reason } when a cd operand or -C value cannot be read.
 export function resolveDir(inv, segmentIndex, segments, cwd, pathResolve) {
-  if (inv.dir) {
-    if (!inv.dir.literal) return { undecidable: 'a -C directory the hook cannot read' };
-    return { dir: pathResolve(cwd, inv.dir.text) };
-  }
-  for (let i = segmentIndex - 1; i >= 0; i--) {
+  let dir = cwd;
+  for (let i = 0; i < segmentIndex; i++) {
     const words = segments[i];
     if (words[0]?.text !== 'cd') continue;
     const operand = words[1];
     if (!operand || !operand.literal || operand.text === '-') return { undecidable: 'a cd the hook cannot follow' };
-    return { dir: pathResolve(cwd, operand.text) };
+    dir = pathResolve(dir, operand.text);
   }
-  return { dir: cwd };
+  if (inv.dir) {
+    if (!inv.dir.literal) return { undecidable: 'a -C directory the hook cannot read' };
+    dir = pathResolve(dir, inv.dir.text);
+  }
+  return { dir };
 }
 
 // ---------------------------------------------------------------------------------------
@@ -356,12 +359,29 @@ export function parseOptOut(text) {
   return header ? disabled : null;
 }
 
+// The nearest existing ancestor of a directory, so a path under a not-yet-created
+// directory still names its repository.
+function existingAncestor(dir) {
+  let current = dir;
+  while (current && !existsSync(current)) {
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+  return current;
+}
+
 // The committed opt-out of the repository holding `dir`: status absent | ok | malformed | failed.
+// Read from the repository's top level, since the pathspec is repository-relative.
 export function readOptOut(dir) {
-  const ls = runGit(['ls-tree', '--name-only', 'HEAD', '--', OPT_OUT_FILE], dir);
+  const start = existingAncestor(dir);
+  if (!start) return { status: 'failed', disabled: new Set() };
+  const top = runGit(['rev-parse', '--show-toplevel'], start);
+  if (!top.ok || !top.out) return { status: 'failed', disabled: new Set() };
+  const ls = runGit(['ls-tree', '--name-only', '--full-tree', 'HEAD', '--', OPT_OUT_FILE], top.out);
   if (!ls.ok) return { status: 'failed', disabled: new Set() };
   if (ls.out === '') return { status: 'absent', disabled: new Set() };
-  const show = runGit(['show', `HEAD:${OPT_OUT_FILE}`], dir);
+  const show = runGit(['show', `HEAD:${OPT_OUT_FILE}`], top.out);
   if (!show.ok) return { status: 'failed', disabled: new Set() };
   const disabled = parseOptOut(show.out);
   return disabled ? { status: 'ok', disabled } : { status: 'malformed', disabled: new Set() };

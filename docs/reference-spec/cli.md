@@ -180,7 +180,7 @@ Each reads the host's tool payload from stdin as untrusted data, matched with li
 | hook | matches | blocks |
 | --- | --- | --- |
 | `require-explicit-model` | `Agent` | a subagent dispatch with no `model` (`#ai-conversational`) |
-| `guard-default-branch` | `Bash`, `PowerShell` | `commit`, `merge`, `cherry-pick`, `revert`, `am`, or `rebase` while the current branch is the default branch (`#git-branch-workflow`); `merge --ff-only` is allowed |
+| `guard-default-branch` | `Bash`, `PowerShell` | `commit`, `merge`, `cherry-pick`, `revert`, `am`, or `rebase` while the current branch is the default branch (`#git-branch-workflow`); `merge --ff-only` and the commit-free `--abort` and `--quit` forms are allowed |
 | `guard-git-flags` | `Bash`, `PowerShell` | `push` with `--force`, `-f`, `--force-with-lease`, `--force-if-includes`, or a `+` refspec; `--no-verify` on any subcommand, `commit -n`; a `core.hooksPath` override through `-c`, `--config-env`, `GIT_CONFIG_*`, or `git config` (`#git-branch-workflow`, `#git-tooling`) |
 | `guard-dated-todos` | `Write`, `Edit`, `MultiEdit` | an added line carrying `TODO`, `FIXME`, `HACK`, `XXX`, or `BUG` without `(YYYY-MM-DD)` after the word; prose files (`.md`, `.mdx`, `.txt`) are out of scope (`#swe-dated-todos`) |
 
@@ -192,7 +192,7 @@ The git guards split a command on `&&`, `||`, `;`, `|`, `&`, and newlines, honou
 They are a tripwire for the agent's own commands, not a sandbox.
 Not covered: git aliases; scripts and tools that call git (`gh`, `npm version`); wrappers outside that set; `eval`, a `$VAR` command head, and `cmd /c`; a `git pull` that merges; heredoc bodies; a second clone whose own HEAD carries an opt-out; commands typed by the user.
 
-**Opt-out.** A project switches a hook off in `.agentsmith/hooks.yaml`, read from the committed content at `HEAD` of the repository the command targets, never from the working tree, so disabling a guard takes a commit the branch diff shows:
+**Opt-out.** A project switches a hook off in `.agentsmith/hooks.yaml`, read from the committed content at `HEAD` of the repository the command targets (found from its top level, so a subdirectory or a not-yet-created directory still names it), never from the working tree, so disabling a guard takes a commit the branch diff shows:
 
 ```yaml
 # a project decision; names are the script names
