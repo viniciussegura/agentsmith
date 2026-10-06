@@ -7,7 +7,7 @@ Each carries its own packaging: Gemini and Codex do not consume Claude Code plug
 
 ## Why it matters
 
-Today non-Claude tools run the review protocols only in the degraded mode they read from `AGENTS.md`; native adapters would give them real fan-out, verify, and reduce where their runtime supports it.
+Today non-Claude tools get only the review rules' intent and human gates from `AGENTS.md`; native adapters would give them the protocol itself, with real fan-out, verify, and reduce where their runtime supports it.
 
 ## Constraints
 

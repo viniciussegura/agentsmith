@@ -46,7 +46,9 @@ test-helpers/      shared test scaffolding; skipped by `node --test` only while
 - Rules follow their own `#code-markdown` convention: one sentence per line.
 - Rules are themselves artifacts, so they follow their own `#code-prose`: lead
   with the obligation, state each constraint once, and cite a neighbouring rule
-  rather than restating it.
+  rather than restating it. A core rule names a bundle-only rule in backticks
+  with its bundle (`` `#ai-plan` (process bundle) ``), never bare; see
+  [`docs/design-decisions/lean-split.md`](docs/design-decisions/lean-split.md).
 - A rule that asks for a **prose** artifact **cites** `#code-prose`, or cites a
   rule that does. That rule deliberately enumerates nothing, so the citation is
   the only registration, and the coverage is on the artifact rather than the
@@ -76,6 +78,10 @@ test-helpers/      shared test scaffolding; skipped by `node --test` only while
   that ownership in `instructions/ownership.yaml`; cross-reference the two.
   The map holds location, the owner rule holds lifecycle
   ([`docs/reference-spec/records.md`](docs/reference-spec/records.md)).
+- Every module has a word cap and the generated core a total cap; the numbers
+  live only in `test/word-budget.test.mjs`, which fails the suite when a rule or
+  the core outgrows them. Cut rationale or move an obligation to its home; the
+  caps are never raised to admit a rule.
 - To add a rule, drop a `.md` into a section group under `instructions/` (e.g.
   `core/swe/` or `backend/`); it is picked up automatically.
 - Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the

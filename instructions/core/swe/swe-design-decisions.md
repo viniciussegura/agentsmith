@@ -1,12 +1,13 @@
 # #swe-design-decisions Design decisions
 
-The design-decisions log records *why* the system is as it is now -- the standing rationale for choices that bind work beyond the unit that introduced them.
-A decision file is the choice, the alternatives rejected, and what would reopen it, written per #code-prose -- not a narrative of how the choice was reached.
-It lives under the design-decisions directory, one file per decision (#swe-docs-layout), created lazily when the first cross-cutting decision is warranted, **never** preemptively.
-Like the reference spec (#swe-reference-spec), a decision file is **kept, mutable, and self-replacing**: no `Status:` line, no date in the name. Edit it in place when the decision changes; delete it when the decision is abandoned. A working spec (`#ai-plan`, process bundle) is the opposite on both counts -- uncommitted and deleted when the branch ships -- so it preserves nothing. Past rationale is preserved by git and by the PR body that carried the change (#git-pr) -- the log never accretes superseded entries.
-Scope by reach, in one tier: a choice that binds other work, or that a future contributor would re-litigate, earns a decision file. A decision is always project scope (a committed repo file).
-Rationale below that threshold has no repo home by design: a non-obvious constraint belongs in a comment at the site it constrains (#code-style), and deliberation about a shipped choice belongs in the PR body and nowhere else, because it is point-in-time and stale deliberation misleads whoever reopens the question.
-It is the WHY counterpart to the reference spec's WHAT/HOW; the relationship is many-to-many. Present-truth documents link **out** to a decision by slug; a decision need not enumerate its referrers -- to find what a decision affects, grep its slug.
-Where a decision constrains a specific code site, the comment at that site **names the decision's slug**, so the grep resolves in both directions. Before writing a bare constraint comment, grep the design-decisions directory for the constraint's subject, so the convention is recognition rather than recall. It narrows the discoverability gap without closing it -- an omitted slug loses a backlink and breaks nothing -- and such comments are in scope for #swe-docs-drift when a decision file is renamed or deleted: grep the slug and update or remove them.
-Distinct from `docs/instruction-rules-decisions.md`, the regenerated audit output of the instruction-review application (`#ai-instruction-review`), which is not hand-authored rationale.
-Kept current under #swe-docs-drift and gated by #swe-done, which checks that an existing decision file is not left stale when a unit of work alters its rationale -- never that a new decision must be authored (authoring is a soft #ai-session-hygiene prompt).
+The design-decisions log records *why* the system is as it is now: the standing rationale for choices that bind work beyond the unit that introduced them, the reference spec's WHY counterpart (#swe-reference-spec).
+A decision file is the choice, the alternatives rejected, and what would reopen it, written per #code-prose.
+One file per decision under the design-decisions directory (#swe-docs-layout), created when the first cross-cutting decision is warranted, **never** preemptively.
+A decision file is **kept, mutable, and self-replacing**: no `Status:` line, no date in the name, edited in place, deleted when abandoned.
+Past rationale lives in git and the PR body (#git-pr); the log never accretes superseded entries.
+Scope by reach: a choice that binds other work, or that a future contributor would re-litigate, earns a file, always at project scope.
+Below that threshold, a non-obvious constraint goes in a comment at the site it constrains (#code-style), and deliberation about a shipped choice goes in the PR body and nowhere else.
+Present-truth documents link **out** by slug; a decision never enumerates its referrers, so grep its slug to find what it affects.
+A comment at a code site a decision constrains **names the decision's slug**; before writing a bare constraint comment, grep the design-decisions directory for the subject, and such comments follow a renamed or deleted file (#swe-docs-drift).
+Distinct from `docs/instruction-rules-decisions.md`, the instruction-review audit output (`#ai-instruction-review`).
+The done gate (#swe-done) only keeps existing files current; authoring a new one is a soft #ai-session-hygiene prompt, never a gate.
