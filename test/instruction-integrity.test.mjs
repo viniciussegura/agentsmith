@@ -45,9 +45,10 @@ test('generator emits no dangling-tag or cross-boundary warnings', () => {
 //      caught here;
 //   2. the generated core -- catches a token reintroduced via generator template
 //      text in src/, which no source-tree walk would see.
-// docs/ is deliberately NOT walked: it holds two intentional residuals (the
-// cli.md migration-table row and the README migration step, which must name the
-// path it tells consumers to delete).
+// docs/ is deliberately NOT walked: docs/reference-spec/cli.md's removed-commands
+// table names `spec-index` on purpose. The root CHANGELOG.md is outside every
+// walked tree and names `docs/working-specs/` in the upgrade step that tells
+// consumers what to delete.
 // Match the PATH token `working-specs` (bare: #ai-plan once said "under
 // working-specs", with no docs/ prefix) and the COMMAND `spec-index`. The
 // singular term "working spec" / adjectival `working-spec` stays legal

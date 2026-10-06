@@ -1,6 +1,6 @@
 # Changelog
 
-A `1.0.0-rc.<pr>` heading is an unpublished pre-release, one per pull request, collapsed into the dated release heading when the release is cut (`#local-pr-version` in `AGENTS.md`); `## Earlier` covers the pull requests merged before versions were assigned.
+A `<target>-rc.<pr>` heading is an unpublished pre-release, one per pull request, collapsed into the dated release heading when the release is cut (`#local-pr-version` in `AGENTS.md`); `## Earlier` covers the pull requests merged before versions were assigned.
 
 ## 1.0.0-rc.28
 

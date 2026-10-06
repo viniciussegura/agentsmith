@@ -1,9 +1,10 @@
-# Extend the vocabulary-regression lint beyond `instructions/`
+# A vocabulary-regression lint over the living documents
 
 ## What
 
-`test/instruction-integrity.test.mjs` guards removed vocabulary in the rule sources only.
-The 2026-07-22 terminology audit found the drift real in `README.md`, `tools/`, `devtools/`, and `docs/future-work/` too; extend the guard to those scopes.
+No lint guards retired vocabulary in general.
+`test/instruction-integrity.test.mjs` checks two literal tokens (`working-specs`, `spec-index`) across `instructions/`, `tools/`, and the generated core, and nothing checks `README.md`, `docs/`, or `devtools/`, where the 2026-07-22 terminology audit found the drift real.
+Add a retired-term list with one scope per term, walked over the living documents, so a rename settled by an audit stays settled.
 
 ## Why it matters
 
@@ -11,4 +12,4 @@ A retired term reintroduced in a doc or a skill prompt is read by agents as curr
 
 ## Constraints
 
-- Point-in-time records are exempt: the lint walks living documents, not the history they cite.
+- Point-in-time records and deliberate residuals (a removed-commands table, a changelog upgrade step) are exempt per term, the way the two-token test exempts `docs/` today.

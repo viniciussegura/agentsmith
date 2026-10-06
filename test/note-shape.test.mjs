@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { escapeRegExp } from '../test-helpers/escape-regexp.mjs';
 
 const root = resolve(fileURLToPath(import.meta.url), '../..');
 
@@ -22,7 +23,6 @@ const TEMPLATE_PHRASE = 'followed by the sections';
 const OMITTABLE_MARK = '(omitted when there are none)';
 
 const normalize = (text) => text.replace(/\r\n?/g, '\n');
-const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const SPAN = new RegExp(`\`(## [^\`]+)\`( ${escapeRegExp(OMITTABLE_MARK)})?`, 'g');
 
 export function readTemplate(moduleText) {
@@ -67,8 +67,10 @@ export function noteProblems(text, template) {
   const h2 = headings.filter((h) => h.level === 2).map((h) => h.text);
   for (const h of h2) if (!allowed.includes(h)) problems.push(`heading outside the template: ${h}; allowed: ${allowed.join(', ')}`);
   for (const t of template) if (t.required && !h2.includes(t.text)) problems.push(`missing required heading: ${t.text}`);
+  const repeated = h2.find((h, i) => h2.indexOf(h) !== i);
+  if (repeated) problems.push(`repeated heading: ${repeated}; each section appears once`);
   const expectedOrder = allowed.filter((a) => h2.includes(a));
-  const actualOrder = h2.filter((h) => allowed.includes(h));
+  const actualOrder = [...new Set(h2)].filter((h) => allowed.includes(h));
   if (actualOrder.join('|') !== expectedOrder.join('|')) {
     problems.push(`headings out of template order: ${actualOrder.join(', ')}; expected ${expectedOrder.join(', ')}`);
   }
@@ -137,6 +139,7 @@ test('each failure class is reported on its own', () => {
     'a missing required heading': [`# Title\n\n${section('## What')}\n${section('## Constraints')}`, /missing required heading: ## Why it matters/],
     'prose before the first section': [`# Title\n\nintro\n\n${section('## What')}\n${section('## Why it matters')}`, /prose before the first section/],
     'an H3': [`# Title\n\n${section('## What', '### sub\n\nx')}\n${section('## Why it matters')}`, /deeper than H2/],
+    'a repeated heading': [`${conforming}\n${section('## Constraints', '- more')}`, /repeated heading: ## Constraints/],
   };
   for (const [name, [text, expected]] of Object.entries(cases)) {
     const problems = noteProblems(text, FUTURE);
