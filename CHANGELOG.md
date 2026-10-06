@@ -2,6 +2,11 @@
 
 A `1.0.0-rc.<pr>` heading is an unpublished pre-release, one per pull request, collapsed into the dated release heading when the release is cut (`#local-pr-version` in `AGENTS.md`); `## Earlier` covers the pull requests merged before versions were assigned.
 
+## 1.0.0-rc.28
+
+- One records document, a lean README, and capped notes (#28)
+- **Upgrade.** `#swe-future-work` and `#swe-technical-debts` now name a note's exact headings; rewrite existing notes under `docs/future-work/` and `docs/technical-debts/` to them, since nothing in a consumer repo enforces the shape.
+
 ## 1.0.0-rc.27
 
 - Make the repo conform to its own rules (#27)
