@@ -1,7 +1,5 @@
 # The review-board persist gate validates by hand, field by field
 
-Date: 2026-10-05
-
 ## What
 
 `persist.mjs` guards its scratch inputs (round record, findings, PM directive) with four hand-written validators, each a list of per-field checks, while `lint.mjs` re-checks the written store with a fifth and `round-args.mjs` already declares `ROUTING_SCHEMA` as a JSON-Schema object.

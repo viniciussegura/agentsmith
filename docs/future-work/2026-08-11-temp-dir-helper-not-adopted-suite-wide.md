@@ -1,19 +1,14 @@
 # Adopt `makeTempDir` across the nine remaining `mkdtempSync` test files
 
-Recorded 2026-08-11, during the temp-directory cleanup fix (`fix/test-temp-dir-cleanup`).
-
 ## What
 
-`test-helpers/tmp-dir.mjs` exports `makeTempDir(t, prefix)`, which creates a temp directory and registers its removal on the `node:test` context.
-Five test files use it: `test/spec-review-guard.test.js`, `test/review-persist.test.js`, `test/triage-server.test.mjs`, and -- added by the 2026-09-30 docs-layout-config unit -- `test/cli.test.js` and `test/docslayout.test.js`.
-
-Nine still create temp directories with a local `try`/`finally`, roughly 54 `mkdtempSync` call sites in total.
-**`test/cli.test.js` now carries both idioms**: its pre-existing tests use `mkdtempSync` with inline `try`/`finally`, while the docs-layout-config tests appended to it use `makeTempDir`.
-That is a sharper form of the same defect this note records -- two implementations of one concept inside a single file -- and it makes converting that file more valuable, not less, because the target idiom is already present to copy.
+`test-helpers/tmp-dir.mjs` exports `makeTempDir(t, prefix)`, which creates a temp directory and registers its removal on the `node:test` context; six test files use it.
+Nine still create temp directories with a local idiom, 45 `mkdtempSync` call sites in total, and `test/cli.test.js` carries both idioms: its older tests use `mkdtempSync` with inline `try`/`finally`, while the docs-layout-config tests appended to it use `makeTempDir`.
+Migrate the nine, deleting `inTempDirs` and `tmp()` as their call sites convert; convert `test/cli.test.js` on its own, since at 30 call sites it is over half the work and the only file where the target idiom already sits beside the one being replaced.
 
 | File | `mkdtempSync` calls | Shape |
 | --- | --- | --- |
-| `test/cli.test.js` | 31 | mixed: inline `try`/`finally` per test, plus `makeTempDir` in the docs-layout-config tests |
+| `test/cli.test.js` | 30 | mixed: inline `try`/`finally`, plus `makeTempDir` in the docs-layout-config tests |
 | `test/round-guard.test.mjs` | 4 | inline `try`/`finally` per test |
 | `test/execute.test.js` | 2 | inline `try`/`finally` per test |
 | `test/list-modules.test.js` | 2 | inline `try`/`finally` per test |
@@ -23,34 +18,14 @@ That is a sharper form of the same defect this note records -- two implementatio
 | `test/skill-cli-entry.test.mjs` | 1 | inline `try`/`finally` per test |
 | `test/triage-apply.test.mjs` | 1 | inline `try`/`finally` per test |
 
-Do not audit this table by tallying `mkdtempSync` against `rmSync` per file -- several files call `rmSync` for fixture teardown unrelated to their temp directory, so the counts do not pair.
+## Why it matters
 
-## Why it matters now
-
-The suite carries two implementations of one concept, which is the shape `#swe-reuse` calls a bug.
-`inTempDirs` in `test/round-context.test.mjs` is the clearest case: a scoped-callback helper doing exactly what `makeTempDir` does, in a different idiom.
-
-Nothing is broken -- all nine clean up correctly, measured flat across a full run -- so this is consistency, not a leak.
-The cost is a reviewer reading two idioms and a contributor guessing which to copy.
-The next new test file is where that guess gets made, and copying the `try`/`finally` shape is what reintroduced the original debt.
-
-## Proposed action
-
-Migrate the nine to `makeTempDir(t, prefix)` in a follow-up branch, deleting `inTempDirs` and `tmp()` as their call sites convert.
-Each test signature gains the `t` parameter; each `try`/`finally` collapses to a single call.
-
-Convert `test/cli.test.js` on its own -- at 31 call sites it is over half the work and carries all of the review risk.
-It is also the only file where the target idiom already sits beside the one being replaced, so the conversion is a local pattern match rather than a fresh decision.
+The suite carries two implementations of one concept, which `#swe-reuse` calls a bug; `inTempDirs` is the clearest case, a scoped-callback helper doing what `makeTempDir` does in a different idiom.
+Nothing leaks, so this is consistency: the cost is a reviewer reading two idioms and the next new test file copying the wrong one, which is how the original debt arose.
 
 ## Constraints
 
-Purely mechanical; no behavior change and no new coverage.
-
-A converted test that forgets the `t` parameter throws `TypeError: Cannot read properties of undefined (reading 'after')` rather than silently leaking, so the migration fails loud.
-Verify the same way the original fix was verified: count directories for the affected prefixes in `os.tmpdir()` across a full `npm test`, and confirm the count is flat.
-A `mkdtempSync` whose directory outlives one test cannot use `makeTempDir` as it stands -- `t.after` is per-test -- so check for a shared-across-tests directory before converting a file.
-
-## Why it was deferred
-
-Scoped out of `fix/test-temp-dir-cleanup`, whose approved scope was the three leaking files the technical debt named plus their consolidation.
-The nine are not leaking, so folding them in would have widened a mechanical fix to twelve files without fixing anything.
+- Purely mechanical; no behavior change and no new coverage.
+- A converted test that forgets the `t` parameter throws rather than silently leaking, so the migration fails loud.
+- Verify as the original fix was verified: count directories for the affected prefixes in `os.tmpdir()` across a full `npm test` and confirm the count is flat; do not tally `mkdtempSync` against `rmSync` per file, since several files call `rmSync` for unrelated fixture teardown.
+- A `mkdtempSync` whose directory outlives one test cannot use `makeTempDir` as it stands (`t.after` is per test); check for a shared directory before converting a file.

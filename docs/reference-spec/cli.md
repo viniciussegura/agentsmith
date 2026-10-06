@@ -19,7 +19,7 @@ agentsmith                        (bare: TTY -> interactive wizard; non-TTY -> e
 Writes the generated instructions (and, unless `--no-tools`, the tool adapters) under the resolved scope's base directory.
 Prints the intended-effects plan, gates it through the confirmation rules below, then applies it and writes the install manifest.
 
-`install` takes one input beyond its flags: `<base>/.agentsmith/docs-layout.yaml`, the project's docs-layout remap (its shape and both row forms are in the [README](../../README.md#remapping-the-documentation-layout)).
+`install` takes one input beyond its flags: `<base>/.agentsmith/docs-layout.yaml`, the project's docs-layout remap (its shape and both row forms are in [`docs-layout-config.md`](./docs-layout-config.md)).
 It is read after the scope's base is resolved and before any output is generated, so a bad config cannot produce a half-written tree; it is never created, modified, recorded in the install manifest, or removed by `uninstall`.
 **`uninstall` does not read it at all.** It writes no map, so validating the config there would let a stale one -- a row tag renamed by a later release, say -- block the user from removing an install that never consults it.
 An absent file, or one holding only comments and an empty `rows:`, means no overrides and changes nothing.

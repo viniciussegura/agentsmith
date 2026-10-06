@@ -8,7 +8,7 @@ Four small, mechanical fixes shipped together on one branch.
 **Depends on.** --
 **Blocks.** --
 **Acceptance.** The personal-address grep that `#swe-environment` prescribes matches only that rule.
-**State.** in-progress
+**State.** shipped ([#27](https://github.com/viniciussegura/agentsmith/pull/27))
 
 ## conformance-2 `sentinel-debt`
 
@@ -16,7 +16,7 @@ Four small, mechanical fixes shipped together on one branch.
 **Depends on.** --
 **Blocks.** --
 **Acceptance.** No sentinel debt remains recorded; the suite sweeps every tracked document for the form.
-**State.** in-progress
+**State.** shipped ([#27](https://github.com/viniciussegura/agentsmith/pull/27))
 
 ## conformance-3 `role-field`
 
@@ -24,7 +24,7 @@ Four small, mechanical fixes shipped together on one branch.
 **Depends on.** --
 **Blocks.** --
 **Acceptance.** A finding with no role field is filed under its role; a malformed accepted finding halts persistence with nothing written.
-**State.** in-progress
+**State.** shipped ([#27](https://github.com/viniciussegura/agentsmith/pull/27))
 
 ## conformance-4 `protocol-doc`
 
@@ -32,4 +32,4 @@ Four small, mechanical fixes shipped together on one branch.
 **Depends on.** --
 **Blocks.** --
 **Acceptance.** The protocol document's first section after its preamble describes the round or its guard.
-**State.** in-progress
+**State.** shipped ([#27](https://github.com/viniciussegura/agentsmith/pull/27))

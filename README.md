@@ -26,6 +26,8 @@ npx github:viniciussegura/agentsmith install          # latest
 npx github:viniciussegura/agentsmith#v0.1.0 install    # pinned, reproducible
 ```
 
+Changes per version, including upgrade steps, are in [CHANGELOG.md](CHANGELOG.md).
+
 agentsmith is a verb-first CLI: `install` and `uninstall` are subcommands; `--stdout`, `--help`, and `--version` are top-level query flags.
 
 `install` runs with defaults — project scope, split mode, nested placement, tool adapters on — and asks only to confirm the resulting plan.
@@ -52,7 +54,7 @@ A plugin-only install ships the commands but not the binary; its `npx` fallback 
 By default `install` writes a lean core to `.agentsmith/AGENTS.md`, one file per on-demand bundle under `.agentsmith/agents/`, a root `AGENTS.md` stub pointing at the core (an existing stub is left untouched), and installs the tool adapters (e.g. `tools/claude/` into `.claude/`).
 Whether you commit the generated `AGENTS.md` is your call — agentsmith only produces the file.
 Before writing anything, it prints the intended-effects plan — naming the scope and the absolute base directory every path is relative to — and, on a TTY without `--yes`, asks for confirmation.
-Where the project carries a `.agentsmith/docs-layout.yaml` ([Remapping the documentation layout](#remapping-the-documentation-layout)), `install` reads it and the plan names every remapped row.
+Where the project carries a `.agentsmith/docs-layout.yaml` ([`docs-layout-config.md`](docs/reference-spec/docs-layout-config.md)), `install` reads it and the plan names every remapped row.
 
 **Gitignore the working state.** `install` does not modify your `.gitignore`, and everything agentsmith writes under `.agentsmith/` besides the generated instructions is per-machine working state — the working-spec store (`#ai-plan`), the review-board issue store, scratch, and the install manifest.
 The one stated exception is `.agentsmith/docs-layout.yaml`: a team decision you author and commit, which `install` only ever reads.
@@ -110,50 +112,10 @@ The adapter install is non-destructive: it writes only the adapter's own files
 (e.g. `.claude/skills/spec-review-board/`) and never touches the rest of your
 `.claude/`.
 
-### Remapping the documentation layout
-
-The `#swe-docs-layout` rule ships a table of five documentation locations, each defaulting to a directory under `docs/`.
-A project whose real layout differs declares it in `.agentsmith/docs-layout.yaml`, and `install` emits that table describing the project's layout instead of agentsmith's defaults — so every rule citing the map tells an agent the truth about this repo.
-
-The file is yours: `install` reads it, never creates or modifies it, and `uninstall` leaves it in place.
-Rows are keyed by the bare owner tag of the row being remapped, and each row declares exactly one of two forms:
-
-- **`path:`** — *relocated*: this record type lives at a different path in the repo.
-- **`external:`** — *external*: this record type is served by a tracker, so an item is registered there instead of a file being written here. Only two rows are eligible: `swe-technical-debts` and `swe-future-work`.
-
-```yaml
-# .agentsmith/docs-layout.yaml
-rows:
-  swe-design-decisions:
-    path: docs/adr/<decision-slug>.md
-  swe-technical-debts:
-    external: jira/ENG
-```
-
-Indentation is exact: `rows:` at column 0, a row key at two spaces, a field at four.
-Comments follow YAML: a `#` as a line's first non-space character comments the whole line, and a `#` after whitespace that follows content runs to the end of that line.
-Values are written unquoted.
-With that file in place, `agentsmith install` discloses the remap on the plan it asks you to confirm:
-
-```text
-  layout  2 row(s) remapped from .agentsmith/docs-layout.yaml: swe-design-decisions -> docs/adr/<decision-slug>.md, swe-technical-debts -> external -- jira/ENG
-```
-
-The emitted table then reads `` `docs/adr/<decision-slug>.md` `` for the design-decisions row and ``external -- `jira/ENG` `` for the technical-debts row, and the map gains a paragraph telling an agent to register, scan, update, and close in that tracker wherever the owner rule names a file.
-
-Parsing is deny-by-default: an unknown key, an unknown owner tag, a row declaring both forms or neither, a duplicate row, wrong indentation, or a path or label outside the allowed characters is an error naming the file and line, exit `1`, with nothing written.
-The config arrives with any clone or pull request and its values become instruction text an agent reads, so that strictness is a security boundary rather than an ergonomic check.
-
-Five rules are worth knowing before you write one:
-
-- A path starts with a **literal directory** and goes at least one level deep. A bare name at the repository root is refused, and so is a first segment carrying a placeholder (`<slug>/notes.md`), because either leaves the root for an agent to name. A placeholder below that root is fine: `docs/epics/<slug>/` is the shipped epics default.
-- A path may **not name** `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` or `package.json` in any segment, and no directory segment may be `node_modules` or begin with a dot. Each of those rules is applied to every segment on its own, once with its placeholders standing for a name and once with them removed, so `AGENTS<name>.md`, `docs/<slug>.git/` and `docs/<slug>.git/<name>` are refused as well.
-- Three rows must **keep a placeholder**, because something else resolves their records individually: `swe-reference-spec` keeps `<name>`, `swe-design-decisions` keeps `<decision-slug>`, and `swe-epic` keeps `<slug>`. The other two rows are free to drop theirs and declare a different naming pattern, down to a single file for the whole record type. `swe-epic` carries one extra requirement — its path must still end in `/` — because an epic is a directory per record holding `README.md`, `roadmap.md` and the rest, which a file per epic cannot.
-- No two rows may **resolve to the same location**, counting the defaults of rows you did not remap: pointing `swe-future-work` at `docs/technical-debts/` makes an agent read deferred items as debts, since the debts rule says that directory holds only open debts. Locations are compared case-insensitively and ignoring a trailing slash, because `docs/Notes/` and `docs/notes/` are one directory on Windows and macOS, and a file `docs/notes` cannot coexist with a directory of that name. A row's location is the fixed part of its path, up to its first placeholder — so `docs/<slug>/index.md` is a directory per record under `docs/`, not the one fixed file its file name suggests. Nesting is otherwise fine — the whole map nests under `docs/` — with one asymmetry: a row storing each record as its own directory claims every directory at its location, so both `swe-epic: docs/<slug>/` and that `index.md` form are refused for reading the other rows' directories as their own records, while `swe-technical-debts: docs/<YYYY-MM-DD>-<slug>.md` claims only the files there and is accepted.
-- A row key is the **bare** tag: write `swe-future-work:`, not `#swe-future-work:` — the hashed form of a real row tag is an error, with or without a trailing comment, because reading it as a comment drops the key and leaves its field lines to attach to the row above, remapping that one instead. Every other `#` line is an ordinary comment, so a space after the `#` is how you comment a row out — and comment its field lines out with it.
-`agentsmith --stdout` deliberately reads no config and always prints the defaults; `agentsmith install --dry-run` is the way to preview a remapped set.
-
-Because both gitignore recipes above deny `.agentsmith/` wholesale, the config needs its `!.agentsmith/docs-layout.yaml` re-admit or teammates never receive it — `install` warns when git reports the file ignored.
+**Remap the documentation layout.** The `#swe-docs-layout` rule ships five documentation locations defaulting to `docs/`; a project whose layout differs declares its own in `.agentsmith/docs-layout.yaml`, and `install` emits the table describing that layout instead.
+`install --dry-run` previews the result, and an invalid file fails the install with nothing written.
+The file is a committed team decision that `install` only reads.
+Its shape, the two row forms, and the validation rules are in [`docs/reference-spec/docs-layout-config.md`](docs/reference-spec/docs-layout-config.md).
 
 **Coexisting with a project instruction file.** A project may ship its own instruction file alongside the generated set; on conflict the project file wins (except the safety baseline). When a project file restates a rule the generated set already owns, reference its `#tag` rather than paraphrasing it -- a paraphrase silently goes stale when the canonical rule is edited.
 
@@ -180,26 +142,6 @@ that realize the instruction protocols with real subagent delegation:
 - **`/instruction-check`** — a single-agent, fast pass that grades the current
   diff against the project's own generated `AGENTS.md` and reports rule
   violations. The light tier; reach for `/code-review-board` on larger changes.
-
-### Upgrading: working specs are no longer committed
-
-A working spec is now branch scratch under `.agentsmith/specs/<branch>/<date>-<slug>/`
-— gitignored, per-machine, and deleted when the branch ships. A unit's durable
-record is its PR body, which carries the approved scope inline.
-
-If your project adopted the earlier workflow, two manual steps are needed after
-updating the instruction set — **in this order**:
-
-1. **Cross-check the specs before deleting them.** Git makes the contents
-   recoverable, not discoverable: nobody greps deleted files. Scan for anything
-   still live that exists *only* there — an open question, an accepted shortcut,
-   a decision that never graduated — and move it to `docs/future-work/`,
-   `docs/technical-debts/`, or `docs/design-decisions/` first. Specs still at
-   `Draft`/`Approved`, or with no `Status:` line, are the ones to read closely.
-   This repo's own migration found one such item across 25 directories.
-2. **Then delete `docs/working-specs/`.** What remains is point-in-time history
-   the current rules never consult. There is no index to regenerate and no
-   `spec-index` command — both were removed with it.
 
 The instruction-review / -apply engine that audits and edits the rule set itself
 is **authoring-only** (installed with `--dev`); see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -233,10 +175,6 @@ Commands then surface as `/agentsmith:code-review-board`,
   run it before disabling the plugin if you want the project left clean (the
   plugin cannot clean the instructions up itself). Both are plugin-only — the CLI
   never installs them.
-- **Pick one path for tooling.** Installing via *both* `npx` (full) and the
-  plugin double-wires the `Agent` model-enforcement hook (harmless — it is
-  idempotent — but redundant) and lands two copies of every command. Use the
-  plugin **or** the `npx` adapter install, not both, for tooling.
 
 ### Choosing an install path
 
@@ -248,17 +186,12 @@ Commands then surface as `/agentsmith:code-review-board`,
 | Update | `/plugin` (version-aware) | re-run `npx … install` |
 | Teardown | disable/remove in `/plugin` (+ `/agentsmith:remove-instructions` for instructions) | `npx … uninstall` |
 
-Two coherent paths:
-
-- **Plugin path:** the plugin for tools, `/agentsmith:update-instructions` (`--no-tools` under the hood) for instructions. No duplication, single hook.
-- **`npx`-only path:** `npx … install` does both tools and instructions; no plugin. Use `--no-tools` only if you want instructions without adapters.
-
-Mixing a *full* `npx install` with the plugin is the case to avoid — it is the double-tools / double-hook redundancy above.
+Use the plugin for tools and `/agentsmith:update-instructions` for instructions, or `npx … install` for both; mixing a *full* `npx install` with the plugin double-wires the model-enforcement hook and lands two copies of every command.
 
 ## Contributing
 
 Working on the rules or the generator? See [CONTRIBUTING.md](CONTRIBUTING.md) for
 the repository layout, how to author rules, and the dev workflow. How this repo
 organizes its specs, decisions, and history is in
-[docs/reference-spec/documentation-model.md](docs/reference-spec/documentation-model.md); the review-board round
+[docs/reference-spec/records.md](docs/reference-spec/records.md); the review-board round
 protocol is in [docs/reference-spec/review-board-protocol.md](docs/reference-spec/review-board-protocol.md).

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { DATA_OPEN, DATA_CLOSE } from '../tools/claude/skills/code-review-board/round-args.mjs';
+import { escapeRegExp } from '../test-helpers/escape-regexp.mjs';
 
 const root = resolve(fileURLToPath(import.meta.url), '../..');
 const SOURCE_PLACEHOLDER = '<source>';
@@ -22,7 +23,6 @@ const KNOWN_SITES = [
 const SELF = 'test/sentinel-form.test.mjs';
 
 const unwrapped = (text) => text.replace(/\s+/g, ' ');
-const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // The open form with any concrete source: a doc may show a worked example (#swe-public-surface-docs).
 const OPEN_ANY_SOURCE = new RegExp(`^${escapeRegExp(DATA_OPEN('\u0000')).replace('\u0000', '[^\n]+?')}$`);
 // One fence per match: lazy up to the closing `---`, since the text has had its newlines collapsed.
