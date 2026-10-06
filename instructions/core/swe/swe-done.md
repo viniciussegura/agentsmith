@@ -1,14 +1,14 @@
 # #swe-done Definition of done
 
 Done has two altitudes.
-A **unit of work** is done at its own gate: a working spec reaching `Implemented` (#ai-plan), or a request landed without one -- a trivial change that skipped the spec (#ai-plan), or a line closed in `annotated.md` (#ai-multiple-requests).
+A **unit of work** is done at its own gate: a working spec reaching `Implemented` (`#ai-plan`, process bundle), or a request landed without one -- a trivial change that skipped the spec (`#ai-plan`), or a line closed in `annotated.md` (#ai-multiple-requests).
 The branch's **deliverable** is done when every unit of work in it is done and the branch items below hold.
 Do not open or update a PR before both tiers hold.
 
 **Per unit of work.** Checked as each one lands.
 
 1. The unit is complete as raised.
-   A partial delivery is done only when the narrowing was surfaced and accepted (#ai-plan-deviation).
+   A partial delivery is done only when the narrowing was surfaced and accepted (`#ai-plan-deviation`, process bundle).
 2. Tests for the unit pass locally.
    When the repo has no test harness, or the unit is genuinely untestable, the verification actually performed is stated and recorded (#git-pr, #swe-technical-debts): "done" is never "it compiled."
    Invoking the untestable exception **requires naming the specific blocker** (e.g. "no test harness exists", "purely declarative config with no executable path") -- "hard to test" or "not worth testing" do not qualify.
@@ -20,13 +20,13 @@ Do not open or update a PR before both tiers hold.
 
 **Per branch.** Checked once, before the PR.
 
-1. Branch consolidation is done (#swe-consolidation-audit), when the branch carries more than one unit of work and at least one of them required a working spec (#ai-plan).
+1. Branch consolidation is done (`#swe-consolidation-audit`, process bundle), when the branch carries more than one unit of work and at least one of them required a working spec (`#ai-plan`).
 2. Unused dependencies are pruned (#swe-deps).
-3. A **non-trivial diff** -- one that meets any criterion from #ai-plan -- has had a deliberate, independent review pass (#ai-review-board) before it squash-merges to the default branch.
+3. A **non-trivial diff** -- one that meets any criterion from `#ai-plan` -- has had a deliberate, independent review pass (#ai-review-board) before it squash-merges to the default branch.
    Per-item self-review is the floor, never the substitute.
 4. Temporary artifacts the session created but the change does not ship (scratch files, throwaway worktrees, ad-hoc output or log directories) are removed.
    Outputs that are deliberately persisted are not temporary and stay: anything the change is meant to produce, plus durable stores a workflow writes by design.
-   This sweep does **not** reach `.agentsmith/specs/` (#ai-plan) or `.agentsmith/review-board/` (#ai-review-board): both are durable stores with their own stated deletion triggers, and this item is checked *before* the PR -- the window in which a working spec is still the only record of the unit.
+   This sweep does **not** reach `.agentsmith/specs/` (`#ai-plan`) or `.agentsmith/review-board/` (#ai-review-board): both are durable stores with their own stated deletion triggers, and this item is checked *before* the PR -- the window in which a working spec is still the only record of the unit.
    When it is unclear whether an artifact is throwaway or wanted, ask the user before deleting rather than guessing.
 
 An AI agent carries further items on top of these (#ai-done).

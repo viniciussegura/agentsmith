@@ -10,6 +10,7 @@ project, the [README](README.md) is all you need.
 instructions/      rule sections (the portable source of truth)
   main.md          preamble, emitted first
   core/            ai/ git/ swe/ ...            always-loaded modules
+  process/         specs, plans, spec review, branch lifespan, epics   on-demand bundle
   frontend/        ui-guidelines/ ...           on-demand bundle
   backend/         ...                          on-demand bundle
   ownership.yaml   #tag -> owner map            repo config; NEVER exported
@@ -78,7 +79,7 @@ test-helpers/      shared test scaffolding; skipped by `node --test` only while
 - To add a rule, drop a `.md` into a section group under `instructions/` (e.g.
   `core/swe/` or `backend/`); it is picked up automatically.
 - Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the
-  `process` non-review marker) in `instructions/ownership.yaml`; adding a rule
+  `ai` and `git` meta lenses) in `instructions/ownership.yaml`; adding a rule
   means adding its one owner row, or `npm test`'s coverage lint fails on the
   orphan. Role metadata lives in `instructions/roles.yaml`; both are repo config
   and are never exported.

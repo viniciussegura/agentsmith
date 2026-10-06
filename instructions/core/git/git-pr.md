@@ -2,7 +2,7 @@
 
 The PR **title** follows #git-title -- same format, same issue-code and outcome rules as the commit subject.
 
-The PR **body** carries one load-bearing obligation: it states the unit's **approved scope** and how it was judged done, inline, because a working spec is uncommitted branch scratch (#ai-plan) and nothing else durably records either.
+The PR **body** carries one load-bearing obligation: it states the unit's **approved scope** and how it was judged done, inline, because a working spec is uncommitted branch scratch (`#ai-plan`, process bundle) and nothing else durably records either.
 Inline means *stated*, not *transcribed* -- the scope in a sentence, not the spec pasted in.
 
 Around that, the body is a summary a reviewer reads once, not an archive they excavate (#code-prose).

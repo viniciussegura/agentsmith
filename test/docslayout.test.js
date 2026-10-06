@@ -605,7 +605,7 @@ const REWRITTEN_SITES = [
   { path: 'instructions/core/swe/swe-entity.md', was: 'docs/reference-spec/', cites: 'entity-model' },
   { path: 'instructions/core/ai/ai-review-board.md', was: 'docs/reference-spec/', cites: 'review-board-protocol' },
   { path: 'instructions/core/ai/ai-review-engine.md', was: 'docs/reference-spec/', cites: 'review-board-protocol' },
-  { path: 'instructions/core/ai/ai-spec-review.md', was: 'docs/reference-spec/', cites: 'review-board-protocol' },
+  { path: 'instructions/process/ai-spec-review.md', was: 'docs/reference-spec/', cites: 'review-board-protocol' },
   { path: 'instructions/authoring/ai-instruction-review.md', was: 'docs/reference-spec/', cites: 'review-board-protocol' },
   { path: 'instructions/core/ai/ai-session-hygiene.md', was: 'docs/design-decisions/', cites: null },
   { path: 'instructions/core/git/git-pr.md', was: 'docs/technical-debts/', cites: null },
@@ -649,7 +649,8 @@ const buildRemapped = (overrides, { extraCore = '' } = {}) => {
     listModules: makeListModules(repoRoot),
   });
   const remap = ({ path, demote }) => ({
-    text: applyLayoutOverrides({ moduleText: read(path), overrides }) + (path.endsWith('swe-epic.md') ? extraCore : ''),
+    // The probe rides on a module that stays in the core, so a core reference is what it plants.
+    text: applyLayoutOverrides({ moduleText: read(path), overrides }) + (path.endsWith('swe-docs-drift.md') ? extraCore : ''),
     demote,
   });
   return buildOutputs({

@@ -5,13 +5,13 @@ We follow the [Git feature branch workflow](https://www.atlassian.com/git/tutori
 - All work happens on branches off the default branch (`main` in most repos).
   A new deliverable branches from an up-to-date default branch (fetch first), not from whatever branch the session is currently on -- a prior session branch may be stale or already squash-merged.
   When new work starts while the session is on a branch other than the default branch, confirm the intended base with the user before branching.
-  A branch ships to the default branch via squash-merge (#swe-branch-lifespan decides *when*).
+  A branch ships to the default branch via squash-merge (`#swe-branch-lifespan`, in the process bundle, decides *when*).
   **Never** commit directly to the default branch; when a commit is warranted there, stop and ask to create a branch first.
 - A branch's scope is its deliverable, which may be wider than one feature.
   Implementing a feature often surfaces related issues; fixing them on the same branch is expected.
   A branch may also bundle deliberately, _e.g._ a "release revision" collecting several fixes.
   Layered work on one branch is fine -- it squashes into a single commit by design.
-  That scope has an end: the branch ships once it stops converging (#swe-branch-lifespan).
+  That scope has an end: the branch ships once it stops converging (`#swe-branch-lifespan`).
 - The **squash-merge is performed by the human**, not the AI agent -- via the host's merge button or `git merge --squash`.
   The squash-commit subject follows #git-title (it is the only commit that survives on the default branch); its body summarizes the change and links the PR (#git-pr).
   Where the branch carries AI-authored commits, the human performing the squash also carries their authorship trailers onto the squash commit (#git-usage): the host composes its default squash message from commit subjects and drops trailers, so attribution survives only if it is copied across deliberately.

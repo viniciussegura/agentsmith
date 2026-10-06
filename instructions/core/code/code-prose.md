@@ -13,4 +13,4 @@ Terseness is a budget on words, **never** on content: an artifact that drops a c
 When the two collide, completeness wins and the prose gets tighter instead -- cut the telling, not the told.
 
 This rule governs prose; #code-markdown governs its formatting, and #ai-conversational the agent's own conversational register.
-Where another rule sets an explicit budget for one artifact (e.g. #swe-epic's bird's-eye cap on a unit entry), that budget is this rule applied, not an addition to it.
+Where another rule sets an explicit budget for one artifact (e.g. `#swe-epic`'s bird's-eye cap on a unit entry, in the process bundle), that budget is this rule applied, not an addition to it.

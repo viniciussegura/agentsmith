@@ -273,6 +273,11 @@ async function main() {
       `agentsmith: warning -- unresolved #tag references: ${built.dangling.join(', ')}\n`,
     );
   }
+  if (built.unresolvedProse.length) {
+    process.stderr.write(
+      `agentsmith: warning -- core prose references an undefined #tag: ${built.unresolvedProse.join(', ')}\n`,
+    );
+  }
   if (built.crossBoundary.length) {
     const list = built.crossBoundary
       .map((c) => `#${c.from || '(core preamble)'} -> bundle-only #${c.tag}`)
