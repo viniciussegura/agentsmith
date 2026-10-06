@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { HOOKS } from '../src/settings.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -17,13 +18,12 @@ const plugin = {
   version: pkg.version,
   description: pkg.description,
   // skills/commands/agents auto-discovered (A1) — intentionally not enumerated.
+  // Hooks come from the one list the settings merge also reads, so the two paths agree.
   hooks: {
-    PreToolUse: [
-      {
-        matcher: 'Agent',
-        hooks: [{ type: 'command', command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/agentsmith/require-explicit-model.mjs"' }],
-      },
-    ],
+    PreToolUse: HOOKS.map(({ script, matcher }) => ({
+      matcher,
+      hooks: [{ type: 'command', command: `node "\${CLAUDE_PLUGIN_ROOT}/hooks/agentsmith/${script}"` }],
+    })),
   },
 };
 

@@ -57,14 +57,15 @@ Before writing anything, it prints the intended-effects plan — naming the scop
 Where the project carries a `.agentsmith/docs-layout.yaml` ([`docs-layout-config.md`](docs/reference-spec/docs-layout-config.md)), `install` reads it and the plan names every remapped row.
 
 **Gitignore the working state.** `install` does not modify your `.gitignore`, and everything agentsmith writes under `.agentsmith/` besides the generated instructions is per-machine working state — the working-spec store (`#ai-plan`), the review-board issue store, scratch, and the install manifest.
-The one stated exception is `.agentsmith/docs-layout.yaml`: a team decision you author and commit, which `install` only ever reads.
+The two stated exceptions are `.agentsmith/docs-layout.yaml` and `.agentsmith/hooks.yaml`: team decisions you author and commit, which `install` only ever reads.
 Several rules depend on the working state never being committed; the working-spec store in particular is defeated entirely if it lands in version control.
 
-If you do **not** commit the generated instructions, deny the directory and re-admit the layout config:
+If you do **not** commit the generated instructions, deny the directory and re-admit the two config files:
 
 ```gitignore
 .agentsmith/*
 !.agentsmith/docs-layout.yaml
+!.agentsmith/hooks.yaml
 ```
 
 If you **do** commit them (so teammates and CI get the set without running the installer), re-admit the generated paths too:
@@ -74,11 +75,12 @@ If you **do** commit them (so teammates and CI get the set without running the i
 !.agentsmith/AGENTS.md
 !.agentsmith/agents/
 !.agentsmith/docs-layout.yaml
+!.agentsmith/hooks.yaml
 ```
 
 Note the `/*` — `.agentsmith/` on its own cannot be paired with `!` exceptions, because git will not re-include a file whose parent directory is excluded.
 Both forms are deny-by-default, so a working-**state** directory added by a future version is ignored without your `.gitignore` needing an edit.
-A *committed* file a later version adds does need the edit — the `!.agentsmith/docs-layout.yaml` line is exactly that case.
+A *committed* file a later version adds does need the edit — the two `!` lines for the config files are exactly that case.
 
 ```bash
 agentsmith install                    # project scope, default mode/placement
@@ -90,8 +92,8 @@ agentsmith install --clean --yes      # uninstall then reinstall this scope, no 
 ```
 
 `agentsmith uninstall` reverses an `install` of the same scope: it deletes
-every path agentsmith wrote (from its install manifest), un-merges the hook
-entry from `settings.json`, and removes the marked `CLAUDE.md` import
+every path agentsmith wrote (from its install manifest), un-merges its hook
+entries from `settings.json`, and removes the marked `CLAUDE.md` import
 (`--scope user`). `uninstall` and `install --clean` are **destructive**: off a
 TTY they refuse to run without `--yes`.
 
@@ -182,11 +184,11 @@ Commands then surface as `/agentsmith:code-review-board`,
 | --- | --- | --- |
 | Instructions (`AGENTS.md` + bundles) | ✗ — run `/agentsmith:update-instructions` | ✓ (`install`) |
 | Tools (commands / agents / skills) | ✓ `/agentsmith:<name>` | ✓ `/agentsmith-<name>` (`install`, tools on) |
-| Model-enforcement hook | ✓ via `plugin.json` | ✓ via `settings.json` |
+| Hooks (model, default branch, git flags, dated markers) | ✓ via `plugin.json` | ✓ via `settings.json` |
 | Update | `/plugin` (version-aware) | re-run `npx … install` |
 | Teardown | disable/remove in `/plugin` (+ `/agentsmith:remove-instructions` for instructions) | `npx … uninstall` |
 
-Use the plugin for tools and `/agentsmith:update-instructions` for instructions, or `npx … install` for both; mixing a *full* `npx install` with the plugin double-wires the model-enforcement hook and lands two copies of every command.
+Use the plugin for tools and `/agentsmith:update-instructions` for instructions, or `npx … install` for both; mixing a *full* `npx install` with the plugin double-wires the hooks and lands two copies of every command.
 
 ## Contributing
 

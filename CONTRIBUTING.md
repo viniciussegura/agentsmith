@@ -16,6 +16,9 @@ instructions/      rule sections (the portable source of truth)
   roles.yaml       review-role metadata         repo config; NEVER exported
 tools/             tool-specific adapters, installed into .<ai>/ (shipped to consumers)
   claude/          agents/ skills/ commands/ hooks/   Claude Code adapter (-> .claude/)
+    hooks/agentsmith/  four PreToolUse hooks on one _lib.mjs; wired by src/settings.js (HOOKS) for the
+                       npx path and by bin/build-plugin.js for the plugin; a project switches one off in a
+                       committed .agentsmith/hooks.yaml (docs/reference-spec/cli.md, Hooks)
     .claude-plugin/plugin.json                        generated plugin manifest
 devtools/          maintainer-only dev tooling, never shipped to consumers
   claude/          authoring adapters (instruction-review/apply) installed only with --dev

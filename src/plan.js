@@ -86,8 +86,8 @@ export function renderPlan(plan) {
   for (const op of plan.ops) {
     if (op.kind === 'write') writes.push(REL(op.path));
     else if (op.kind === 'prune') deletes.push(...op.paths.map(REL));
-    else if (op.kind === 'mergeSettings') updates.push(`${REL(op.path)} (add agentsmith hook)`);
-    else if (op.kind === 'unmergeSettings') updates.push(`${REL(op.path)} (remove agentsmith hook)`);
+    else if (op.kind === 'mergeSettings') updates.push(`${REL(op.path)} (add agentsmith hooks)`);
+    else if (op.kind === 'unmergeSettings') updates.push(`${REL(op.path)} (remove agentsmith hooks)`);
     else if (op.kind === 'writeImport') updates.push(`${REL(op.path)} (add agentsmith import)`);
     else if (op.kind === 'removeImport') updates.push(`${REL(op.path)} (remove agentsmith import)`);
     else if (op.kind === 'keepStub') keeps.push(REL(op.path));
