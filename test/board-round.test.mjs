@@ -5,12 +5,18 @@ import { runRound } from '../tools/claude/skills/code-review-board/round-body.mj
 import { codeArgs, specArgs, instructionArgs, ROUTING_SCHEMA } from '../tools/claude/skills/code-review-board/round-args.mjs';
 
 // Build a recording harness: captures every agent() call + supports parallel/phase/log.
-function harness(routing = { lenses: ['security', 'db'], perLens: {} }) {
+// CLI dispatches (summary, apply, guard) reply with their output and an exit line, as the driver asks.
+const CLI_LABELS = { 'reduce:pre': 'preReduceExit', 'persist:apply': 'persistExit', 'guard:check': 'guardExit' };
+function harness(routing = { lenses: ['security', 'db'], perLens: {} }, exits = {}) {
   const calls = [];
   const phases = [];
   const agent = async (prompt, opts = {}) => {
     calls.push({ prompt, opts });
     if (!opts.model) throw new Error(`dispatch without explicit model: ${opts.label}`);
+    if (opts.label in CLI_LABELS) {
+      assert.ok(opts.schema, `${opts.label} must ask for a structured result`);
+      return { exitCode: exits[CLI_LABELS[opts.label]] ?? 0, output: `${opts.label}: output` };
+    }
     if (opts.schema) return routing;              // the plan/reduce structured return
     return `ok:${opts.label}`;
   };
@@ -165,4 +171,125 @@ test('a dispatch missing model throws (the in-driver assertion)', async () => {
       args: codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] }) }),
     /dispatch without explicit model/,
   );
+});
+
+test('a failed pre-reduce summary halts the round before the maintainer reduce', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { preReduceExit: 1 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] });
+  await assert.rejects(
+    () => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }),
+    /summary.*exit(ed)? 1|exit(ed)? 1.*summary/i,
+  );
+  assert.ok(h.calls.some((c) => c.opts.label === 'reduce:pre'), 'the summary step ran');
+  assert.ok(!h.calls.some((c) => c.opts.label === 'reduce'), 'the maintainer reduce must not run on a failed summary');
+  assert.ok(!h.calls.some((c) => c.opts.label === 'persist:apply'), 'persist must not run on a failed summary');
+});
+
+test('a CLI dispatch whose result carries no integer exitCode is treated as failed', async () => {
+  for (const bad of ['done', { output: 'ran' }, { exitCode: '0', output: '' }]) {
+    const h = harness({ lenses: ['security'], perLens: {} });
+    const agent = async (prompt, opts) => (opts.label === 'reduce:pre' ? bad : h.agent(prompt, opts));
+    const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] });
+    await assert.rejects(() => runRound({ agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /exitCode/);
+  }
+});
+
+test('a failed CLI step carries the full command output in its error, untruncated', async () => {
+  const long = 'x'.repeat(5000);
+  const h = harness({ lenses: ['security'], perLens: {} });
+  const agent = async (prompt, opts) => (opts.label === 'reduce:pre' ? { exitCode: 1, output: long } : h.agent(prompt, opts));
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] });
+  await assert.rejects(() => runRound({ agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), (e) => e.message.includes(long));
+});
+
+test('a clean CLI step whose output mentions "exit 1" is not read as a failure', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} });
+  const agent = async (prompt, opts) => (opts.label === 'reduce:pre' ? { exitCode: 0, output: 'note: a prior run had exit 1' } : h.agent(prompt, opts));
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] });
+  await runRound({ agent, parallel: h.parallel, phase: h.phase, log: h.log, args });
+  assert.ok(h.calls.some((c) => c.opts.label === 'reduce'));
+});
+
+test('the instruction board has no persist step: its reduce writes the worksheet', async () => {
+  const h = harness({ lenses: ['swe'], perLens: {} });
+  const args = instructionArgs({ roundId: 'r', scratch: '/p/x', subjectRef: 'full-audit', candidateLenses: ['swe'] });
+  assert.equal(args.persistCmd, null, 'no CLI marker to run');
+  const out = await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args });
+  assert.ok(!h.calls.some((c) => c.opts.label === 'persist:apply'), 'nothing is dispatched to run `true`');
+  assert.equal(out.persist, null);
+});
+
+test('a failed persist apply fails the round instead of completing as success', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { persistExit: 1 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] });
+  await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /persist.*exited 1/i);
+});
+
+test('a failed containment guard fails the round', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { guardExit: 1 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  assert.ok(args.guardCmd, 'the code args carry a guard command');
+  await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /guard.*exited 1/i);
+});
+
+
+test('the containment guard runs even when a CLI step failed, and the error carries both outcomes', async () => {
+  for (const exits of [{ preReduceExit: 1 }, { persistExit: 1 }]) {
+    const h = harness({ lenses: ['security'], perLens: {} }, exits);
+    const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+    await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), (e) => {
+      assert.match(e.message, /exited 1/);
+      assert.match(e.message, /containment guard passed/i, `guard outcome missing from: ${e.message}`);
+      return true;
+    });
+    assert.ok(h.calls.some((c) => c.opts.label === 'guard:check'), `guard did not run after ${JSON.stringify(exits)}`);
+    assert.ok(h.phases.includes('Guard'));
+  }
+});
+
+test('a failed step and a failed guard are both reported, the guard first', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { persistExit: 1, guardExit: 1 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), (e) => {
+    assert.match(e.message, /containment guard exited 1/);
+    assert.match(e.message, /persist exited 1/);
+    assert.ok(e.message.indexOf('containment guard') < e.message.indexOf('persist exited'), 'the escape is the headline');
+    return true;
+  });
+});
+
+test('the guard runs when the fan-out itself fails, since reviewers may already have written', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} });
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'review:security') throw new Error('reviewer crashed');
+    return h.agent(prompt, opts);
+  };
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  await assert.rejects(() => runRound({ agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /reviewer crashed/);
+  assert.ok(h.calls.some((c) => c.opts.label === 'guard:check'), 'guard did not run after a failed fan-out');
+});
+
+test('guard exit 3 (baseline missing, check did not run) completes the round and is reported in the result', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { guardExit: 3 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  const out = await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args });
+  assert.equal(out.guard.exitCode, 3, 'the caller reads the did-not-run code from the result');
+  assert.ok(out.persist && out.persist.exitCode === 0, 'the persist result survives');
+});
+
+test('guard exit 3 after a failed step still reports the step failure, and says the guard did not run', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { persistExit: 1, guardExit: 3 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), (e) => {
+    assert.match(e.message, /persist exited 1/);
+    assert.match(e.message, /guard did not run/i);
+    return true;
+  });
+});
+
+test('a guard configuration error is caught before any dispatch, so it cannot hide a step failure', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { persistExit: 1 });
+  const args = { ...codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] }), guardBaseline: '/p/base.txt', guardCmd: null };
+  await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /guardBaseline set without guardCmd/);
+  assert.equal(h.calls.length, 0, 'nothing was dispatched');
 });

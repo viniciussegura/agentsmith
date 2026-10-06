@@ -17,21 +17,6 @@ The 2026-06-26 board-unification unit (in git history, §A) simplified the round
 this document is the corrected canonical form — the verify sub-step is preserved for
 code and instruction (review semantics unchanged).
 
-## Workflow-script runtime contract
-
-A Workflow `-wf` driver is **not** an ordinary module. The runtime imposes three hard
-constraints, established by live smoke: (1) `export const meta = {...}` must be the
-**first** statement; (2) **no second `export`** and **no `import`** (static or dynamic) —
-the script is evaluated in a non-module scope and must be **fully self-contained**;
-(3) the Workflow `args` input arrives as a **JSON string**, so the script `JSON.parse`s
-it before use. Because of (2), the tested body cannot be imported: `round-body.mjs` is
-the source of truth (unit-tested via `runRound`), and `board-round.mjs` is **generated**
-from it by `bin/build-board-round.js` (the agentsmith generate+drift pattern —
-`test/board-round-render.test.mjs` fails if the committed script drifts). The generated
-guard `JSON.parse`s `args` and calls `runRound` only when an `agent` function is present
-(i.e. under the runtime). Structured-output (`agent(prompt, {schema})`) returns the
-parsed object and is verified end-to-end.
-
 ## Containment guard (agents carry Write)
 
 Reviewers, verifiers, and maintainers carry the **Write** tool — that is what makes the
@@ -138,7 +123,7 @@ over a per-board **args** descriptor, built by the pure builders in `round-args.
   maintainer: <agent name>,            // spec-specialist | project-manager | ai-engineer
   candidateLenses: [<role>...],
   verify: boolean,                     // true for code/instruction, false for spec
-  persistCmd: <CLI string>,            // board persist (or 'true' no-op for instruction)
+  persistCmd: <CLI string | null>,     // board persist; null for instruction, whose reduce writes the worksheet
   preReduceCmd: <CLI string | null>,   // optional pre-reduce summary step (code)
   guardBaseline: <path | null>,        // pre-round porcelain snapshot; present enables Guard
   guardCmd: <CLI string | null>,       // the Guard-phase command, built from skillsDir

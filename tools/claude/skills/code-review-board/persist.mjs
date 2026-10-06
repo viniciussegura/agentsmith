@@ -13,12 +13,23 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, sep } from 'node:path';
 import { argv, stdout, stderr, exit } from 'node:process';
-import { lintStore, idToSafe } from './lint.mjs';
+import { lintStore, idToSafe, parseId } from './lint.mjs';
 import { isMain } from './is-main.mjs';
+
+// The owning role is the id's `<role>` segment (`<roundId>#<role>-<n>`, issue-format.md);
+// a findings file declares no role field of its own.
+const roleOf = (id) => parseId(id)?.role;
 
 // ---------- io helpers ----------
 
-const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
+// A parse failure names the file: in a round with eight scratch files a bare SyntaxError locates nothing.
+function readJson(p) {
+  try {
+    return JSON.parse(readFileSync(p, 'utf8'));
+  } catch (err) {
+    throw new Error(`cannot read JSON at ${p}: ${err.message}`);
+  }
+}
 
 function writeJson(p, o) {
   mkdirSync(dirname(p), { recursive: true });
@@ -43,11 +54,19 @@ function defaultScratchDir(store, roundId) {
   return join(dirname(store), 'tmp', 'review-board', roundId);
 }
 
+const isBlank = (v) => v === undefined || v === null || v === '';
+
 function readDirJson(dir) {
+  return readDirJsonNamed(dir).map((n) => n.data);
+}
+
+// Same, keeping each file's name: a validation message must say which file a finding came from.
+function readDirJsonNamed(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((e) => e.endsWith('.json'))
-    .map((e) => readJson(join(dir, e)));
+    .sort()
+    .map((e) => ({ file: e, data: readJson(join(dir, e)) }));
 }
 
 function walk(dir, fn) {
@@ -99,7 +118,7 @@ export function assertRoundRecord(record, source) {
   if (!record || typeof record !== 'object' || Array.isArray(record)) {
     throw new Error(`round record (${source}) is not a JSON object`);
   }
-  const missing = ROUND_REQUIRED.filter((k) => record[k] === undefined || record[k] === null || record[k] === '');
+  const missing = ROUND_REQUIRED.filter((k) => isBlank(record[k]));
   const known = new Set([...ROUND_REQUIRED, ...ROUND_OPTIONAL]);
   const unknown = Object.keys(record).filter((k) => !known.has(k));
   if (!missing.length && !unknown.length) return;
@@ -114,7 +133,202 @@ export function assertRoundRecord(record, source) {
   );
 }
 
+// The Issue fields a reviewer must emit, the ones it may, and the priority bands (issue-format.md).
+export const FINDING_REQUIRED = ['id', 'title', 'description', 'priority', 'priorityRationale'];
+// A reviewer may pre-set these; the closed-state fields (closedInRound, promotedTo,
+// closingComments) are set by persist or /review-promote, so on a NEW finding they are unknown.
+const FINDING_OPTIONAL = ['kind', 'status', 'lastConfirmedCommit', 'locations', 'relatedIssues'];
+const FINDING_STRING = ['id', 'title', 'description', 'priorityRationale'];
+const PRIORITIES = new Set(['low', 'medium', 'high']);
+const FINDING_KNOWN = new Set([...FINDING_REQUIRED, ...FINDING_OPTIONAL]);
+
+
+/** Every way one raw `new` finding fails the Issue contract, as messages; empty when it conforms. */
+function findingProblems(raw, roundId) {
+  const problems = [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return ['is not a JSON object'];
+  const parts = parseId(raw.id);
+  if (!parts) problems.push('id is malformed (expected `<roundId>#<role>-<n>`)');
+  else {
+    if (parts.role === 'epic') problems.push('id uses the reserved `epic` role segment');
+    if (parts.roundId !== roundId) problems.push(`id names round \`${parts.roundId}\`, not this round \`${roundId}\``);
+  }
+  const missing = FINDING_REQUIRED.filter((k) => isBlank(raw[k]));
+  if (missing.length) problems.push(`missing required field(s): ${missing.join(', ')}`);
+  const unknown = Object.keys(raw).filter((k) => !FINDING_KNOWN.has(k));
+  if (unknown.length) problems.push(`unknown field(s): ${unknown.join(', ')}`);
+  const notString = FINDING_STRING.filter((k) => !isBlank(raw[k]) && typeof raw[k] !== 'string');
+  if (notString.length) problems.push(`non-string field(s): ${notString.join(', ')}`);
+  if (!isBlank(raw.priority) && !PRIORITIES.has(raw.priority)) {
+    problems.push(`priority \`${raw.priority}\` is not one of ${[...PRIORITIES].join(' | ')}`);
+  }
+  if (!isBlank(raw.kind) && raw.kind !== 'issue') problems.push(`kind \`${raw.kind}\` is not \`issue\``);
+  if (!isBlank(raw.status) && raw.status !== 'open') problems.push(`status \`${raw.status}\` is not \`open\` (a new finding opens open)`);
+  if (!isBlank(raw.lastConfirmedCommit) && typeof raw.lastConfirmedCommit !== 'string') problems.push('lastConfirmedCommit is not a string');
+  if (!isBlank(raw.locations) && !Array.isArray(raw.locations)) problems.push('locations is not an array');
+  if (!isBlank(raw.relatedIssues) && !Array.isArray(raw.relatedIssues)) problems.push('relatedIssues is not an array');
+  return problems;
+}
+
+const FINDINGS_FILE_KEYS = new Set(['new', 'reconcile']);
+// A root `role` key is ignored: the role is the id's segment. Warned about rather than refused, so one
+// lens emitting it does not discard the other lenses' findings.
+const FINDINGS_FILE_RETIRED_KEYS = new Set(['role']);
+
+/** Every way a findings FILE fails `{ new: [], reconcile: [] }`; empty when it conforms. */
+function findingsFileProblems(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return ['root is not a JSON object'];
+  const problems = [];
+  for (const k of FINDINGS_FILE_KEYS) {
+    if (data[k] === undefined) problems.push(`missing \`${k}\` array`);
+    else if (!Array.isArray(data[k])) problems.push(`\`${k}\` is not an array`);
+  }
+  const unknown = Object.keys(data).filter((k) => !FINDINGS_FILE_KEYS.has(k) && !FINDINGS_FILE_RETIRED_KEYS.has(k));
+  if (unknown.length) problems.push(`unknown key(s): ${unknown.join(', ')}`);
+  return problems;
+}
+
+/**
+ * Gate the findings files against the documented contract before any write: each file is
+ * `{ new: Issue[], reconcile: Reconcile[] }` and nothing else, and each `new` finding matches
+ * the Issue interface (issue-format.md). Every problem is reported at once, with the file it
+ * came from. A malformed finding the verifier ACCEPTED would be written, so it throws; one the
+ * verifier REJECTED is never written, so it is returned as a warning rather than halting the
+ * round -- but never dropped silently (#swe-errors). A malformed FILE throws regardless: none
+ * of its findings can be trusted to have reached the verifier.
+ * A file carrying a root `role` key is warned about, not refused: the key is ignored, and failing
+ * the round for it would discard the other lenses' findings.
+ * @param {Array<{ file: string, data: { new?: unknown[] } }>} named  findings files, by name
+ * @param {{ roundId: string, accepted: Set<string>, judged: Set<string> }} ctx  verdict ids: accepted, and all
+ * @returns {string[]} warnings: malformed findings that were rejected or never verified, and retired keys
+ */
+export function assertFindings(named, { roundId, accepted, judged }) {
+  const errors = [];
+  const warnings = [];
+  for (const { file, data } of named) {
+    const fileProblems = findingsFileProblems(data);
+    if (fileProblems.length) {
+      errors.push(`findings/${file}: ${fileProblems.join('; ')} (expected { new: Issue[], reconcile: Reconcile[] })`);
+      continue;
+    }
+    for (const k of FINDINGS_FILE_RETIRED_KEYS) {
+      if (k in data) warnings.push(`findings/${file}: carries a \`${k}\` key, which nothing reads -- the role is the id's segment`);
+    }
+    data.new.forEach((raw, i) => {
+      const problems = findingProblems(raw, roundId);
+      if (!problems.length) return;
+      const id = raw?.id;
+      const line = `finding findings/${file} new[${i}] (id \`${id}\`): ${problems.join('; ')}`;
+      if (accepted.has(id)) errors.push(line);
+      else warnings.push(`${judged.has(id) ? 'rejected' : 'unverified'} ${line}`);
+    });
+  }
+  if (errors.length) {
+    throw new Error(`findings do not match issue-format.md -- ${errors.join(' | ')}`);
+  }
+  return warnings;
+}
+
+// pm-directive.json (issue-format.md): every section the PM may emit, and what each entry needs.
+const DIRECTIVE_SECTIONS = new Set(['epics', 'priorityOverrides', 'duplicates', 'rejections']);
+const DIRECTIVE_ENTRY_REQUIRED = {
+  epics: ['id', 'title'],
+  priorityOverrides: ['id', 'priority', 'rationale'],
+  duplicates: ['id', 'canonical'],
+  rejections: ['id'],
+};
+
+/**
+ * Throw unless the PM directive is well-formed, before any write: known sections only, an epic
+ * id that parses with the `epic` role for THIS round, required entry fields present, and
+ * priorities in band. applyEpics runs after issues are written, so it relies on this gate.
+ * @param {unknown} directive
+ * @param {{ roundId: string, source: string }} ctx
+ */
+export function assertDirective(directive, { roundId, source }) {
+  if (!directive || typeof directive !== 'object' || Array.isArray(directive)) {
+    throw new Error(`PM directive (${source}) is not a JSON object`);
+  }
+  const problems = [];
+  const unknown = Object.keys(directive).filter((k) => !DIRECTIVE_SECTIONS.has(k));
+  if (unknown.length) problems.push(`unknown section(s): ${unknown.join(', ')}`);
+  for (const section of DIRECTIVE_SECTIONS) {
+    const entries = directive[section];
+    if (entries === undefined) continue;
+    if (!Array.isArray(entries)) { problems.push(`${section} is not an array`); continue; }
+    entries.forEach((e, i) => {
+      const at = `${section}[${i}]`;
+      if (!e || typeof e !== 'object') { problems.push(`${at} is not an object`); return; }
+      const missing = DIRECTIVE_ENTRY_REQUIRED[section].filter((k) => isBlank(e[k]));
+      if (missing.length) problems.push(`${at} missing required field(s): ${missing.join(', ')}`);
+      if (!isBlank(e.priority) && !PRIORITIES.has(e.priority)) problems.push(`${at} priority \`${e.priority}\` is not one of ${[...PRIORITIES].join(' | ')}`);
+      if (section === 'epics' && !isBlank(e.id)) {
+        const parts = parseId(e.id);
+        if (!parts) problems.push(`${at} id \`${e.id}\` is malformed (expected \`<roundId>#epic-<n>\`)`);
+        else {
+          if (parts.role !== 'epic') problems.push(`${at} id \`${e.id}\` does not use the \`epic\` role segment`);
+          if (parts.roundId !== roundId) problems.push(`${at} id names round \`${parts.roundId}\`, not this round \`${roundId}\``);
+        }
+        if (!isBlank(e.children) && !Array.isArray(e.children)) problems.push(`${at} children is not an array`);
+      }
+    });
+  }
+  if (problems.length) throw new Error(`PM directive (${source}) does not match issue-format.md -- ${problems.join('; ')}`);
+}
+
+// Reconcile transitions a reviewer may emit on a dirty prior issue (issue-format.md).
+const RECONCILE_TRANSITIONS = new Set(['fixed', 'deprecated', 'superseded', 'reopen', 'still-open']);
+
+/**
+ * Throw unless every reconcile entry names an issue that exists in the store and a known
+ * transition, before any write. An entry that cannot be applied is an error, never a skip:
+ * a skipped transition leaves the issue the reviewer meant to close open (#swe-errors).
+ * @param {Array<{ file: string, data: { reconcile?: unknown[] } }>} named
+ * @param {Map<string, unknown>} index  the store index (issue id -> record)
+ */
+export function assertReconcile(named, index) {
+  const problems = [];
+  const seen = new Map(); // issue id -> the entry that first reconciled it this round
+  for (const { file, data } of named) {
+    (data?.reconcile || []).forEach((rc, i) => {
+      const at = `findings/${file} reconcile[${i}]`;
+      if (!rc || typeof rc !== 'object') { problems.push(`${at} is not an object`); return; }
+      if (isBlank(rc.id)) problems.push(`${at} is missing id`);
+      else if (!index.has(rc.id)) problems.push(`${at} names \`${rc.id}\`, which is not in the store`);
+      else if (seen.has(rc.id)) problems.push(`${at} reconciles \`${rc.id}\` twice this round (first in ${seen.get(rc.id)}); one lens owns a transition`);
+      else seen.set(rc.id, at);
+      if (isBlank(rc.transition)) problems.push(`${at} is missing transition`);
+      else if (!RECONCILE_TRANSITIONS.has(rc.transition)) {
+        problems.push(`${at} transition \`${rc.transition}\` is not one of ${[...RECONCILE_TRANSITIONS].join(' | ')}`);
+      }
+    });
+  }
+  if (problems.length) throw new Error(`reconcile entries do not match issue-format.md -- ${problems.join('; ')}`);
+}
+
 // ---------- apply ----------
+
+/**
+ * Read and gate the scratch both `summary` and `apply` consume -- round record, verdicts,
+ * findings files, reconcile entries -- so the two steps refuse the same input and the reduce
+ * never runs on scratch that apply will reject. Throws before anything is written.
+ * @param {{ store: string, roundId: string, scratch: string }} input
+ */
+function gateScratch({ store, roundId, scratch }) {
+  const roundPath = join(scratch, 'round.json');
+  const round = readJson(roundPath);
+  assertRoundRecord(round, roundPath);
+  if (round.id !== roundId) {
+    throw new Error(`round record (${roundPath}) is for round \`${round.id}\`, but round \`${roundId}\` is being persisted`);
+  }
+  const verdicts = readDirJson(join(scratch, 'verdicts'));
+  const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
+  const judged = new Set(verdicts.map((v) => v.id));
+  const namedFindings = readDirJsonNamed(join(scratch, 'findings'));
+  const warnings = assertFindings(namedFindings, { roundId, accepted, judged });
+  assertReconcile(namedFindings, indexStore(store));
+  return { round, accepted, findings: namedFindings.map((n) => n.data), warnings };
+}
 
 /**
  * Write the store for a round from its JSON scratch. Never throws on store
@@ -124,17 +338,10 @@ export function assertRoundRecord(record, source) {
  */
 export function persistApply({ store, roundId, scratchDir }) {
   const scratch = scratchDir || defaultScratchDir(store, roundId);
-  // Parse AND validate ALL inputs up front so malformed scratch fails before any write.
-  const roundPathIn = join(scratch, 'round.json');
-  const round = readJson(roundPathIn);
-  assertRoundRecord(round, roundPathIn);
-  const findings = readDirJson(join(scratch, 'findings'));
-  const verdicts = readDirJson(join(scratch, 'verdicts'));
-  const directive = existsSync(join(scratch, 'pm-directive.json'))
-    ? readJson(join(scratch, 'pm-directive.json'))
-    : {};
-
-  const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
+  const { round, accepted, findings, warnings: findingWarnings } = gateScratch({ store, roundId, scratch });
+  const directivePath = join(scratch, 'pm-directive.json');
+  const directive = existsSync(directivePath) ? readJson(directivePath) : {};
+  assertDirective(directive, { roundId, source: directivePath });
   const pmRejected = new Set((directive.rejections || []).map((r) => r.id));
   const priorityOf = new Map((directive.priorityOverrides || []).map((p) => [p.id, p]));
   const dupOf = new Map((directive.duplicates || []).map((d) => [d.id, d]));
@@ -143,9 +350,9 @@ export function persistApply({ store, roundId, scratchDir }) {
 
   // 1) Verified-new issues.
   for (const f of findings) {
-    const roleDir = f.role;
     for (const raw of f.new || []) {
       if (!accepted.has(raw.id) || pmRejected.has(raw.id)) continue;
+      const roleDir = roleOf(raw.id);
       const issue = {
         ...raw,
         kind: 'issue',
@@ -187,7 +394,7 @@ export function persistApply({ store, roundId, scratchDir }) {
 
   // 5) Validate.
   const { errors, warnings } = lintStore({ root: store });
-  return { written, errors, warnings, counts: countWritten({ store, written }) };
+  return { written, errors, warnings: [...findingWarnings, ...warnings], counts: countWritten({ store, written }) };
 }
 
 // Tally what reached the store, by partition. Reported unconditionally (zeros
@@ -216,8 +423,7 @@ function applyReconcile({ store, round, findings, written }) {
   const index = indexStore(store);
   for (const f of findings) {
     for (const rc of f.reconcile || []) {
-      const rec = index.get(rc.id);
-      if (!rec) continue; // unknown id: nothing to reconcile (lint will not see a phantom).
+      const rec = index.get(rc.id); // present: assertReconcile ran before any write
       const issue = rec.obj;
 
       if (CLOSING.has(rc.transition)) {
@@ -287,13 +493,11 @@ const summarize = (o, role) => ({ id: o.id, title: o.title, priority: o.priority
  * Project the PM's input: carried-forward OPEN issues (from the store) plus this
  * round's accepted new findings (scratch minus rejects). Writes pm-input.json.
  * @param {{ store: string, roundId: string, scratchDir?: string }} input
- * @returns {{ roundId: string, carried: object[], new: object[] }}
+ * @returns {{ roundId: string, carried: object[], new: object[], warnings: string[] }}
  */
 export function persistSummary({ store, roundId, scratchDir }) {
   const scratch = scratchDir || defaultScratchDir(store, roundId);
-  const findings = readDirJson(join(scratch, 'findings'));
-  const verdicts = readDirJson(join(scratch, 'verdicts'));
-  const accepted = new Set(verdicts.filter((v) => v.verdict === 'accept').map((v) => v.id));
+  const { accepted, findings, warnings } = gateScratch({ store, roundId, scratch });
 
   const carried = [];
   walk(join(store, 'issues'), (abs) => {
@@ -306,13 +510,13 @@ export function persistSummary({ store, roundId, scratchDir }) {
   const fresh = [];
   for (const f of findings) {
     for (const n of f.new || []) {
-      if (accepted.has(n.id)) fresh.push(summarize(n, f.role));
+      if (accepted.has(n.id)) fresh.push(summarize(n, roleOf(n.id)));
     }
   }
 
   const out = { roundId, carried, new: fresh };
   writeJson(join(scratch, 'pm-input.json'), out);
-  return out;
+  return { ...out, warnings };
 }
 
 // ---------- CLI ----------
@@ -335,8 +539,9 @@ if (invokedDirectly) {
       );
       if (errors.length) exit(1);
     } else if (cmd === 'summary') {
-      persistSummary({ store, roundId });
-      stdout.write('review-board persist summary: ok\n');
+      const { warnings } = persistSummary({ store, roundId });
+      for (const w of warnings) stderr.write(`warning: ${w}\n`);
+      stdout.write(`review-board persist summary: ok -- ${warnings.length} warning(s)\n`);
     } else {
       stderr.write('usage: persist.mjs <summary|apply> <store-dir> <round-id>\n');
       exit(2);

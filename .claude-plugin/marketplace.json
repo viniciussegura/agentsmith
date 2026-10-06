@@ -1,8 +1,7 @@
 {
   "name": "agentsmith",
   "owner": {
-    "name": "Vinicius Segura",
-    "email": "viniciussegura@gmail.com"
+    "name": "Vinicius Segura"
   },
   "plugins": [
     {

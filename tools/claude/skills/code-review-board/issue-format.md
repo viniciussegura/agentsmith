@@ -58,6 +58,10 @@ interface ReviewRoundInfo {
 `persist.mjs apply` names its output `rounds/<id>.json`, so it validates this record **before any write** and fails naming every missing required field and every unknown one together -- the failure it catches is a drifted field name (`selectedRoles` for `roles`), which is only legible when both halves are reported.
 Build the record with `roundRecord()` from `round-args.mjs` rather than by hand, so the field names cannot drift from this interface in the first place.
 
+Both `summary` and `apply` gate the same scratch the same way, before any write: `round.json` matches `ReviewRoundInfo` and names the round being persisted; each findings file is exactly `{ new, reconcile }` with both arrays, refused by name otherwise (a retired `role` key is tolerated with a warning); and for every `new` finding, the id parses as `<roundId>#<role>-<n>` for **this** round with a non-epic role, the five required fields (`id`, `title`, `description`, `priority`, `priorityRationale`) are present and well-typed, `priority` is a band above, `locations`/`relatedIssues` are arrays, `kind`/`status` if present are `issue`/`open`, and no other field is present -- the closed-state fields (`closedInRound`, `promotedTo`, `closingComments`) are persist's and `/review-promote`'s to set, never a reviewer's.
+A malformed finding the verifier accepted fails the step, naming its file, position, and every problem; one the verifier rejected is reported as a warning, since it is never written.
+Both also refuse a `reconcile` entry whose id is not in the store, whose transition is not one of the five above, or whose issue another entry already reconciled this round; `apply` alone gates `pm-directive.json` the same way (known sections only, required entry fields, priorities in band, epic ids with the `epic` role for this round), since the directive does not exist yet when `summary` runs.
+
 ## Status lifecycle
 
 | status | meaning | set by |
@@ -137,7 +141,7 @@ It does **not** check supersession-chain acyclicity: our relations live in free-
 Per-run scratch under `.agentsmith/tmp/review-board/<round-id>/` (gitignored). Machine files are JSON; `persist.mjs` consumes them and writes the store.
 
 - `round.json` -- the `ReviewRoundInfo` for the round (written by Setup).
-- `findings/<role>.json` -- `{ role, new: Issue[], reconcile: Reconcile[] }`. `new` are this round's findings under pre-minted ids; `reconcile` are transitions on the role's dirty prior issues.
+- `findings/<role>.json` -- `{ new: Issue[], reconcile: Reconcile[] }`; the owning role is the id's `<role>` segment, not a field. `new` are this round's findings under pre-minted ids; `reconcile` are transitions on the role's dirty prior issues.
 - `verdicts/<finding-id>.json` -- `{ id, verdict: "accept" | "reject", rationale }`, one per new finding.
 - `pm-directive.json` -- the PM's structured directive (below); absent means no consolidation.
 - `pm-input.json` -- written by `persist.mjs summary`, read by the PM reduce.

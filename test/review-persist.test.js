@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { persistApply, persistSummary } from '../tools/claude/skills/code-review-board/persist.mjs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { persistApply, persistSummary, FINDING_REQUIRED } from '../tools/claude/skills/code-review-board/persist.mjs';
 import { makeTempDir } from '../test-helpers/tmp-dir.mjs';
+
+const repoRoot = resolve(fileURLToPath(import.meta.url), '../..');
 
 // Build a round scratch dir + empty store; return { store, scratchDir, roundId }.
 function scaffold(t, roundId = 'r1') {
@@ -39,7 +42,6 @@ function newFinding(id, over = {}) {
 test('apply writes only accepted new issues, and lints clean', (t) => {
   const { store, scratchDir, roundId } = scaffold(t);
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
-    role: 'swe',
     new: [newFinding('r1#swe-1'), newFinding('r1#swe-2', { title: 'Rejected one' })],
     reconcile: [],
   });
@@ -69,7 +71,6 @@ test('reconcile closes, reopens, and refreshes still-open issues', (t) => {
     status: 'fixed', closingComments: 'done', closedInRound: 'r1',
   });
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
-    role: 'swe',
     new: [],
     reconcile: [
       { id: 'r1#swe-1', transition: 'fixed', closingComments: 'patched in PR #4' },
@@ -103,7 +104,7 @@ test('reconcile still-open refreshes locations and baseline', (t) => {
     ...newFinding('r1#swe-1'), lastConfirmedCommit: 'aaa',
   });
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
-    role: 'swe', new: [],
+    new: [],
     reconcile: [{ id: 'r1#swe-1', transition: 'still-open', locations: [{ filename: 'src/a.js', lines: [5, 9], snippet: 'y' }] }],
   });
   const res = persistApply({ store, scratchDir, roundId });
@@ -117,7 +118,6 @@ test('reconcile still-open refreshes locations and baseline', (t) => {
 test('pm directive writes epics, applies overrides and duplicates', (t) => {
   const { store, scratchDir, roundId } = scaffold(t, 'r4');
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
-    role: 'swe',
     new: [newFinding('r4#swe-1'), newFinding('r4#swe-2', { title: 'Dup of one' })],
     reconcile: [],
   });
@@ -162,13 +162,15 @@ test('summary projects carried-forward open issues and accepted new findings', (
     ...newFinding('r1#swe-1', { title: 'Carried' }),
   });
   // A new finding this round, accepted.
-  writeJson(join(scratchDir, 'findings', 'swe.json'), { role: 'swe', new: [newFinding('r6#swe-1', { title: 'Fresh' })], reconcile: [] });
+  writeJson(join(scratchDir, 'findings', 'swe.json'), { new: [newFinding('r6#swe-1', { title: 'Fresh' })], reconcile: [] });
   writeJson(join(scratchDir, 'verdicts', 'r6--swe-1.json'), { id: 'r6#swe-1', verdict: 'accept', rationale: 'ok' });
 
   const out = persistSummary({ store, scratchDir, roundId });
 
   const onDisk = JSON.parse(readFileSync(join(scratchDir, 'pm-input.json'), 'utf8'));
-  assert.deepEqual(onDisk, out);
+  const { warnings, ...projected } = out;
+  assert.deepEqual(onDisk, projected);
+  assert.deepEqual(warnings, []);
   assert.equal(out.carried.length, 1);
   assert.equal(out.carried[0].id, 'r1#swe-1');
   assert.equal(out.new.length, 1);
@@ -180,7 +182,6 @@ test('summary projects carried-forward open issues and accepted new findings', (
 test('epic child that the PM rejected is dropped, store stays lint-clean', (t) => {
   const { store, scratchDir, roundId } = scaffold(t, 'r7');
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
-    role: 'swe',
     new: [newFinding('r7#swe-1'), newFinding('r7#swe-2', { title: 'Rejected child' })],
     reconcile: [],
   });
@@ -221,7 +222,7 @@ function withRound(scratchDir, over) {
 test('apply rejects a round record missing id, before writing anything', (t) => {
   const { store, scratchDir, roundId } = scaffold(t);
   withRound(scratchDir, { id: undefined });
-  writeJson(join(scratchDir, 'findings', 'swe.json'), { role: 'swe', new: [newFinding('r1#swe-1')], reconcile: [] });
+  writeJson(join(scratchDir, 'findings', 'swe.json'), { new: [newFinding('r1#swe-1')], reconcile: [] });
   writeJson(join(scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
 
   assert.throws(() => persistApply({ store, scratchDir, roundId }), /round record/i);
@@ -279,7 +280,7 @@ test('apply returns counts of what it wrote, zero included', (t) => {
 test('apply counts issues and epics separately from the round record', (t) => {
   const { store, scratchDir, roundId } = scaffold(t);
   writeJson(join(scratchDir, 'findings', 'swe.json'), {
-    role: 'swe', new: [newFinding('r1#swe-1'), newFinding('r1#swe-2', { title: 'Second' })], reconcile: [],
+    new: [newFinding('r1#swe-1'), newFinding('r1#swe-2', { title: 'Second' })], reconcile: [],
   });
   for (const id of ['r1--swe-1', 'r1--swe-2']) {
     writeJson(join(scratchDir, 'verdicts', `${id}.json`), { id: id.replace('--', '#'), verdict: 'accept', rationale: 'ok' });
@@ -291,4 +292,267 @@ test('apply counts issues and epics separately from the round record', (t) => {
   const res = persistApply({ store, scratchDir, roundId });
   assert.equal(res.errors.length, 0, res.errors.join('\n'));
   assert.deepEqual(res.counts, { issues: 2, epics: 1, rounds: 1 });
+});
+
+test('apply derives the issue directory from the id when a finding carries no role field', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
+  writeJson(join(scratchDir, 'findings', 'qa.json'), {
+    new: [newFinding('r1#qa-1')],
+    reconcile: [],
+  });
+  writeJson(join(scratchDir, 'verdicts', 'r1--qa-1.json'), { id: 'r1#qa-1', verdict: 'accept', rationale: 'real' });
+
+  const res = persistApply({ store, scratchDir, roundId });
+
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+  assert.ok(!existsSync(join(store, 'issues', 'undefined')), 'issue filed under issues/undefined/');
+  assert.equal(readdirSync(join(store, 'issues', 'qa')).length, 1);
+});
+
+test('summary attributes a role-less new finding to the role in its id', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
+  writeJson(join(scratchDir, 'findings', 'db.json'), { new: [newFinding('r1#db-1')], reconcile: [] });
+  writeJson(join(scratchDir, 'verdicts', 'r1--db-1.json'), { id: 'r1#db-1', verdict: 'accept', rationale: 'real' });
+
+  const out = persistSummary({ store, scratchDir, roundId });
+
+  assert.equal(out.new.length, 1);
+  assert.equal(out.new[0].role, 'db');
+});
+
+test('apply fails closed on malformed accepted findings, naming the file and every problem', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
+  writeJson(join(scratchDir, 'findings', 'swe.json'), {
+    new: [
+      newFinding('r1-swe-1'),
+      newFinding('r1#epic-1'),
+      { id: 'r1#swe-2' },
+      newFinding('r9#swe-3'),
+      newFinding('r1#swe-4', { priority: 'P1', title: 42, location: 'drifted' }),
+    ],
+    reconcile: [],
+  });
+  for (const id of ['r1-swe-1', 'r1#epic-1', 'r1#swe-2', 'r9#swe-3', 'r1#swe-4']) {
+    writeJson(join(scratchDir, 'verdicts', `${id.replace('#', '--')}.json`), { id, verdict: 'accept', rationale: 'real' });
+  }
+
+  assert.throws(() => persistApply({ store, scratchDir, roundId }), (e) => {
+    for (const expected of ['swe.json', 'r1-swe-1', 'r1#epic-1', 'r1#swe-2', 'title', 'r9#swe-3', 'priority', 'location']) {
+      assert.ok(e.message.includes(expected), `message lacks ${expected}: ${e.message}`);
+    }
+    return true;
+  });
+  assert.ok(!existsSync(join(store, 'issues')), 'store was written despite malformed findings');
+});
+
+test('a malformed finding the verifier rejected is a warning, not a halt', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
+  writeJson(join(scratchDir, 'findings', 'swe.json'), {
+    new: [newFinding('r1#swe-1'), newFinding('garbage')],
+    reconcile: [],
+  });
+  writeJson(join(scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+  writeJson(join(scratchDir, 'verdicts', 'garbage.json'), { id: 'garbage', verdict: 'reject', rationale: 'noise' });
+
+  const res = persistApply({ store, scratchDir, roundId });
+
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+  assert.equal(readdirSync(join(store, 'issues', 'swe')).length, 1);
+  assert.equal(res.warnings.filter((w) => w.includes('garbage') && w.includes('swe.json')).length, 1);
+});
+
+test('summary fails closed on a malformed accepted finding and warns on a rejected one', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t);
+  writeJson(join(scratchDir, 'findings', 'swe.json'), { new: [newFinding('nohash')], reconcile: [] });
+  writeJson(join(scratchDir, 'verdicts', 'nohash.json'), { id: 'nohash', verdict: 'accept', rationale: 'real' });
+  assert.throws(() => persistSummary({ store, scratchDir, roundId }), /nohash/);
+
+  writeJson(join(scratchDir, 'verdicts', 'nohash.json'), { id: 'nohash', verdict: 'reject', rationale: 'noise' });
+  const out = persistSummary({ store, scratchDir, roundId });
+  assert.equal(out.new.length, 0);
+  assert.equal(out.warnings.filter((w) => w.includes('nohash')).length, 1);
+});
+
+test('reviewer-common.md states every field the gate requires', () => {
+  const prose = readFileSync(resolve(repoRoot, 'tools', 'claude', 'skills', 'code-review-board', 'reviewer-common.md'), 'utf8');
+  for (const field of FINDING_REQUIRED) assert.ok(prose.includes('`' + field + '`'), `reviewer-common.md does not name ${field}`);
+});
+
+// One accepted, well-formed finding plus whatever the caller adds; returns the scaffold.
+function acceptedRound(t, extraFindings = [], directive = null) {
+  const sc = scaffold(t);
+  const all = [newFinding('r1#swe-1'), ...extraFindings];
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: all, reconcile: [] });
+  for (const f of all) {
+    writeJson(join(sc.scratchDir, 'verdicts', `${String(f.id).replace('#', '--')}.json`), { id: f.id, verdict: 'accept', rationale: 'real' });
+  }
+  if (directive) writeJson(join(sc.scratchDir, 'pm-directive.json'), directive);
+  return sc;
+}
+
+function assertHaltsBeforeWrite(sc, ...expected) {
+  assert.throws(() => persistApply(sc), (e) => {
+    for (const x of expected) assert.ok(e.message.includes(x), `message lacks ${x}: ${e.message}`);
+    return true;
+  });
+  assert.ok(!existsSync(join(sc.store, 'issues')), 'store was written despite the malformed input');
+  assert.ok(!existsSync(join(sc.store, 'epics')), 'epics were written despite the malformed input');
+}
+
+test('a PM priority override outside the bands halts before any write', (t) => {
+  const sc = acceptedRound(t, [], { priorityOverrides: [{ id: 'r1#swe-1', priority: 'P1', rationale: 'x' }] });
+  assertHaltsBeforeWrite(sc, 'pm-directive.json', 'priorityOverrides', 'P1');
+});
+
+test('a new finding carrying closed-state fields is refused', (t) => {
+  const sc = acceptedRound(t, [newFinding('r1#swe-2', { closedInRound: 'r0', closingComments: 'done', promotedTo: 'JIRA-1' })]);
+  assertHaltsBeforeWrite(sc, 'r1#swe-2', 'closedInRound', 'closingComments', 'promotedTo');
+});
+
+test('optional fields are checked by shape, not just by name', (t) => {
+  const sc = acceptedRound(t, [newFinding('r1#swe-2', { locations: 'src/a.js', kind: 'epic', lastConfirmedCommit: 7, status: 'fixed' })]);
+  assertHaltsBeforeWrite(sc, 'r1#swe-2', 'locations', 'kind', 'lastConfirmedCommit', 'status');
+});
+
+test('a malformed PM directive halts before issues are written', (t) => {
+  const sc = acceptedRound(t, [], {
+    epics: [{ title: 'No id' }, { id: 'r1#swe-9', title: 'Wrong role' }, { id: 'r9#epic-1', title: 'Other round' }],
+    duplicates: [{ id: 'r1#swe-1' }],
+    bogus: true,
+  });
+  assertHaltsBeforeWrite(sc, 'pm-directive.json', 'epics[0]', 'epics[1]', 'epics[2]', 'duplicates[0]', 'canonical', 'bogus');
+});
+
+test('apply refuses a round.json whose id differs from the round being applied', (t) => {
+  const sc = acceptedRound(t);
+  const round = JSON.parse(readFileSync(join(sc.scratchDir, 'round.json'), 'utf8'));
+  writeJson(join(sc.scratchDir, 'round.json'), { ...round, id: 'r2' });
+  assertHaltsBeforeWrite(sc, 'round.json', 'r2', 'r1');
+});
+
+test('id-less findings are reported by their position in the file', (t) => {
+  const sc = scaffold(t);
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: [{ title: 'a' }, { title: 'b' }], reconcile: [] });
+  const out = persistSummary(sc);
+  assert.equal(out.warnings.length, 2);
+  assert.ok(out.warnings[0].includes('new[0]'), out.warnings[0]);
+  assert.ok(out.warnings[1].includes('new[1]'), out.warnings[1]);
+});
+
+test('a malformed reconcile entry halts before any write', (t) => {
+  const { store, scratchDir, roundId } = scaffold(t, 'r2');
+  const seeded = join(store, 'issues', 'swe', 'r1--swe-1-old.json');
+  writeJson(seeded, { ...newFinding('r1#swe-1', { title: 'Old open' }), lastConfirmedCommit: 'aaa' });
+  const before = readFileSync(seeded, 'utf8');
+  writeJson(join(scratchDir, 'findings', 'swe.json'), {
+    new: [],
+    reconcile: [
+      { id: 'r1#swe-1', transition: 'fix' },
+      { id: 'r1#swe-42', transition: 'fixed' },
+      { transition: 'reopen' },
+    ],
+  });
+
+  assert.throws(() => persistApply({ store, scratchDir, roundId }), (e) => {
+    for (const x of ['swe.json', 'reconcile[0]', '`fix`', 'reconcile[1]', 'r1#swe-42', 'reconcile[2]']) {
+      assert.ok(e.message.includes(x), `message lacks ${x}: ${e.message}`);
+    }
+    return true;
+  });
+  assert.equal(readFileSync(seeded, 'utf8'), before, 'the seeded issue was touched');
+  assert.ok(!existsSync(join(store, 'rounds')), 'the round record was written');
+});
+
+test('a findings file whose root is not { new, reconcile } is refused by name, never read as zero findings', (t) => {
+  const roots = [
+    [newFinding('r1#swe-1')],
+    { findings: [newFinding('r1#swe-1')] },
+    { new: {}, reconcile: [] },
+    { new: [newFinding('r1#swe-1')] },
+  ];
+  for (const bad of roots) {
+    const sc = scaffold(t);
+    writeJson(join(sc.scratchDir, 'findings', 'swe.json'), bad);
+    writeJson(join(sc.scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+    for (const run of [persistSummary, persistApply]) {
+      assert.throws(() => run(sc), (e) => {
+        assert.ok(e.message.includes('findings/swe.json'), `${run.name} did not name the file: ${e.message}`);
+        assert.ok(!(e instanceof TypeError), `${run.name} crashed instead of gating: ${e.message}`);
+        return true;
+      }, `${run.name} accepted root ${JSON.stringify(bad).slice(0, 40)}`);
+    }
+    assert.ok(!existsSync(join(sc.store, 'issues')));
+  }
+});
+
+test('summary gates round.json and reconcile entries the same way apply does', (t) => {
+  const sc = scaffold(t, 'r2');
+  writeJson(join(sc.store, 'issues', 'swe', 'r1--swe-1-old.json'), newFinding('r1#swe-1'));
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: [], reconcile: [{ id: 'r1#swe-1', transition: 'fix' }] });
+  assert.throws(() => persistSummary(sc), /reconcile\[0\].*`fix`/);
+
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: [], reconcile: [] });
+  const round = JSON.parse(readFileSync(join(sc.scratchDir, 'round.json'), 'utf8'));
+  writeJson(join(sc.scratchDir, 'round.json'), { ...round, id: 'r9' });
+  assert.throws(() => persistSummary(sc), /round\.json.*r9.*r2/);
+});
+
+test('a findings file still carrying the retired role key is a warning, never a halt', (t) => {
+  const sc = scaffold(t);
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { role: 'swe', new: [newFinding('r1#swe-1')], reconcile: [] });
+  writeJson(join(sc.scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+
+  const res = persistApply(sc);
+
+  assert.equal(res.errors.length, 0, res.errors.join('\n'));
+  assert.equal(readdirSync(join(sc.store, 'issues', 'swe')).length, 1, 'the finding was still written');
+  assert.equal(res.warnings.filter((w) => w.includes('findings/swe.json') && w.includes('`role`')).length, 1);
+});
+
+test('an unreadable findings file is reported by path, not as a bare SyntaxError', (t) => {
+  const sc = scaffold(t);
+  mkdirSync(join(sc.scratchDir, 'findings'), { recursive: true });
+  writeFileSync(join(sc.scratchDir, 'findings', 'qa.json'), '{ "new": [ {"id": "r1#qa-1", "title": ');
+  for (const run of [persistSummary, persistApply]) {
+    assert.throws(() => run(sc), (e) => {
+      assert.ok(e.message.includes('qa.json'), `${run.name}: ${e.message}`);
+      return true;
+    });
+  }
+});
+
+test('a malformed finding with no verdict at all is labelled unverified, not rejected', (t) => {
+  const sc = scaffold(t);
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), {
+    new: [newFinding('r1#swe-1'), newFinding('bad-1'), newFinding('bad-2')],
+    reconcile: [],
+  });
+  writeJson(join(sc.scratchDir, 'verdicts', 'r1--swe-1.json'), { id: 'r1#swe-1', verdict: 'accept', rationale: 'real' });
+  writeJson(join(sc.scratchDir, 'verdicts', 'bad-1.json'), { id: 'bad-1', verdict: 'reject', rationale: 'noise' });
+
+  const out = persistSummary(sc);
+
+  assert.ok(out.warnings.some((w) => w.startsWith('rejected') && w.includes('bad-1')), out.warnings.join('\n'));
+  assert.ok(out.warnings.some((w) => w.startsWith('unverified') && w.includes('bad-2')), out.warnings.join('\n'));
+});
+
+test('a PM priority override without a rationale is refused before any write', (t) => {
+  const sc = acceptedRound(t, [], { priorityOverrides: [{ id: 'r1#swe-1', priority: 'high' }] });
+  assertHaltsBeforeWrite(sc, 'priorityOverrides[0]', 'rationale');
+});
+
+test('an issue reconciled by two lenses in one round is refused before any write', (t) => {
+  const sc = scaffold(t, 'r2');
+  const seeded = join(sc.store, 'issues', 'swe', 'r1--swe-1-old.json');
+  writeJson(seeded, newFinding('r1#swe-1'));
+  const before = readFileSync(seeded, 'utf8');
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: [], reconcile: [{ id: 'r1#swe-1', transition: 'fixed' }] });
+  writeJson(join(sc.scratchDir, 'findings', 'qa.json'), { new: [], reconcile: [{ id: 'r1#swe-1', transition: 'still-open' }] });
+
+  assert.throws(() => persistApply(sc), (e) => {
+    for (const x of ['r1#swe-1', 'swe.json', 'qa.json', 'twice']) assert.ok(e.message.includes(x), `message lacks ${x}: ${e.message}`);
+    return true;
+  });
+  assert.equal(readFileSync(seeded, 'utf8'), before);
+  assert.ok(!existsSync(join(sc.store, 'issues', 'swe', 'closed')));
 });

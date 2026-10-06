@@ -86,6 +86,21 @@ The instruction-review / -apply engine and its meta-agents live under
 repo's* instruction source and cannot run in a consumer project. Dogfood install:
 `node bin/cli.js install --dev`. The triage UI (`npm run triage`) drives the worksheet.
 
+## Workflow driver build
+
+`tools/claude/skills/code-review-board/board-round.mjs` is **generated** from `round-body.mjs` by `bin/build-board-round.js`; edit the body, then run `npm run build:board-round`.
+`test/board-round-render.test.mjs` fails when the committed script drifts from the body.
+
+The split exists because a Workflow `-wf` script is not an ordinary module.
+The runtime imposes three constraints, established by live smoke:
+
+1. `export const meta = {...}` is the **first** statement.
+2. **No second `export`** and **no `import`**, static or dynamic: the script is evaluated in a non-module scope and must be fully self-contained, so the tested body cannot be imported and is inlined instead.
+3. The Workflow `args` input arrives as a **JSON string**; the script `JSON.parse`s it before use.
+
+The generated guard parses `args` and calls `runRound` only when an `agent` function is present, which is the case under the runtime alone.
+Structured output (`agent(prompt, {schema})`) returns the parsed object.
+
 ## Records and history
 
 How this repo organizes its decisions and history — the present-truth /

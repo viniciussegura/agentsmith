@@ -64,7 +64,7 @@ Where subagents are unavailable, role-play each lens sequentially, emitting the 
 ### 4. Persist (main thread)
 
 - The driver writes the round's `ReviewRoundInfo` to `.agentsmith/tmp/review-board/<round-id>/round.json` (Setup already computed every field).
-- **Build the PM input:** run `node .claude/skills/code-review-board/persist.mjs summary .agentsmith/review-board <round-id>`; it writes `pm-input.json` (carried-forward open issues + accepted new findings, as lean summaries) for the reduce.
+- **Build the PM input:** run `node .claude/skills/code-review-board/persist.mjs summary .agentsmith/review-board <round-id>`; it writes `pm-input.json` (carried-forward open issues + accepted new findings, as lean summaries) for the reduce, or exits `1` naming a malformed accepted finding -- on a non-zero exit, stop; do not spawn the reduce.
 - Persistence proper happens **after** the reduce (step 5b), in one deterministic `persist.mjs apply` call -- the driver no longer hand-authors issue/epic/round files.
 
 ### 5. Reduce (PM role, strong model)
