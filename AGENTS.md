@@ -11,7 +11,7 @@ Project-scoped, never generated into the shipped set.
 When a branch opens a PR, set the package version to a pre-release of the target release, differentiated by the PR number: `<target>-rc.<pr-number>` (e.g. `1.0.0-rc.16` for PR #16).
 
 - Bump `package.json`, then run `npm run build:plugin`: `tools/claude/.claude-plugin/plugin.json` derives its version from it and drifts silently otherwise.
-- In the same step, add the PR's entry to `CHANGELOG.md` under a `## <target>-rc.<pr-number>` heading: the PR title as the first bullet, any bullets from the PR body's *Breaking changes* section under a **Breaking** label, and the steps a consumer must take under an **Upgrade** label, written here because the PR body has no slot for them.
+- In the same step, add the PR's entry to `CHANGELOG.md` under a `## <target>-rc.<pr-number>` heading: the PR title as the first bullet, any bullets from the PR body's *Breaking changes* section (#git-pr item 2, present whenever the title carries `!`) under a **Breaking** label, and the steps a consumer must take under an **Upgrade** label, written here because the PR body has no slot for them.
   `npm test` fails while the first versioned heading does not carry `package.json`'s version.
 - The bump happens once the PR number exists, and rides on the branch like any other change (#git-branch-workflow) -- it is not a separate release commit.
 - A branch with no PR carries no bump.

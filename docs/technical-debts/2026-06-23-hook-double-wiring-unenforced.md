@@ -8,11 +8,11 @@ A user who installs the tools via both paths gets the hook wired twice, so it fi
 ## Why accepted
 
 Each firing is idempotent: both invocations independently check for a `model` and exit identically, so the effect is a duplicate check, not a malfunction.
-Detecting that the other path is already installed is fuzzy and outside the installer's trust model; the README's install-path table warns against mixing the two paths instead.
+Detecting that the other path is already installed is fuzzy and outside the installer's trust model; the README warns against mixing the two paths instead.
 
 ## Cost / risk
 
-Negligible: one redundant hook process per dispatch on a misconfigured machine, and duplicate commands.
+Negligible: one redundant hook process per dispatch on a misconfigured machine.
 
 ## Remediation sketch
 
