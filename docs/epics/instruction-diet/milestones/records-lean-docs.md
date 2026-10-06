@@ -3,18 +3,18 @@
 ## records-1 `records-merge`
 
 **Outcome.** The two reference-spec documents about record types become one: the record table, the remapping pointer, and the citation convention; the records design decision keeps rationale only.
-**Depends on.** --
+**Depends on.** `readme-diet`
 **Blocks.** `rule-rewrite`
 **Acceptance.** The reference spec holds one document about record types and every inbound link resolves.
-**State.** planned
+**State.** in-progress
 
 ## records-2 `readme-diet`
 
 **Outcome.** The README summarizes the docs-layout remap in a few lines and links a dedicated document; the working-spec upgrade note is gone; a changelog exists and the pre-release rule names it.
 **Depends on.** --
-**Blocks.** --
+**Blocks.** `records-merge`
 **Acceptance.** The README is under 200 lines and the changelog carries the current pre-release.
-**State.** planned
+**State.** in-progress
 
 ## records-3 `note-template`
 
@@ -22,7 +22,7 @@
 **Depends on.** --
 **Blocks.** `note-cap`
 **Acceptance.** The owner rules name the template and every existing note conforms.
-**State.** planned
+**State.** in-progress
 
 ## records-4 `note-cap`
 
@@ -30,4 +30,4 @@
 **Depends on.** `note-template`
 **Blocks.** --
 **Acceptance.** The suite includes the cap and every existing note passes.
-**State.** planned
+**State.** in-progress
