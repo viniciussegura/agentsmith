@@ -26,6 +26,9 @@ Indentation is exact: `rows:` at column 0, a row key at two spaces, a field at f
 Comments follow YAML: a `#` as a line's first non-space character comments the whole line, and a `#` after whitespace that follows content runs to the end of that line.
 Values are written unquoted.
 
+Two stores sit outside the map and are not remappable, because they are per-machine working state rather than documentation: the gitignored working-spec store at `.agentsmith/specs/` (`#ai-plan`) and the review-board store at `.agentsmith/review-board/` (`#ai-review-board`).
+Each is named directly in its owner rule, so it still has exactly one home.
+
 ## What `install` does with it
 
 `install` discloses the remap on the plan it asks you to confirm:
@@ -36,6 +39,7 @@ Values are written unquoted.
 
 The emitted table then reads `` `docs/adr/<decision-slug>.md` `` for the design-decisions row and ``external -- `jira/ENG` `` for the technical-debts row.
 For an `external` row the map also gains a paragraph telling an agent to register, scan, update, and close in that tracker wherever the owner rule names a file.
+That redirect is location and registration, not lifecycle, so the map stays the one home for where a record lives: an owner rule is static text, identical for every project, so it cannot carry a per-project redirect, and only the map is rewritten per project.
 
 ## Validation
 
@@ -67,3 +71,17 @@ Five rules are worth knowing before you write one:
 
 The file is a team decision and travels with the repo.
 Both gitignore recipes in the [README](../../README.md#usage) deny `.agentsmith/` wholesale, so the config needs its `!.agentsmith/docs-layout.yaml` re-admit or teammates never receive it -- `install` warns when git reports the file ignored.
+
+## Implementation
+
+Two of the map's own properties make remapping work: every owner rule cites the map rather than restating a path, so one rewritten cell reaches every reader; and the owner tag is the row's identity, because the path is the thing being overridden and cannot also identify it.
+
+Two facts about a row are policy rather than table data -- whether it may be `external`, and which placeholder a relocated path must retain -- so neither is inferable from the `path`/`description`/`owner` columns.
+Both live in a per-row policy constant, `ROW_POLICY` in [`src/docslayout.js`](../../src/docslayout.js), keyed by the same bare owner tag and deny-by-default: a tag absent from it is ineligible for `external` and requires no placeholder.
+A third fact is table data and stays there: a default path ending in `/` declares that the row stores each record as its own directory.
+What those facts mean for a config author -- placeholder retention, the trailing slash, and how locations are compared -- is stated once, under [Validation](#validation).
+
+The external-row redirect paragraph is conditional rule text, carried in the rule source between `<!-- agentsmith:external-note -->` and `<!-- /agentsmith:external-note -->`.
+The generator keeps the enclosed text and drops the two marker lines when at least one row is `external`; otherwise it strips the block whole -- markers, text, and the blank line above it -- which is the case for every project with no config, so the paragraph costs the default output nothing.
+Its one home is the rule module `instructions/core/swe/swe-docs-layout.md`, and it is deliberately not quoted here: a second copy would be text shipping as instructions with no drift check on it.
+Why conditional content is applied as a post-render rewrite rather than templated is in [`project-dependent-rule-content`](../design-decisions/project-dependent-rule-content.md).

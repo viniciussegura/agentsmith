@@ -1,4 +1,4 @@
-// Gate over the past-unit citation convention (docs/reference-spec/documentation-model.md).
+// Gate over the past-unit citation convention (docs/reference-spec/records.md).
 //
 // Working specs are uncommitted branch scratch (#ai-plan), so a shipped unit
 // cannot be linked -- it is cited in prose as `<YYYY-MM-DD> <name> (in git
@@ -27,7 +27,7 @@
 // the allowlist churn. This gate covers malformed markers, not absent ones.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -52,7 +52,12 @@ const NON_CITATION_PROSE = [
 
 // The document that DEFINES the convention necessarily quotes the marker while
 // explaining it, so its prose lines are exempt.
-const DEFINITION = join('docs', 'reference-spec', 'documentation-model.md');
+const DEFINITION = join('docs', 'reference-spec', 'records.md');
+
+// An exemption for a file that does not exist exempts nothing and passes silently.
+test('the citation definition the gate exempts exists', () => {
+  assert.ok(existsSync(join(ROOT, DEFINITION)), `${DEFINITION} is missing`);
+});
 
 function walk(dir) {
   let out = [];

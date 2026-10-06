@@ -175,6 +175,7 @@ Commands then surface as `/agentsmith:code-review-board`,
   run it before disabling the plugin if you want the project left clean (the
   plugin cannot clean the instructions up itself). Both are plugin-only — the CLI
   never installs them.
+
 ### Choosing an install path
 
 | | Claude Code plugin | `npx` CLI |
@@ -192,5 +193,5 @@ Use the plugin for tools and `/agentsmith:update-instructions` for instructions,
 Working on the rules or the generator? See [CONTRIBUTING.md](CONTRIBUTING.md) for
 the repository layout, how to author rules, and the dev workflow. How this repo
 organizes its specs, decisions, and history is in
-[docs/reference-spec/documentation-model.md](docs/reference-spec/documentation-model.md); the review-board round
+[docs/reference-spec/records.md](docs/reference-spec/records.md); the review-board round
 protocol is in [docs/reference-spec/review-board-protocol.md](docs/reference-spec/review-board-protocol.md).

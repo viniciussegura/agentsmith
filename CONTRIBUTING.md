@@ -58,9 +58,20 @@ test-helpers/      shared test scaffolding; skipped by `node --test` only while
   the block whole otherwise — so the text has a rule-source home without costing
   the default output a byte. `#swe-docs-layout` is the only rule using it; the
   contract is in
-  [`docs/reference-spec/documentation-layout.md`](docs/reference-spec/documentation-layout.md)
+  [`docs/reference-spec/docs-layout-config.md`](docs/reference-spec/docs-layout-config.md#implementation)
   and the rationale in
   [`docs/design-decisions/project-dependent-rule-content.md`](docs/design-decisions/project-dependent-rule-content.md).
+- To add a documentation folder: add its row to the map in
+  `instructions/core/swe/swe-docs-layout.md` (path, naming pattern, one-line
+  intent; every shipped row has a path, the pathless `external` form is only
+  ever a project's override); give the row a stable owner tag, since consumer
+  configs key on it and renaming or removing one is a breaking change for them;
+  classify the tag in `ROW_POLICY` (`src/docslayout.js`), whether it may be
+  `external` and which placeholder a relocated path must keep, or `npm test`
+  fails on the unclassified row; put its lifecycle in an owner rule and record
+  that ownership in `instructions/ownership.yaml`; cross-reference the two.
+  The map holds location, the owner rule holds lifecycle
+  ([`docs/reference-spec/records.md`](docs/reference-spec/records.md)).
 - To add a rule, drop a `.md` into a section group under `instructions/` (e.g.
   `core/swe/` or `backend/`); it is picked up automatically.
 - Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the
@@ -105,7 +116,7 @@ Structured output (`agent(prompt, {schema})`) returns the parsed object.
 
 How this repo organizes its decisions and history — the present-truth /
 point-in-time families — is in
-[`docs/reference-spec/documentation-model.md`](docs/reference-spec/documentation-model.md).
+[`docs/reference-spec/records.md`](docs/reference-spec/records.md).
 
 New work follows `#ai-plan`: a working spec under
 `.agentsmith/specs/<branch>/<date>-<slug>/`. That store is **gitignored and
