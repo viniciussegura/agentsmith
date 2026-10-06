@@ -147,8 +147,9 @@ that realize the instruction protocols with real subagent delegation:
 
 The instruction-review / -apply engine that audits and edits the rule set itself
 is **authoring-only** (installed with `--dev`); see [CONTRIBUTING.md](CONTRIBUTING.md).
-Non-Claude tools run the same protocols in a degraded mode straight from
-`AGENTS.md`.
+Non-Claude tools get the review rules' intent and human gates from
+`AGENTS.md`; the protocols themselves are Claude tooling plus this repository's
+reference spec.
 
 After an `npx` adapter install, commands surface as `/agentsmith-<name>` (a
 hyphen prefix, so they cannot collide with a built-in or another plugin); the
