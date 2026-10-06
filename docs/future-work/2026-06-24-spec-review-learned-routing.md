@@ -1,19 +1,15 @@
-# Future work: spec-review learned routing
+# Spec-review learned routing
 
-Date: 2026-06-24
-Status: Deferred (`#swe-future-work`)
-Context: the 2026-06-24 spec-review specialist-fanout unit (in git history)
+## What
 
-## The gap
+In the spec-review fan-out, round 1 has no prior generalist directive, so the driver bootstraps the specialist set by mapping spec content to candidate lenses, biasing to include when unsure.
+Let the generalist route round 1 too: a cheap dry pass that reads the spec and proposes the round-1 lens set and per-lens questions, extending the authority it already has for rounds 2 and later at the cost of one extra dispatch.
+A related deferral: a summary projection step in `guard.mjs` if the curated `spec_review` set grows large enough that direct ingestion of specialist findings becomes a cost.
 
-In the spec-review specialist fan-out, **round 1** has no prior generalist directive, so the **driver** bootstraps the specialist set by mapping spec content to candidate lenses (`routing-1.json`), biasing to include when unsure. This bootstrap is a heuristic: it can over-consult (a wasted cheap subagent) or, worse, miss a relevant lens at round 1 (a domain blocker surfaces a round later than it could).
+## Why it matters
 
-## The deferred improvement
+The bootstrap is a heuristic: it can over-consult (a wasted cheap subagent) or miss a relevant lens at round 1, so a domain blocker surfaces a round later than it could.
 
-**Learned routing:** before round 1, run the **generalist** on a cheap dry pass whose only job is to read the spec and propose the round-1 lens set + the per-lens directed questions -- i.e. let the judge route round 1 too, instead of the driver's heuristic. The generalist already owns routing for rounds 2+; this extends the same authority to round 1 at the cost of one extra cheap dispatch.
+## Constraints
 
-Only worth building if the bootstrap heuristic proves weak in practice (observed missed or over-consulted lenses). Until then the driver bootstrap is the simpler default.
-
-## Related
-
-- A `guard.mjs summary` projection step (additive) if a curated `spec_review` set ever grows large enough that the generalist's direct ingestion of specialist findings becomes a cost (today it is bounded by finding count over <=6 lenses; see the spec's Token discipline).
+- Only worth building if the heuristic proves weak in practice (observed missed or over-consulted lenses); until then the driver bootstrap is the simpler default.

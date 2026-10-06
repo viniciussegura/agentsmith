@@ -1,7 +1,5 @@
 # `review-qa` grades test health without being able to run the tests
 
-Date: 2026-10-05
-
 ## What
 
 The `review-qa` reviewer declares `tools: Read, Grep, Glob, Write` and no execution tool, so the lens that judges "do the tests hold" grades from a static reading of the test sources.
