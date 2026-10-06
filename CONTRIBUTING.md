@@ -117,6 +117,10 @@ Structured output (`agent(prompt, {schema})`) returns the parsed object.
 How this repo organizes its decisions and history — the present-truth /
 point-in-time families — is in
 [`docs/reference-spec/records.md`](docs/reference-spec/records.md).
+A future-work or technical-debt note carries only the headings its owner rule
+names and is capped at 40 lines; `npm test` enforces both
+(`test/note-shape.test.mjs`), so a note that outgrows the cap is split rather
+than extended.
 
 New work follows `#ai-plan`: a working spec under
 `.agentsmith/specs/<branch>/<date>-<slug>/`. That store is **gitignored and
