@@ -10,7 +10,7 @@ const root = resolve(fileURLToPath(import.meta.url), '../..');
 const SOURCE_PLACEHOLDER = '<source>';
 const RETIRED_FORM = /UNTRUSTED DATA/;
 // Anything that looks like a data sentinel, in any form: a `---` fence naming DATA.
-const SENTINEL_LIKE = /---\s*(BEGIN\s+)?(UNTRUSTED\s+)?DATA\b[^\n]*---/i;
+const SENTINEL_LIKE = /---\s*(BEGIN\s+|END\s+)?(UNTRUSTED\s+)?DATA\b[^\n]*---/i;
 // The sites known to spell the sentinel; the sweep must find at least these, or it is not looking.
 const KNOWN_SITES = [
   'instructions/core/swe/swe-prompt-injection-sentinel.md',
@@ -26,7 +26,7 @@ const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // The open form with any concrete source: a doc may show a worked example (#swe-public-surface-docs).
 const OPEN_ANY_SOURCE = new RegExp(`^${escapeRegExp(DATA_OPEN('\u0000')).replace('\u0000', '[^\n]+?')}$`);
 // One fence per match: lazy up to the closing `---`, since the text has had its newlines collapsed.
-const SENTINEL_LINE = /---\s*(BEGIN\s+)?(UNTRUSTED\s+)?(END\s+)?DATA\b[^\n]*?---/gi;
+const SENTINEL_LINE = /---\s*(BEGIN\s+|END\s+)?(UNTRUSTED\s+)?DATA\b[^\n]*?---/gi;
 // Prose and source alike: a JS template string re-spelling the sentinel is the drift the
 // rule's one-shared-constant clause forbids.
 const trackedSources = () =>
@@ -60,4 +60,10 @@ test('the sweep accepts a worked example with a concrete source', () => {
     assert.ok(OPEN_ANY_SOURCE.test(fence) || fence === DATA_CLOSE, fence);
   }
   assert.equal((example.match(SENTINEL_LINE) || []).length, 2);
+});
+
+test('site discovery catches a lone retired closing fence', () => {
+  assert.ok(SENTINEL_LIKE.test('some prose\n--- END UNTRUSTED DATA ---\n'), 'retired close not selected');
+  assert.ok(SENTINEL_LIKE.test(`${DATA_CLOSE}\n`), 'current close not selected');
+  assert.ok(SENTINEL_LIKE.test(`${DATA_OPEN('x')}\n`), 'current open not selected');
 });

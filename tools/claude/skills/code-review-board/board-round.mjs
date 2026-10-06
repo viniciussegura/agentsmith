@@ -39,16 +39,28 @@ async function runRound({ agent, parallel, phase, log, args }) {
   };
   // A CLI dispatch is a round step: a non-zero or missing exit code fails the round, since a Workflow
   // that completes is read as success and nothing downstream re-checks the step.
-  const cliStep = async (name, cmd, opts) => {
+  const cliResult = async (name, cmd, opts) => {
     const res = await guarded(
       `Run: ${cmd}. Return the process exit code as exitCode and the complete stdout and stderr as output.`,
       { ...opts, schema: CLI_RESULT_SCHEMA },
     );
-    const code = res?.exitCode;
-    if (!Number.isInteger(code)) throw new Error(`${name} returned no integer exitCode: ${JSON.stringify(res)}`);
-    if (code !== 0) throw new Error(`${name} exited ${code}:\n${res.output ?? ''}`);
+    if (!Number.isInteger(res?.exitCode)) throw new Error(`${name} returned no integer exitCode: ${JSON.stringify(res)}`);
     return res;
   };
+  const cliStep = async (name, cmd, opts) => {
+    const res = await cliResult(name, cmd, opts);
+    if (res.exitCode !== 0) throw new Error(`${name} exited ${res.exitCode}:\n${res.output ?? ''}`);
+    return res;
+  };
+  // round-guard.mjs exit codes: 0 clean; 3 the baseline is missing, so the check did not run and
+  // the caller fixes the path and re-checks; anything else is an escape.
+  const GUARD_CLEAN = 0;
+  const GUARD_NOT_RUN = 3;
+
+  // The command is built by round-args (absolute skillsDir, quoted paths), not here. A guarded
+  // round missing it fails before any dispatch: silently skipping the containment check is the one
+  // outcome worse than a false positive, and a configuration error must not bury a step failure.
+  if (guardBaseline && !guardCmd) throw new Error('guardBaseline set without guardCmd: the containment guard would be skipped');
 
   // Every agent from Plan onward carries Write, so the containment guard below must run
   // whatever happens in between: a step that fails is exactly a round where something may
@@ -118,24 +130,21 @@ async function runRound({ agent, parallel, phase, log, args }) {
   // the gitignored scratch/store. round-guard compares git porcelain to the caller's
   // pre-round snapshot; a non-zero exit means an agent escaped scratch (#ai-review-engine).
   // It runs after a failed step too, and an escape is the headline over the step's error.
+  // Exit 3 is not a failure: the check did not run, the result carries the code, and the caller
+  // re-checks once the baseline path is fixed; failing here would discard the persist result.
   let guard = null;
+  let guardNote = 'No containment guard was configured.';
   if (guardBaseline) {
-    // The command is built by round-args (absolute skillsDir, quoted paths), not here.
-    // A guarded round missing it fails loud: silently skipping the containment check
-    // is the one outcome worse than a false positive.
-    if (!guardCmd) throw new Error('guardBaseline set without guardCmd: the containment guard would be skipped');
     phase('Guard');
-    try {
-      guard = await cliStep('containment guard', guardCmd, { label: 'guard:check', phase: 'Guard', model: MODEL.persist });
-    } catch (guardError) {
-      if (!stepError) throw guardError;
-      throw new Error(`${guardError.message}\n\nThe round had already failed: ${stepError.message}`);
+    guard = await cliResult('containment guard', guardCmd, { label: 'guard:check', phase: 'Guard', model: MODEL.persist });
+    if (guard.exitCode === GUARD_CLEAN) guardNote = 'The containment guard passed.';
+    else if (guard.exitCode === GUARD_NOT_RUN) guardNote = `The containment guard did not run (exit ${GUARD_NOT_RUN}: baseline missing); fix the path and re-check.`;
+    else {
+      const escape = `containment guard exited ${guard.exitCode}:\n${guard.output ?? ''}`;
+      throw new Error(stepError ? `${escape}\n\nThe round had already failed: ${stepError.message}` : escape);
     }
   }
-  if (stepError) {
-    const guardNote = guardBaseline ? 'The containment guard passed.' : 'No containment guard was configured.';
-    throw new Error(`${stepError.message}\n\n${guardNote}`);
-  }
+  if (stepError) throw new Error(`${stepError.message}\n\n${guardNote}`);
 
   return { roundId, board, result, persist, guard };
 }

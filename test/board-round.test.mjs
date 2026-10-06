@@ -268,3 +268,28 @@ test('the guard runs when the fan-out itself fails, since reviewers may already 
   await assert.rejects(() => runRound({ agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /reviewer crashed/);
   assert.ok(h.calls.some((c) => c.opts.label === 'guard:check'), 'guard did not run after a failed fan-out');
 });
+
+test('guard exit 3 (baseline missing, check did not run) completes the round and is reported in the result', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { guardExit: 3 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  const out = await runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args });
+  assert.equal(out.guard.exitCode, 3, 'the caller reads the did-not-run code from the result');
+  assert.ok(out.persist && out.persist.exitCode === 0, 'the persist result survives');
+});
+
+test('guard exit 3 after a failed step still reports the step failure, and says the guard did not run', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { persistExit: 1, guardExit: 3 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), (e) => {
+    assert.match(e.message, /persist exited 1/);
+    assert.match(e.message, /guard did not run/i);
+    return true;
+  });
+});
+
+test('a guard configuration error is caught before any dispatch, so it cannot hide a step failure', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { persistExit: 1 });
+  const args = { ...codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'] }), guardBaseline: '/p/base.txt', guardCmd: null };
+  await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /guardBaseline set without guardCmd/);
+  assert.equal(h.calls.length, 0, 'nothing was dispatched');
+});

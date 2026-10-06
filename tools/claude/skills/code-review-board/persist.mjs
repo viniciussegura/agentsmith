@@ -65,6 +65,7 @@ function readDirJsonNamed(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((e) => e.endsWith('.json'))
+    .sort()
     .map((e) => ({ file: e, data: readJson(join(dir, e)) }));
 }
 
@@ -170,7 +171,8 @@ function findingProblems(raw, roundId) {
 }
 
 const FINDINGS_FILE_KEYS = new Set(['new', 'reconcile']);
-// Retired: the role is the id's segment. Still emitted by pre-gate reviewers, so tolerated with a warning.
+// A root `role` key is ignored: the role is the id's segment. Warned about rather than refused, so one
+// lens emitting it does not discard the other lenses' findings.
 const FINDINGS_FILE_RETIRED_KEYS = new Set(['role']);
 
 /** Every way a findings FILE fails `{ new: [], reconcile: [] }`; empty when it conforms. */
@@ -194,8 +196,8 @@ function findingsFileProblems(data) {
  * verifier REJECTED is never written, so it is returned as a warning rather than halting the
  * round -- but never dropped silently (#swe-errors). A malformed FILE throws regardless: none
  * of its findings can be trusted to have reached the verifier.
- * A file that still carries the retired `role` key is warned about, not refused: every pre-gate
- * round emitted it, and failing the round would discard the other lenses' findings.
+ * A file carrying a root `role` key is warned about, not refused: the key is ignored, and failing
+ * the round for it would discard the other lenses' findings.
  * @param {Array<{ file: string, data: { new?: unknown[] } }>} named  findings files, by name
  * @param {{ roundId: string, accepted: Set<string>, judged: Set<string> }} ctx  verdict ids: accepted, and all
  * @returns {string[]} warnings: malformed findings that were rejected or never verified, and retired keys

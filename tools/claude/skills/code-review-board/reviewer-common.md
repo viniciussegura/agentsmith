@@ -19,7 +19,7 @@ Stay in your lens -- other roles own theirs; overlap is fine, and duplicate-by-d
 - Read only what the prompt provides plus what you must open to substantiate a finding -- never sweep the repo.
 - Trace the actual code or text before raising; a finding you cannot cite a location for is a guess -- drop it.
 - One schema object per finding: a precise `title`, a `description` naming the defect and the rule or principle at stake, `priority` (`low` | `medium` | `high`) + `priorityRationale` in your lens, and `locations`. Priority bands are in `issue-format.md`.
-  `id`, `title`, `description`, `priority`, and `priorityRationale` are required: `persist.mjs` refuses an accepted finding that lacks one, carries a field outside the `Issue` schema, or whose id names another round -- before anything is written.
+  `id`, `title`, `description`, `priority`, and `priorityRationale` are required: `persist.mjs` refuses an accepted finding that lacks one, carries any field beyond those plus `kind`, `status`, `lastConfirmedCommit`, `locations`, and `relatedIssues` (the closed-state fields are persist's to set), or whose id names another round -- before anything is written.
 
 ## Output
 
