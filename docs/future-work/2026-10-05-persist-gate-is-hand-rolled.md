@@ -9,14 +9,13 @@ Replace the hand-rolled checks with one declarative schema per scratch artifact,
 
 Edges the hand-rolled gate still leaves open, to be closed by the schema rather than one at a time:
 
-- a PM priority override without a `rationale` overwrites the required `priorityRationale` with nothing;
 - directive ids are not resolved -- a mistyped `canonical` fails only at post-write lint, and an override, rejection, or duplicate naming no accepted finding is a silent no-op;
 - the same accepted id in two findings files writes twice and lint sees one file;
 - whitespace-only strings count as present in the gate but not in `lint.mjs`;
 - a non-string id is reported twice;
 - directive ids outside `epics` (overrides, duplicates, rejections) are not resolved against the accepted findings;
 - a finding's id role is not matched to the findings file it came from, so `swe.json` may carry a `qa` id;
-- verdict files are ungated: `verdict: 'Accept'` silently demotes a finding;
+- verdict files are ungated: `verdict: 'Accept'` silently demotes a finding, and a verdict file whose root is not an object crashes with no path;
 - `apply` indexes the store three times per run (gate, reconcile, epics) -- redundant I/O, no correctness impact.
 
 ## Why it matters

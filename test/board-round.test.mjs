@@ -232,3 +232,39 @@ test('a failed containment guard fails the round', async () => {
   await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /guard.*exited 1/i);
 });
 
+
+test('the containment guard runs even when a CLI step failed, and the error carries both outcomes', async () => {
+  for (const exits of [{ preReduceExit: 1 }, { persistExit: 1 }]) {
+    const h = harness({ lenses: ['security'], perLens: {} }, exits);
+    const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+    await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), (e) => {
+      assert.match(e.message, /exited 1/);
+      assert.match(e.message, /containment guard passed/i, `guard outcome missing from: ${e.message}`);
+      return true;
+    });
+    assert.ok(h.calls.some((c) => c.opts.label === 'guard:check'), `guard did not run after ${JSON.stringify(exits)}`);
+    assert.ok(h.phases.includes('Guard'));
+  }
+});
+
+test('a failed step and a failed guard are both reported, the guard first', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} }, { persistExit: 1, guardExit: 1 });
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  await assert.rejects(() => runRound({ agent: h.agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), (e) => {
+    assert.match(e.message, /containment guard exited 1/);
+    assert.match(e.message, /persist exited 1/);
+    assert.ok(e.message.indexOf('containment guard') < e.message.indexOf('persist exited'), 'the escape is the headline');
+    return true;
+  });
+});
+
+test('the guard runs when the fan-out itself fails, since reviewers may already have written', async () => {
+  const h = harness({ lenses: ['security'], perLens: {} });
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'review:security') throw new Error('reviewer crashed');
+    return h.agent(prompt, opts);
+  };
+  const args = codeArgs({ roundId: 'r1', store: '/p/s', subjectRef: 'x', candidateLenses: ['security'], skillsDir: '/p/skills' });
+  await assert.rejects(() => runRound({ agent, parallel: h.parallel, phase: h.phase, log: h.log, args }), /reviewer crashed/);
+  assert.ok(h.calls.some((c) => c.opts.label === 'guard:check'), 'guard did not run after a failed fan-out');
+});

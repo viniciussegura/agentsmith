@@ -535,3 +535,24 @@ test('a malformed finding with no verdict at all is labelled unverified, not rej
   assert.ok(out.warnings.some((w) => w.startsWith('rejected') && w.includes('bad-1')), out.warnings.join('\n'));
   assert.ok(out.warnings.some((w) => w.startsWith('unverified') && w.includes('bad-2')), out.warnings.join('\n'));
 });
+
+test('a PM priority override without a rationale is refused before any write', (t) => {
+  const sc = acceptedRound(t, [], { priorityOverrides: [{ id: 'r1#swe-1', priority: 'high' }] });
+  assertHaltsBeforeWrite(sc, 'priorityOverrides[0]', 'rationale');
+});
+
+test('an issue reconciled by two lenses in one round is refused before any write', (t) => {
+  const sc = scaffold(t, 'r2');
+  const seeded = join(sc.store, 'issues', 'swe', 'r1--swe-1-old.json');
+  writeJson(seeded, newFinding('r1#swe-1'));
+  const before = readFileSync(seeded, 'utf8');
+  writeJson(join(sc.scratchDir, 'findings', 'swe.json'), { new: [], reconcile: [{ id: 'r1#swe-1', transition: 'fixed' }] });
+  writeJson(join(sc.scratchDir, 'findings', 'qa.json'), { new: [], reconcile: [{ id: 'r1#swe-1', transition: 'still-open' }] });
+
+  assert.throws(() => persistApply(sc), (e) => {
+    for (const x of ['r1#swe-1', 'swe.json', 'qa.json', 'twice']) assert.ok(e.message.includes(x), `message lacks ${x}: ${e.message}`);
+    return true;
+  });
+  assert.equal(readFileSync(seeded, 'utf8'), before);
+  assert.ok(!existsSync(join(sc.store, 'issues', 'swe', 'closed')));
+});

@@ -54,6 +54,8 @@ function defaultScratchDir(store, roundId) {
   return join(dirname(store), 'tmp', 'review-board', roundId);
 }
 
+const isBlank = (v) => v === undefined || v === null || v === '';
+
 function readDirJson(dir) {
   return readDirJsonNamed(dir).map((n) => n.data);
 }
@@ -115,7 +117,7 @@ export function assertRoundRecord(record, source) {
   if (!record || typeof record !== 'object' || Array.isArray(record)) {
     throw new Error(`round record (${source}) is not a JSON object`);
   }
-  const missing = ROUND_REQUIRED.filter((k) => record[k] === undefined || record[k] === null || record[k] === '');
+  const missing = ROUND_REQUIRED.filter((k) => isBlank(record[k]));
   const known = new Set([...ROUND_REQUIRED, ...ROUND_OPTIONAL]);
   const unknown = Object.keys(record).filter((k) => !known.has(k));
   if (!missing.length && !unknown.length) return;
@@ -139,7 +141,6 @@ const FINDING_STRING = ['id', 'title', 'description', 'priorityRationale'];
 const PRIORITIES = new Set(['low', 'medium', 'high']);
 const FINDING_KNOWN = new Set([...FINDING_REQUIRED, ...FINDING_OPTIONAL]);
 
-const isBlank = (v) => v === undefined || v === null || v === '';
 
 /** Every way one raw `new` finding fails the Issue contract, as messages; empty when it conforms. */
 function findingProblems(raw, roundId) {
@@ -230,7 +231,7 @@ export function assertFindings(named, { roundId, accepted, judged }) {
 const DIRECTIVE_SECTIONS = new Set(['epics', 'priorityOverrides', 'duplicates', 'rejections']);
 const DIRECTIVE_ENTRY_REQUIRED = {
   epics: ['id', 'title'],
-  priorityOverrides: ['id', 'priority'],
+  priorityOverrides: ['id', 'priority', 'rationale'],
   duplicates: ['id', 'canonical'],
   rejections: ['id'],
 };
@@ -285,12 +286,15 @@ const RECONCILE_TRANSITIONS = new Set(['fixed', 'deprecated', 'superseded', 'reo
  */
 export function assertReconcile(named, index) {
   const problems = [];
+  const seen = new Map(); // issue id -> the entry that first reconciled it this round
   for (const { file, data } of named) {
     (data?.reconcile || []).forEach((rc, i) => {
       const at = `findings/${file} reconcile[${i}]`;
       if (!rc || typeof rc !== 'object') { problems.push(`${at} is not an object`); return; }
       if (isBlank(rc.id)) problems.push(`${at} is missing id`);
       else if (!index.has(rc.id)) problems.push(`${at} names \`${rc.id}\`, which is not in the store`);
+      else if (seen.has(rc.id)) problems.push(`${at} reconciles \`${rc.id}\` twice this round (first in ${seen.get(rc.id)}); one lens owns a transition`);
+      else seen.set(rc.id, at);
       if (isBlank(rc.transition)) problems.push(`${at} is missing transition`);
       else if (!RECONCILE_TRANSITIONS.has(rc.transition)) {
         problems.push(`${at} transition \`${rc.transition}\` is not one of ${[...RECONCILE_TRANSITIONS].join(' | ')}`);
