@@ -34,7 +34,7 @@ Being outside the map, they are also not remappable -- the same statement from t
 
 ## Remapping
 
-A project declares its real layout in `.agentsmith/docs-layout.yaml`, keyed by each row's bare owner tag, and the generator rewrites the emitted table to match ([README](../../README.md#remapping-the-documentation-layout), [`cli.md`](./cli.md)).
+A project declares its real layout in `.agentsmith/docs-layout.yaml`, keyed by each row's bare owner tag, and the generator rewrites the emitted table to match ([`docs-layout-config.md`](./docs-layout-config.md), [`cli.md`](./cli.md)).
 Two of the map's own properties are what make that work: every owner rule cites the map rather than restating a path, so one rewritten cell reaches every reader; and the owner tag is the row's identity, because the path is the thing being overridden and cannot also identify it.
 
 Two facts about a row are policy rather than table data -- whether it may be `external`, and which placeholder token a relocated path must retain -- so neither is inferable from the `path`/`description`/`owner` columns.
