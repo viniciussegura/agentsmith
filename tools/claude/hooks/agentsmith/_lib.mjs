@@ -8,8 +8,8 @@
 //
 // The hooks are a tripwire for the agent's own commands, not a sandbox. Not covered: git
 // aliases; scripts and tools that call git (gh, npm version); wrappers outside WRAPPERS;
-// eval, a $VAR command head, and cmd /c; a git pull that merges; heredoc bodies; a second
-// clone whose own HEAD carries an opt-out; commands typed by the user. The opt-out file,
+// eval, a $VAR command head, and cmd /c; a git pull that merges; a second clone whose own
+// HEAD carries an opt-out; commands typed by the user. The opt-out file,
 // .claude/settings.json, and these scripts are agent-editable; review of the commit that edits
 // them is the control.
 import { spawnSync } from 'node:child_process';
@@ -123,11 +123,30 @@ function matchingParen(command, open) {
   return command.length;
 }
 
+// A heredoc body is data: the lines after a line carrying `<<WORD` (or `<<-WORD`, with the
+// delimiter optionally quoted) up to the line equal to WORD are dropped before tokenizing.
+const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
+function stripHeredocs(command) {
+  const lines = String(command).split('\n');
+  const kept = [];
+  let delimiter = null;
+  for (const line of lines) {
+    if (delimiter !== null) {
+      if (line.trim() === delimiter) delimiter = null;
+      continue;
+    }
+    kept.push(line);
+    const m = HEREDOC.exec(line);
+    if (m) delimiter = m[2];
+  }
+  return kept.join('\n');
+}
+
 // Split a command into segments of words; returns every segment including those nested
 // in `bash -c`, `$(...)`, and backticks, the env words that apply, and whether a quote was
 // left unterminated anywhere.
 export function parseCommand(command, { powershell = false } = {}) {
-  const { items, nested, unterminated } = tokenize(String(command), powershell);
+  const { items, nested, unterminated } = tokenize(stripHeredocs(command), powershell);
   const segments = [];
   let current = [];
   const close = () => {
@@ -199,6 +218,8 @@ const WRAPPERS = {
   sudo: { args: ['-u', '-g', '-C', '-D', '-h', '-p', '-r', '-t', '-U', '-T'] },
   doas: { args: ['-u', '-C'] },
   xargs: { args: ['-n', '-I', '-i', '-P', '-d', '-a', '-E', '-L', '-s'] },
+  // The token-saving proxy on this platform wraps any command, as `rtk <cmd>` or `rtk proxy <cmd>`.
+  rtk: { args: [] },
 };
 
 const isGitHead = (w) => {
@@ -275,6 +296,9 @@ export function matchesLong(token, option) {
   return t.length >= LONG_PREFIX_MIN && option.startsWith(t);
 }
 
+// `git config` flags that read or remove a key rather than set it.
+const CONFIG_READ_OR_UNSET = new Set(['--get', '--get-all', '--get-regexp', '--get-urlmatch', '-l', '--list', '--unset', '--unset-all', '--show-origin', '--show-scope']);
+
 // Scan a short-flag cluster left to right, stopping at the first letter that takes an
 // attached argument; true when `letter` is seen before that.
 function clusterHas(token, letter, argLetters) {
@@ -296,7 +320,9 @@ export function gitFlagsViolation(inv, env) {
   if (inv.configs.some((c) => HOOKS_PATH.test(c)) || inv.configEnv.some((c) => HOOKS_PATH.test(c))) return 'a core.hooksPath override';
   if (/core\.hookspath/i.test(env.get('GIT_CONFIG_PARAMETERS') ?? '')) return 'a core.hooksPath override';
   for (const [k, v] of env) if (/^GIT_CONFIG_KEY_\d+$/.test(k) && /^core\.hookspath$/i.test(v)) return 'a core.hooksPath override';
-  if (inv.sub === 'config' && inv.args.some((a) => /^core\.hookspath$/i.test(a))) return 'a core.hooksPath override';
+  if (inv.sub === 'config' && inv.args.some((a) => /^core\.hookspath$/i.test(a)) && !inv.args.some((a) => CONFIG_READ_OR_UNSET.has(a))) {
+    return 'a core.hooksPath override';
+  }
   for (const a of inv.args) {
     if (a === '--') break;
     if (matchesLong(a, '--no-verify')) return 'a hook-skipping flag';
@@ -318,7 +344,9 @@ export function resolveDir(inv, segmentIndex, segments, cwd, pathResolve) {
   for (let i = 0; i < segmentIndex; i++) {
     const words = segments[i];
     if (words[0]?.text !== 'cd') continue;
-    const operand = words[1];
+    // The operand is the first word past cd's own options (-P, -L, -e, -@); `-` alone is the
+    // previous directory, which the hook cannot know.
+    const operand = words.slice(1).find((w) => w.text === '-' || !w.text.startsWith('-'));
     if (!operand || !operand.literal || operand.text === '-') return { undecidable: 'a cd the hook cannot follow' };
     dir = pathResolve(dir, operand.text);
   }

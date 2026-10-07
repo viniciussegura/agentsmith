@@ -15,16 +15,17 @@ const COMMIT_FREE_FLAGS = new Set(['--abort', '--quit']);
 const DIR_ENV = ['GIT_DIR', 'GIT_WORK_TREE'];
 const DEFAULT_CANDIDATES = ['main', 'master'];
 
-// The default branch: origin/HEAD, else init.defaultBranch, else the first of main, master
-// that exists locally; null when none resolves.
+// The default branch: origin/HEAD, else the first of init.defaultBranch, main, master that
+// exists as a local branch (a configured name no branch carries protects nothing); null when
+// none resolves.
 function defaultBranch(dir) {
   const origin = runGit(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD'], dir);
   if (origin.timedOut) return { timedOut: true };
   if (origin.ok && origin.out) return { name: origin.out.replace(/^origin\//, '') };
   const configured = runGit(['config', '--get', 'init.defaultBranch'], dir);
   if (configured.timedOut) return { timedOut: true };
-  if (configured.ok && configured.out) return { name: configured.out };
-  for (const name of DEFAULT_CANDIDATES) {
+  const candidates = [...(configured.ok && configured.out ? [configured.out] : []), ...DEFAULT_CANDIDATES];
+  for (const name of candidates) {
     const exists = runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${name}`], dir);
     if (exists.timedOut) return { timedOut: true };
     if (exists.ok) return { name };

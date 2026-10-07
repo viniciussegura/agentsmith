@@ -390,6 +390,57 @@ test('guard-default-branch allows the commit-free --abort and --quit forms on th
   expectBlock(run('guard-default-branch', bash('git cherry-pick --continue', dir)), '#git-branch-workflow');
 });
 
+test('guard-dated-todos matches markers in comments only, not identifiers or string literals', (t) => {
+  const dir = repo(t);
+  const file = join(dir, 'src', 'b.js');
+  for (const line of [`if (type === IssueType.${['B', 'UG'].join('')}) {}`, `const mask = '${['XX', 'X'].join('')}-${['XX', 'X'].join('')}-XXXX';`, `const ${['b', 'ug'].join('')} = 1;`, `report(${['B', 'UG'].join('')}_LABEL);`]) {
+    expectSilent(run('guard-dated-todos', write(file, `${line}\n`, dir)));
+  }
+  for (const line of [`// ${['B', 'UG'].join('')}: wrong on empty input`, `# ${M.todo} later`, `/* ${M.fixme} */`, `-- ${M.hack}: cast`, `<!-- ${['XX', 'X'].join('')} -->`, ` * ${M.todo}: in a block comment`]) {
+    expectBlock(run('guard-dated-todos', write(file, `${line}\n`, dir)), '#swe-dated-todos');
+  }
+});
+
+test('the git guards see through the rtk wrapper in both of its forms', (t) => {
+  const feature = repo(t);
+  expectBlock(run('guard-git-flags', bash('rtk git push --force', feature)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash('rtk proxy git push --force', feature)), '#git-branch-workflow');
+  const main = repo(t, { branch: 'main' });
+  pointOriginHeadAt(main, 'main');
+  expectBlock(run('guard-default-branch', bash('rtk git commit -m x', main)), '#git-branch-workflow');
+});
+
+test('a heredoc body is data, not commands', (t) => {
+  const dir = repo(t);
+  expectSilent(run('guard-git-flags', bash('git commit -F - <<EOF\ngit push --force is now blocked\nEOF', dir)));
+  expectSilent(run('guard-git-flags', bash("cat <<'EOF' > notes.txt\n  git push --force\nEOF", dir)));
+  expectSilent(run('guard-git-flags', bash('cat <<-EOF\n\tgit push --force\n\tEOF', dir)));
+  expectBlock(run('guard-git-flags', bash("cat <<'EOF'\nharmless\nEOF\ngit push --force", dir)), '#git-branch-workflow');
+});
+
+test('guard-git-flags blocks setting core.hooksPath, not reading or unsetting it', (t) => {
+  const dir = repo(t);
+  for (const command of ['git config --get core.hooksPath', 'git config --unset core.hooksPath', 'git config --get-all core.hookspath', 'git config --global --unset-all core.hooksPath']) {
+    expectSilent(run('guard-git-flags', bash(command, dir)));
+  }
+  expectBlock(run('guard-git-flags', bash('git config core.hooksPath /x', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash('git config --add core.hooksPath /x', dir)), '#git-branch-workflow');
+});
+
+test('guard-default-branch trusts init.defaultBranch only for a branch that exists', (t) => {
+  const dir = repo(t, { branch: 'master' });
+  git(dir, 'config', 'init.defaultBranch', 'main');
+  expectBlock(run('guard-default-branch', bash('git commit -m x', dir)), '#git-branch-workflow');
+});
+
+test('guard-default-branch reads the cd operand past cd options', (t) => {
+  const main = repo(t, { branch: 'main' });
+  const feature = featureRepo(t);
+  expectBlock(run('guard-default-branch', bash(`cd -P "${main}" && git commit -m x`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash(`cd -L "${main}" && git commit -m x`, feature)), '#git-branch-workflow');
+  expectNotice(run('guard-default-branch', bash('cd -P - && git commit -m x', main)));
+});
+
 test('a malformed opt-out keeps every hook on with a notice, and is never read for a clean command', (t) => {
   const dir = repo(t, { branch: 'main' });
   pointOriginHeadAt(dir, 'main');

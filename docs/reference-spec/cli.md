@@ -181,16 +181,17 @@ Each reads the host's tool payload from stdin as untrusted data, matched with li
 | --- | --- | --- |
 | `require-explicit-model` | `Agent` | a subagent dispatch with no `model` (`#ai-conversational`) |
 | `guard-default-branch` | `Bash`, `PowerShell` | `commit`, `merge`, `cherry-pick`, `revert`, `am`, or `rebase` while the current branch is the default branch (`#git-branch-workflow`); `merge --ff-only` and the commit-free `--abort` and `--quit` forms are allowed |
-| `guard-git-flags` | `Bash`, `PowerShell` | `push` with `--force`, `-f`, `--force-with-lease`, `--force-if-includes`, or a `+` refspec; `--no-verify` on any subcommand, `commit -n`; a `core.hooksPath` override through `-c`, `--config-env`, `GIT_CONFIG_*`, or `git config` (`#git-branch-workflow`, `#git-tooling`) |
-| `guard-dated-todos` | `Write`, `Edit`, `MultiEdit` | an added line carrying `TODO`, `FIXME`, `HACK`, `XXX`, or `BUG` without `(YYYY-MM-DD)` after the word; prose files (`.md`, `.mdx`, `.txt`) are out of scope (`#swe-dated-todos`) |
+| `guard-git-flags` | `Bash`, `PowerShell` | `push` with `--force`, `-f`, `--force-with-lease`, `--force-if-includes`, or a `+` refspec; `--no-verify` on any subcommand, `commit -n`; a `core.hooksPath` override through `-c`, `--config-env`, `GIT_CONFIG_*`, or a `git config` that sets it (reading or unsetting it passes) (`#git-branch-workflow`, `#git-tooling`) |
+| `guard-dated-todos` | `Write`, `Edit`, `MultiEdit` | an added comment line (`//`, `#`, `/*`, ` *`, `--`, `<!--`) carrying `TODO`, `FIXME`, `HACK`, `XXX`, or `BUG` without `(YYYY-MM-DD)` after the word; an identifier or string literal spelling the word is not a marker, and prose files (`.md`, `.mdx`, `.txt`) are out of scope (`#swe-dated-todos`) |
 
 Exit codes: `2` blocks and the message on stderr names the rule and the remedy; `0` allows silently; `1` allows and prints one line saying what the hook could not evaluate, the host's non-blocking channel.
 A block from any segment of a command wins over a notice, and a notice over a silent allow.
 A notice is raised when the git state cannot be read or times out, the directory is not a repository, no default branch resolves (no `origin/HEAD`, `init.defaultBranch`, `main`, or `master`), the command chooses its repository through `--git-dir`, `--work-tree`, `GIT_DIR`, `GIT_WORK_TREE`, or a non-literal `cd`, or a quote is unterminated.
 
-The git guards split a command on `&&`, `||`, `;`, `|`, `&`, and newlines, honour quoting, read into `bash -c` strings, `$(...)`, and backticks, skip env words and the wrappers `env`, `command`, `exec`, `time`, `timeout`, `nice`, `ionice`, `nohup`, `setsid`, `stdbuf`, `sudo`, `doas`, `rtk proxy`, `xargs`, and `find -exec`, skip git's global options, and treat an unambiguous abbreviation of a blocked long option as that option.
+The git guards drop heredoc bodies, split a command on `&&`, `||`, `;`, `|`, `&`, and newlines, honour quoting, read into `bash -c` strings, `$(...)`, and backticks, skip env words and the wrappers `env`, `command`, `exec`, `time`, `timeout`, `nice`, `ionice`, `nohup`, `setsid`, `stdbuf`, `sudo`, `doas`, `rtk` (and `rtk proxy`), `xargs`, and `find -exec`, skip git's global options, and treat an unambiguous abbreviation of a blocked long option as that option.
+The default branch is `origin/HEAD`, else the first of `init.defaultBranch`, `main`, `master` that exists as a local branch.
 They are a tripwire for the agent's own commands, not a sandbox.
-Not covered: git aliases; scripts and tools that call git (`gh`, `npm version`); wrappers outside that set; `eval`, a `$VAR` command head, and `cmd /c`; a `git pull` that merges; heredoc bodies; a second clone whose own HEAD carries an opt-out; commands typed by the user.
+Not covered: git aliases; scripts and tools that call git (`gh`, `npm version`); wrappers outside that set; `eval`, a `$VAR` command head, and `cmd /c`; a `git pull` that merges; a second clone whose own HEAD carries an opt-out; commands typed by the user.
 
 **Opt-out.** A project switches a hook off in `.agentsmith/hooks.yaml`, read from the committed content at `HEAD` of the repository the command targets (found from its top level, so a subdirectory or a not-yet-created directory still names it), never from the working tree, so disabling a guard takes a commit the branch diff shows:
 
