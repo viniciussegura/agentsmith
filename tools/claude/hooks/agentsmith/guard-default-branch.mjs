@@ -12,6 +12,11 @@ const COMMIT_CREATING = new Set(['commit', 'merge', 'cherry-pick', 'revert', 'am
 // progress, which an agent must be able to do on any branch. `--continue` and `--skip` go on
 // to create commits and stay blocked.
 const COMMIT_FREE_FLAGS = new Set(['--abort', '--quit']);
+// `merge --ff-only` is allowed only from a remote-tracking operand: updating the default branch
+// before branching is what the workflow asks for, landing a local branch onto it is the human's.
+const REMOTE_OPERAND = /^(?:[A-Za-z0-9_.-]+\/[^\s]+|@\{u(?:pstream)?\}|FETCH_HEAD)$/;
+const fastForwardsFromRemote = (args) =>
+  args.includes('--ff-only') && args.some((a) => !a.startsWith('-') && REMOTE_OPERAND.test(a));
 const DIR_ENV = ['GIT_DIR', 'GIT_WORK_TREE'];
 const DEFAULT_CANDIDATES = ['main', 'master'];
 
@@ -45,7 +50,7 @@ runHook(HOOK, (payload, verdict) => {
     if (!inv) return;
     sawGit = true;
     if (!COMMIT_CREATING.has(inv.sub)) return;
-    if (inv.sub === 'merge' && inv.args.includes('--ff-only')) return;
+    if (inv.sub === 'merge' && fastForwardsFromRemote(inv.args)) return;
     if (inv.args.some((a) => COMMIT_FREE_FLAGS.has(a))) return;
     if (inv.dirOverride || DIR_ENV.some((k) => parsed.env.has(k))) {
       verdict.notices.push(notice(HOOK, 'a git command whose repository is chosen by --git-dir, --work-tree, or their environment variables'));

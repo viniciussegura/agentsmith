@@ -23,7 +23,15 @@ test('plugin.json mirrors package.json name/version/description and omits compon
   assert.equal(plugin.version, pkg.version);
   assert.equal(plugin.description, pkg.description);
   for (const k of ['commands', 'agents', 'skills']) assert.ok(!(k in plugin), `${k} must be auto-discovered, not enumerated`);
-  assert.ok(plugin.hooks?.PreToolUse, 'declares the PreToolUse hook');
+  // One registration source: plugin.json points at hooks/hooks.json instead of repeating it,
+  // so a host that loads both never fires a hook twice.
+  assert.equal(plugin.hooks, './hooks/hooks.json');
+});
+
+test('hooks/hooks.json is byte-equal to the generator output', () => {
+  const out = execFileSync('node', [join(root, 'bin/build-plugin.js'), '--stdout'], { encoding: 'utf8' });
+  const hooksGen = out.split('\n---\n')[2];
+  assert.equal(read('tools/claude/hooks/hooks.json'), hooksGen, 'hooks.json drifted — run npm run build:plugin');
 });
 
 test('marketplace.json has owner + a relative plugin source at tools/claude', () => {

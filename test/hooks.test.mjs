@@ -441,6 +441,44 @@ test('guard-default-branch reads the cd operand past cd options', (t) => {
   expectNotice(run('guard-default-branch', bash('cd -P - && git commit -m x', main)));
 });
 
+test('a backslash-newline continues the command, a here-string is not a heredoc, and a # comment is dropped', (t) => {
+  const feature = repo(t);
+  expectBlock(run('guard-git-flags', bash('git push origin main \\\n  --force', feature)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash('cat <<<"x"\ngit push --force', feature)), '#git-branch-workflow');
+  expectSilent(run('guard-git-flags', bash('git commit -m x # not --no-verify', feature)));
+  expectBlock(run('guard-git-flags', bash('git commit -m "a#b" --no-verify', feature)), '#git-branch-workflow');
+  const main = repo(t, { branch: 'main' });
+  pointOriginHeadAt(main, 'main');
+  expectBlock(run('guard-default-branch', bash('git \\\n  commit -m x', main)), '#git-branch-workflow');
+});
+
+test('a nested shell behind a wrapper is still inspected', (t) => {
+  const dir = repo(t);
+  for (const command of ['sudo bash -c "git push --force"', 'env X=1 bash -c "git push --force"', 'timeout 5 sh -c "git push --force"', 'rtk bash -lc "git push --force"']) {
+    expectBlock(run('guard-git-flags', bash(command, dir)), '#git-branch-workflow');
+  }
+});
+
+test('merge --ff-only on the default branch is allowed only from a remote-tracking operand', (t) => {
+  const dir = repo(t, { branch: 'main' });
+  pointOriginHeadAt(dir, 'main');
+  for (const command of ['git merge --ff-only origin/main', 'git merge --ff-only @{u}', 'git merge --ff-only @{upstream}', 'git merge --ff-only FETCH_HEAD']) {
+    expectSilent(run('guard-default-branch', bash(command, dir)));
+  }
+  expectBlock(run('guard-default-branch', bash('git merge --ff-only feature', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash('git merge --ff-only', dir)), '#git-branch-workflow');
+});
+
+test('pushd, popd, chdir, and Set-Location move the resolved directory like cd', (t) => {
+  const main = repo(t, { branch: 'main' });
+  const feature = featureRepo(t);
+  expectBlock(run('guard-default-branch', bash(`pushd "${main}" && git commit -m x`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash(`chdir "${main}" && git commit -m x`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', pwsh(`Set-Location -Path "${main}"; git commit -m x`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', pwsh(`sl "${main}"; git commit -m x`, feature)), '#git-branch-workflow');
+  expectNotice(run('guard-default-branch', bash('popd && git commit -m x', main)));
+});
+
 test('a malformed opt-out keeps every hook on with a notice, and is never read for a clean command', (t) => {
   const dir = repo(t, { branch: 'main' });
   pointOriginHeadAt(dir, 'main');
@@ -477,9 +515,8 @@ const scriptsOf = (entries) => entries.flatMap((e) => e.hooks.map((h) => h.comma
 test('plugin.json, hooks.json, the settings merge, and the directory agree on the hook scripts', () => {
   const onDisk = readdirSync(HOOKS_DIR).filter((f) => f.endsWith('.mjs') && !f.startsWith('_')).sort();
   const plugin = JSON.parse(readFileSync(join(root, 'tools/claude/.claude-plugin/plugin.json'), 'utf8'));
-  const hooksJson = JSON.parse(readFileSync(join(root, 'tools/claude/hooks/hooks.json'), 'utf8'));
+  const hooksJson = JSON.parse(readFileSync(join(root, 'tools/claude', plugin.hooks), 'utf8'));
   const merged = agentsmithHooks('.claude/hooks/agentsmith');
-  assert.deepEqual(scriptsOf(plugin.hooks.PreToolUse), onDisk);
   assert.deepEqual(scriptsOf(hooksJson.hooks.PreToolUse), onDisk);
   assert.deepEqual(scriptsOf(merged.PreToolUse), onDisk);
   assert.deepEqual(HOOK_FILES.map((f) => f.split('/').pop()).sort(), onDisk);

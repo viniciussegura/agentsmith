@@ -77,8 +77,15 @@ function tokenize(command, powershell) {
       i++; continue;
     }
     if (ch === escapeChar && (!inDouble || powershell || DOUBLE_QUOTE_ESCAPES.has(command[i + 1] ?? ''))) {
+      // An escaped newline continues the line; it is neither a separator nor a character.
+      if (command[i + 1] === '\n') { i += 2; continue; }
       if (i + 1 < command.length) { push(command[i + 1]); started = true; i += 2; continue; }
       i++; continue;
+    }
+    // An unquoted `#` at a word boundary starts a comment that runs to the end of the line.
+    if (ch === '#' && !inDouble && !started) {
+      const end = command.indexOf('\n', i);
+      i = end === -1 ? command.length : end; continue;
     }
     if (ch === '"') { inDouble = !inDouble; started = true; i++; continue; }
     if (!inDouble && ch === "'") { inSingle = true; started = true; i++; continue; }
@@ -105,7 +112,10 @@ function tokenize(command, powershell) {
     if (ch === '&' && command[i + 1] === '&') { flush(); items.push({ kind: 'sep' }); i += 2; continue; }
     if (ch === '|' && command[i + 1] === '|') { flush(); items.push({ kind: 'sep' }); i += 2; continue; }
     if (ch === ';' || ch === '|' || ch === '&' || ch === '\n') { flush(); items.push({ kind: 'sep' }); i++; continue; }
-    if (GROUPING.has(ch) && ch !== '!') { flush(); items.push({ kind: 'word', text: ch, literal: true, grouping: true }); i++; continue; }
+    // Parentheses always group; a brace groups only when it stands alone (`{ cmd; }`), so a
+    // revision such as `@{u}` or `HEAD^{tree}` stays one word.
+    const braceAlone = (ch === '{' || ch === '}') && !started && /^[\s;]|^$/.test(command.slice(i + 1, i + 2));
+    if (ch === '(' || ch === ')' || braceAlone) { flush(); items.push({ kind: 'word', text: ch, literal: true, grouping: true }); i++; continue; }
     if (/\s/.test(ch)) { flush(); i++; continue; }
     if (ch === '~' && !started) literal = false;
     push(ch); i++;
@@ -125,7 +135,8 @@ function matchingParen(command, open) {
 
 // A heredoc body is data: the lines after a line carrying `<<WORD` (or `<<-WORD`, with the
 // delimiter optionally quoted) up to the line equal to WORD are dropped before tokenizing.
-const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
+// `<<<` is a here-string, one word on the same line, not a heredoc.
+const HEREDOC = /(?<!<)<<(?!<)-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
 function stripHeredocs(command) {
   const lines = String(command).split('\n');
   const kept = [];
@@ -187,13 +198,14 @@ export function parseCommand(command, { powershell = false } = {}) {
   return result;
 }
 
-// `bash -c "script"` (also -lc, -ec): the script is the first non-option word after the
-// cluster that contains `c`.
+// `bash -c "script"` (also -lc, -ec), possibly behind env words or a wrapper: the script is
+// the first non-option word after the cluster that contains `c`.
 function nestedShellScript(words) {
-  const head = words[0]?.split(/[\\/]/).pop();
+  const start = headIndex(words);
+  const head = words[start]?.split(/[\\/]/).pop();
   if (!SHELLS.has(head)) return null;
   let sawC = false;
-  for (let i = 1; i < words.length; i++) {
+  for (let i = start + 1; i < words.length; i++) {
     const w = words[i];
     if (/^-[a-zA-Z]+$/.test(w)) { if (w.includes('c')) sawC = true; continue; }
     if (w.startsWith('-')) continue;
@@ -336,6 +348,10 @@ export function gitFlagsViolation(inv, env) {
   return null;
 }
 
+// Commands that move the working directory for the segments after them, in either shell.
+const DIR_CHANGERS = new Set(['cd', 'pushd', 'chdir', 'Set-Location', 'sl']);
+const DIR_STACK_POPS = new Set(['popd', 'Pop-Location']);
+
 // The directory a git segment runs in: the payload cwd, moved by every literal `cd` in an
 // earlier segment in order, then `-C` on the segment itself. Returns { dir } or
 // { undecidable: reason } when a cd operand or -C value cannot be read.
@@ -343,11 +359,13 @@ export function resolveDir(inv, segmentIndex, segments, cwd, pathResolve) {
   let dir = cwd;
   for (let i = 0; i < segmentIndex; i++) {
     const words = segments[i];
-    if (words[0]?.text !== 'cd') continue;
-    // The operand is the first word past cd's own options (-P, -L, -e, -@); `-` alone is the
-    // previous directory, which the hook cannot know.
+    const head = words[0]?.text;
+    if (DIR_STACK_POPS.has(head)) return { undecidable: 'a popd the hook cannot follow' };
+    if (!DIR_CHANGERS.has(head)) continue;
+    // The operand is the first word past the command's own options (-P, -L, -Path ...); `-`
+    // alone is the previous directory, which the hook cannot know.
     const operand = words.slice(1).find((w) => w.text === '-' || !w.text.startsWith('-'));
-    if (!operand || !operand.literal || operand.text === '-') return { undecidable: 'a cd the hook cannot follow' };
+    if (!operand || !operand.literal || operand.text === '-') return { undecidable: `a ${head} the hook cannot follow` };
     dir = pathResolve(dir, operand.text);
   }
   if (inv.dir) {

@@ -34,7 +34,7 @@ src/bundles.js     on-demand index + #tag reference-integrity + ownership covera
 src/docslayout.js  the #swe-docs-layout table, the .agentsmith/docs-layout.yaml remap, the map-citation lint
 src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** install paths
 bin/cli.js         verb-first CLI: install / uninstall, plus the --stdout query
-bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
+bin/build-plugin.js  generates plugin.json + marketplace.json from package.json, and hooks/hooks.json from src/settings.js
 test/              tests for the generator
 test-helpers/      shared test scaffolding; skipped by `node --test` only while
                    outside test/ AND not named test.*/test-*/*-test.*/*_test.*/*.test.*
@@ -146,7 +146,7 @@ sites they constrain.
 ```bash
 npm test                     # node --test
 node bin/cli.js --stdout     # preview the forged AGENTS.md
-npm run build:plugin         # regenerate plugin.json + marketplace.json
+npm run build:plugin         # regenerate plugin.json + marketplace.json + hooks/hooks.json
 node bin/cli.js install --dev  # dogfood install, including the authoring tools
 ```
 
