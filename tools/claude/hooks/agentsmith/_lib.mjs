@@ -46,17 +46,22 @@ export function parsePayload(raw) {
 // Command parsing
 // ---------------------------------------------------------------------------------------
 
-const GROUPING = new Set(['(', ')', '{', '}', '!']);
 const KEYWORD_HEADS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', 'fi', 'done']);
 const SHELLS = new Set(['bash', 'sh', 'zsh']);
 // Bash escapes only these inside double quotes; any other backslash is literal there.
 const DOUBLE_QUOTE_ESCAPES = new Set(['$', '`', '"', '\\', '\n']);
+// A heredoc starts at an unquoted `<<WORD` (or `<<-WORD`, the delimiter optionally quoted);
+// its body is the lines after the current one up to the line equal to WORD, and is data.
+// `<<<` is a here-string, one word on the same line.
+const HEREDOC_START = /^<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
 
 // Tokenize one shell command into words and separators. A word is { text, literal };
 // literal is false when the word carries a variable, a substitution, or a leading tilde.
+// A separator carries `open` or `close` when it is a subshell parenthesis.
 function tokenize(command, powershell) {
   const items = [];
   const nested = [];
+  const heredocs = [];
   let buf = '';
   let started = false;
   let literal = true;
@@ -109,19 +114,42 @@ function tokenize(command, powershell) {
       i = end === -1 ? command.length : end + 1; continue;
     }
     if (inDouble) { push(ch); i++; continue; }
+    if (ch === '<' && command[i - 1] !== '<') {
+      const m = HEREDOC_START.exec(command.slice(i));
+      if (m) { for (const c of m[0]) push(c); heredocs.push(m[2]); i += m[0].length; continue; }
+    }
+    if (ch === '\n') {
+      flush(); items.push({ kind: 'sep' }); i++;
+      while (heredocs.length) i = skipHeredocBody(command, i, heredocs.shift());
+      continue;
+    }
     if (ch === '&' && command[i + 1] === '&') { flush(); items.push({ kind: 'sep' }); i += 2; continue; }
     if (ch === '|' && command[i + 1] === '|') { flush(); items.push({ kind: 'sep' }); i += 2; continue; }
-    if (ch === ';' || ch === '|' || ch === '&' || ch === '\n') { flush(); items.push({ kind: 'sep' }); i++; continue; }
-    // Parentheses always group; a brace groups only when it stands alone (`{ cmd; }`), so a
-    // revision such as `@{u}` or `HEAD^{tree}` stays one word.
+    if (ch === ';' || ch === '|' || ch === '&') { flush(); items.push({ kind: 'sep' }); i++; continue; }
+    // Parentheses always group and open a subshell; a brace groups only when it stands alone
+    // (`{ cmd; }`), so a revision such as `@{u}` or `HEAD^{tree}` stays one word.
+    if (ch === '(' || ch === ')') { flush(); items.push({ kind: 'sep', [ch === '(' ? 'open' : 'close']: true }); i++; continue; }
     const braceAlone = (ch === '{' || ch === '}') && !started && /^[\s;]|^$/.test(command.slice(i + 1, i + 2));
-    if (ch === '(' || ch === ')' || braceAlone) { flush(); items.push({ kind: 'word', text: ch, literal: true, grouping: true }); i++; continue; }
+    if (braceAlone) { flush(); items.push({ kind: 'sep' }); i++; continue; }
     if (/\s/.test(ch)) { flush(); i++; continue; }
     if (ch === '~' && !started) literal = false;
     push(ch); i++;
   }
   flush();
   return { items, nested, unterminated: inSingle || inDouble };
+}
+
+// The index just past the heredoc body starting at `from`: lines up to and including the
+// one equal to `delimiter`, or the end of the command when none is.
+function skipHeredocBody(command, from, delimiter) {
+  let i = from;
+  while (i < command.length) {
+    const end = command.indexOf('\n', i);
+    const line = end === -1 ? command.slice(i) : command.slice(i, end);
+    i = end === -1 ? command.length : end + 1;
+    if (line.trim() === delimiter) break;
+  }
+  return i;
 }
 
 function matchingParen(command, open) {
@@ -133,47 +161,31 @@ function matchingParen(command, open) {
   return command.length;
 }
 
-// A heredoc body is data: the lines after a line carrying `<<WORD` (or `<<-WORD`, with the
-// delimiter optionally quoted) up to the line equal to WORD are dropped before tokenizing.
-// `<<<` is a here-string, one word on the same line, not a heredoc.
-const HEREDOC = /(?<!<)<<(?!<)-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
-function stripHeredocs(command) {
-  const lines = String(command).split('\n');
-  const kept = [];
-  let delimiter = null;
-  for (const line of lines) {
-    if (delimiter !== null) {
-      if (line.trim() === delimiter) delimiter = null;
-      continue;
-    }
-    kept.push(line);
-    const m = HEREDOC.exec(line);
-    if (m) delimiter = m[2];
-  }
-  return kept.join('\n');
-}
-
 // Split a command into segments of words; returns every segment including those nested
 // in `bash -c`, `$(...)`, and backticks, the env words that apply, and whether a quote was
-// left unterminated anywhere.
+// left unterminated anywhere. A segment's `depth` counts the subshells and child shells it
+// runs under: a directory change inside one does not reach segments outside it.
 export function parseCommand(command, { powershell = false } = {}) {
-  const { items, nested, unterminated } = tokenize(stripHeredocs(command), powershell);
+  const { items, nested, unterminated } = tokenize(String(command), powershell);
   const segments = [];
   let current = [];
+  let depth = 0;
   const close = () => {
-    while (current.length && (current[0].grouping || current[0].text === '!' || KEYWORD_HEADS.has(current[0].text))) current.shift();
-    while (current.length && current[current.length - 1].grouping) current.pop();
-    if (current.length) segments.push(current);
+    while (current.length && (current[0].text === '!' || KEYWORD_HEADS.has(current[0].text))) current.shift();
+    if (current.length) { current.depth = depth; segments.push(current); }
     current = [];
   };
   for (const item of items) {
-    if (item.kind === 'sep') close(); else current.push(item);
+    if (item.kind !== 'sep') { current.push(item); continue; }
+    close();
+    if (item.open) depth++;
+    if (item.close && depth > 0) depth--;
   }
   close();
 
   const result = { segments: [], unterminated, env: new Map() };
-  const absorb = (parsed) => {
-    result.segments.push(...parsed.segments);
+  const absorb = (parsed, base) => {
+    for (const seg of parsed.segments) { seg.depth += base + 1; result.segments.push(seg); }
     result.unterminated = result.unterminated || parsed.unterminated;
     for (const [k, v] of parsed.env) result.env.set(k, v);
   };
@@ -192,9 +204,9 @@ export function parseCommand(command, { powershell = false } = {}) {
       }
     }
     const script = nestedShellScript(words);
-    if (script !== null) absorb(parseCommand(script, { powershell: false }));
+    if (script !== null) absorb(parseCommand(script, { powershell: false }), seg.depth);
   }
-  for (const text of nested) absorb(parseCommand(text, { powershell }));
+  for (const text of nested) absorb(parseCommand(text, { powershell }), 0);
   return result;
 }
 
@@ -308,8 +320,20 @@ export function matchesLong(token, option) {
   return t.length >= LONG_PREFIX_MIN && option.startsWith(t);
 }
 
-// `git config` flags that read or remove a key rather than set it.
+// `git config` flags and subcommands that read or remove a key rather than set it.
 const CONFIG_READ_OR_UNSET = new Set(['--get', '--get-all', '--get-regexp', '--get-urlmatch', '-l', '--list', '--unset', '--unset-all', '--show-origin', '--show-scope']);
+const CONFIG_READ_SUBCOMMANDS = new Set(['get', 'list', 'unset']);
+
+// `git config` sets core.hooksPath when a value follows the key and no read or unset form
+// is present; the bare key is a read.
+function configSetsHooksPath(inv) {
+  if (inv.sub !== 'config') return false;
+  if (inv.args.some((a) => CONFIG_READ_OR_UNSET.has(a))) return false;
+  const operands = inv.args.filter((a) => !a.startsWith('-'));
+  if (CONFIG_READ_SUBCOMMANDS.has(operands[0])) return false;
+  const key = operands.findIndex((a) => /^core\.hookspath$/i.test(a));
+  return key !== -1 && key < operands.length - 1;
+}
 
 // Scan a short-flag cluster left to right, stopping at the first letter that takes an
 // attached argument; true when `letter` is seen before that.
@@ -332,9 +356,7 @@ export function gitFlagsViolation(inv, env) {
   if (inv.configs.some((c) => HOOKS_PATH.test(c)) || inv.configEnv.some((c) => HOOKS_PATH.test(c))) return 'a core.hooksPath override';
   if (/core\.hookspath/i.test(env.get('GIT_CONFIG_PARAMETERS') ?? '')) return 'a core.hooksPath override';
   for (const [k, v] of env) if (/^GIT_CONFIG_KEY_\d+$/.test(k) && /^core\.hookspath$/i.test(v)) return 'a core.hooksPath override';
-  if (inv.sub === 'config' && inv.args.some((a) => /^core\.hookspath$/i.test(a)) && !inv.args.some((a) => CONFIG_READ_OR_UNSET.has(a))) {
-    return 'a core.hooksPath override';
-  }
+  if (configSetsHooksPath(inv)) return 'a core.hooksPath override';
   for (const a of inv.args) {
     if (a === '--') break;
     if (matchesLong(a, '--no-verify')) return 'a hook-skipping flag';
@@ -353,12 +375,18 @@ const DIR_CHANGERS = new Set(['cd', 'pushd', 'chdir', 'Set-Location', 'sl']);
 const DIR_STACK_POPS = new Set(['popd', 'Pop-Location']);
 
 // The directory a git segment runs in: the payload cwd, moved by every literal `cd` in an
-// earlier segment in order, then `-C` on the segment itself. Returns { dir } or
-// { undecidable: reason } when a cd operand or -C value cannot be read.
+// earlier segment at the same or an enclosing depth in order (a subshell starts from its
+// parent's directory and its moves end with it), then `-C` on the segment itself. Returns
+// { dir } or { undecidable: reason } when a cd operand or -C value cannot be read.
 export function resolveDir(inv, segmentIndex, segments, cwd, pathResolve) {
-  let dir = cwd;
+  const stack = [cwd];
+  const enter = (depth) => {
+    while (stack.length - 1 < depth) stack.push(stack[stack.length - 1]);
+    while (stack.length - 1 > depth) stack.pop();
+  };
   for (let i = 0; i < segmentIndex; i++) {
     const words = segments[i];
+    enter(words.depth ?? 0);
     const head = words[0]?.text;
     if (DIR_STACK_POPS.has(head)) return { undecidable: 'a popd the hook cannot follow' };
     if (!DIR_CHANGERS.has(head)) continue;
@@ -366,8 +394,10 @@ export function resolveDir(inv, segmentIndex, segments, cwd, pathResolve) {
     // alone is the previous directory, which the hook cannot know.
     const operand = words.slice(1).find((w) => w.text === '-' || !w.text.startsWith('-'));
     if (!operand || !operand.literal || operand.text === '-') return { undecidable: `a ${head} the hook cannot follow` };
-    dir = pathResolve(dir, operand.text);
+    stack[stack.length - 1] = pathResolve(stack[stack.length - 1], operand.text);
   }
+  enter(segments[segmentIndex]?.depth ?? 0);
+  let dir = stack[stack.length - 1];
   if (inv.dir) {
     if (!inv.dir.literal) return { undecidable: 'a -C directory the hook cannot read' };
     dir = pathResolve(dir, inv.dir.text);

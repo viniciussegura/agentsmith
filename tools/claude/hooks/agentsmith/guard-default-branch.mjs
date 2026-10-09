@@ -12,12 +12,29 @@ const COMMIT_CREATING = new Set(['commit', 'merge', 'cherry-pick', 'revert', 'am
 // progress, which an agent must be able to do on any branch. `--continue` and `--skip` go on
 // to create commits and stay blocked.
 const COMMIT_FREE_FLAGS = new Set(['--abort', '--quit']);
-// `merge --ff-only` is allowed only from a remote-tracking operand: updating the default branch
-// before branching is what the workflow asks for, landing a local branch onto it is the human's.
-const REMOTE_OPERAND = /^(?:[A-Za-z0-9_.-]+\/[^\s]+|@\{u(?:pstream)?\}|FETCH_HEAD)$/;
-const fastForwardsFromRemote = (args) =>
-  args.includes('--ff-only') && args.some((a) => !a.startsWith('-') && REMOTE_OPERAND.test(a));
+// `merge --ff-only` is allowed only when every operand is the upstream or an existing
+// remote-tracking ref: updating the default branch before branching is what the workflow asks
+// for, landing a local branch onto it is the human's. `rebase` onto the same operand stays
+// blocked: it replays any local commits onto the default branch, which a fast-forward refuses.
+const UPSTREAM_OPERAND = /^(?:@\{u(?:pstream)?\}|FETCH_HEAD)$/;
+const REMOTE_REF_PREFIX = 'refs/remotes/';
 const DIR_ENV = ['GIT_DIR', 'GIT_WORK_TREE'];
+
+// Whether `git merge` with `args` fast-forwards from remote-tracking operands only, read in
+// `dir`: true, false, or { timedOut: true }.
+function fastForwardsFromRemote(args, dir) {
+  if (!args.includes('--ff-only')) return false;
+  const operands = args.filter((a) => !a.startsWith('-'));
+  if (operands.length === 0) return false;
+  for (const operand of operands) {
+    if (UPSTREAM_OPERAND.test(operand)) continue;
+    const ref = operand.startsWith(REMOTE_REF_PREFIX) ? operand : `${REMOTE_REF_PREFIX}${operand}`;
+    const exists = runGit(['rev-parse', '--verify', '--quiet', ref], dir);
+    if (exists.timedOut) return { timedOut: true };
+    if (!exists.ok) return false;
+  }
+  return true;
+}
 const DEFAULT_CANDIDATES = ['main', 'master'];
 
 // The default branch: origin/HEAD, else the first of init.defaultBranch, main, master that
@@ -50,7 +67,6 @@ runHook(HOOK, (payload, verdict) => {
     if (!inv) return;
     sawGit = true;
     if (!COMMIT_CREATING.has(inv.sub)) return;
-    if (inv.sub === 'merge' && fastForwardsFromRemote(inv.args)) return;
     if (inv.args.some((a) => COMMIT_FREE_FLAGS.has(a))) return;
     if (inv.dirOverride || DIR_ENV.some((k) => parsed.env.has(k))) {
       verdict.notices.push(notice(HOOK, 'a git command whose repository is chosen by --git-dir, --work-tree, or their environment variables'));
@@ -73,9 +89,13 @@ runHook(HOOK, (payload, verdict) => {
     const def = defaultBranch(dir);
     if (def.timedOut) { verdict.notices.push(notice(HOOK, 'the default branch (git timed out)')); return; }
     if (!def.name) { verdict.notices.push(notice(HOOK, 'the default branch (no origin/HEAD, init.defaultBranch, main, or master)')); return; }
-    if (head.out === def.name) {
-      verdict.blocks.push(`Blocked by #git-branch-workflow: never commit on the default branch (${def.name}); create a branch first.`);
+    if (head.out !== def.name) return;
+    if (inv.sub === 'merge') {
+      const remote = fastForwardsFromRemote(inv.args, dir);
+      if (remote === true) return;
+      if (remote.timedOut) { verdict.notices.push(notice(HOOK, 'the merge operand (git timed out)')); return; }
     }
+    verdict.blocks.push(`Blocked by #git-branch-workflow: never commit on the default branch (${def.name}); create a branch first.`);
   });
   if (parsed.unterminated && sawGit) verdict.notices.push(notice(HOOK, 'a segment with an unterminated quote'));
   if (!verdict.dir) verdict.dir = cwd;

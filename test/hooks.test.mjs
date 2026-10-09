@@ -510,6 +510,55 @@ test('the Agent hook honours the opt-out and still blocks a model-less dispatch 
 // Wiring parity
 // ---------------------------------------------------------------------------
 
+test('a heredoc marker inside quotes or a comment starts no heredoc', (t) => {
+  const dir = repo(t);
+  expectBlock(run('guard-git-flags', bash('echo "use <<EOF here"\ngit push --force', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash("echo 'see <<EOF'\ngit push --force", dir)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash('echo x # <<EOF\ngit push --force', dir)), '#git-branch-workflow');
+  expectSilent(run('guard-git-flags', bash('echo "x" && cat <<EOF\ngit push --force\nEOF', dir)));
+});
+
+test('a case arm, a subshell, and a brace group are their own segments', (t) => {
+  const dir = repo(t);
+  expectBlock(run('guard-git-flags', bash('case $x in a) git push -f;; esac', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash('(git push --force)', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash('{ git push --force; }', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash('f() { git push --force; }', dir)), '#git-branch-workflow');
+});
+
+test('a cd inside a subshell, a brace group, or a nested shell moves only the segments inside it', (t) => {
+  const main = repo(t, { branch: 'main' });
+  pointOriginHeadAt(main, 'main');
+  const feature = featureRepo(t);
+  expectSilent(run('guard-default-branch', bash(`(cd "${main}") && git commit -m x`, feature)));
+  expectSilent(run('guard-default-branch', bash(`(cd "${main}" && git status) && git commit -m x`, feature)));
+  expectSilent(run('guard-default-branch', bash(`bash -c 'cd "${main}"' && git commit -m x`, feature)));
+  expectBlock(run('guard-default-branch', bash(`(cd "${main}" && git commit -m x)`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash(`{ cd "${main}"; } && git commit -m x`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash(`cd "${main}" && (git commit -m x)`, feature)), '#git-branch-workflow');
+});
+
+test('guard-git-flags reads core.hooksPath when no value follows the key', (t) => {
+  const dir = repo(t);
+  for (const command of ['git config core.hooksPath', 'git config --local core.hooksPath', 'git config --default x core.hooksPath', 'git config get core.hooksPath', 'git config unset core.hooksPath']) {
+    expectSilent(run('guard-git-flags', bash(command, dir)));
+  }
+  for (const command of ['git config --local core.hooksPath /x', 'git config set core.hooksPath /x', 'git config core.hooksPath --add /x']) {
+    expectBlock(run('guard-git-flags', bash(command, dir)), '#git-branch-workflow');
+  }
+});
+
+test('merge --ff-only exempts only an operand that is an existing remote-tracking ref', (t) => {
+  const dir = repo(t, { branch: 'main' });
+  pointOriginHeadAt(dir, 'main');
+  git(dir, 'branch', 'refactor/x');
+  expectSilent(run('guard-default-branch', bash('git merge --ff-only refs/remotes/origin/main', dir)));
+  expectBlock(run('guard-default-branch', bash('git merge --ff-only refactor/x', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash('git merge --ff-only upstream/main', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash('git merge --ff-only refactor/x origin/main', dir)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash('git rebase origin/main', dir)), '#git-branch-workflow');
+});
+
 const scriptsOf = (entries) => entries.flatMap((e) => e.hooks.map((h) => h.command.match(/\/hooks\/agentsmith\/([a-z-]+\.mjs)/)[1])).sort();
 
 test('plugin.json, hooks.json, the settings merge, and the directory agree on the hook scripts', () => {
