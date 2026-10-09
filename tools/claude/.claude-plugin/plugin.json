@@ -1,18 +1,6 @@
 {
   "name": "agentsmith",
-  "version": "1.0.0-rc.28",
+  "version": "1.0.0-rc.29",
   "description": "Canonical agent instructions and a generator that forges AGENTS.md for any project.",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/agentsmith/require-explicit-model.mjs\""
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": "./hooks/hooks.json"
 }

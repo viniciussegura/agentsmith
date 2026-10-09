@@ -27,10 +27,11 @@ A path whose own directory entry is present but does not resolve -- a broken sym
 A malformed one is a hard error: `<file>:<line>: <what is wrong>; <what is allowed>; no output was generated` on stderr, exit `1`, before the plan is printed and before anything is written, and the message never echoes the offending value.
 The same exit `1` fires when a non-blank config is present and the `#swe-docs-layout` rule is not in the generated instruction set — the arm that turns a silently non-applied override into a loud failure.
 
-On an install plan for any scope other than `user`, `install` asks `git check-ignore` whether that file is ignored and warns on stderr when it is, since the README's gitignore recipes deny `.agentsmith/` wholesale:
+On an install plan for any scope other than `user`, `install` asks `git check-ignore` whether that file, and the hooks opt-out `.agentsmith/hooks.yaml` ([Hooks](#hooks)), is ignored and warns on stderr for each that is, since the README's gitignore recipes deny `.agentsmith/` wholesale:
 
 ```text
 agentsmith: warning -- .agentsmith/docs-layout.yaml is gitignored, so teammates will not get this layout. Add '!.agentsmith/docs-layout.yaml' after '.agentsmith/*' in .gitignore (see README).
+agentsmith: warning -- .agentsmith/hooks.yaml is gitignored, so it is never committed and the hooks ignore it. Add '!.agentsmith/hooks.yaml' after '.agentsmith/*' in .gitignore (see README).
 ```
 
 The probe is advisory: the exit code stays `0`, and it is silent when the file is absent, already tracked, or git is unreachable.
@@ -130,7 +131,7 @@ Its first line after the header states the scope and the absolute base directory
 agentsmith plan:
   Scope: project (/home/vinic/dev/myrepo)
   write   37 file(s): .agentsmith/AGENTS.md, .agentsmith/agents/frontend.md, ...
-  update  .claude/settings.json (add agentsmith hook)
+  update  .claude/settings.json (add agentsmith hooks)
   keep    AGENTS.md (unchanged)
 ```
 
@@ -171,15 +172,48 @@ An empty or unrecognized answer at the verb, content, or placement prompt is re-
 The wizard can also be aborted at any point with Ctrl-C, leaving the disk untouched.
 The wizard is an input source, not a second code path: it produces the same `{ command, scope, flags }` shape a parsed command line would, and flows through the identical plan/confirm/execute path.
 
+## Hooks
+
+The Claude adapter installs four PreToolUse hooks under `.claude/hooks/agentsmith/` (the plugin ships the same four through `hooks/hooks.json`, the one registration `plugin.json` points at).
+Each reads the host's tool payload from stdin as untrusted data, matched with linear-time patterns and never echoed into a message.
+
+| hook | matches | blocks |
+| --- | --- | --- |
+| `require-explicit-model` | `Agent` | a subagent dispatch with no `model` (`#ai-conversational`) |
+| `guard-default-branch` | `Bash`, `PowerShell` | `commit`, `merge`, `cherry-pick`, `revert`, `am`, or `rebase` while the current branch is the default branch (`#git-branch-workflow`); `merge --ff-only` whose every operand is the upstream (`@{u}`, `FETCH_HEAD`) or an existing remote-tracking ref (`origin/main`, verified in the repository), and the commit-free `--abort` and `--quit` forms, are allowed |
+| `guard-git-flags` | `Bash`, `PowerShell` | `push` with `--force`, `-f`, `--force-with-lease`, `--force-if-includes`, or a `+` refspec; `--no-verify` on any subcommand, `commit -n`; a `core.hooksPath` override through `-c`, `--config-env`, `GIT_CONFIG_*`, or a `git config` that sets it (reading or unsetting it passes) (`#git-branch-workflow`, `#git-tooling`) |
+| `guard-dated-todos` | `Write`, `Edit`, `MultiEdit` | an added comment line (`//`, `#`, `/*`, ` *`, `--`, `<!--`) carrying `TODO`, `FIXME`, `HACK`, `XXX`, or `BUG` without `(YYYY-MM-DD)` after the word; an identifier or string literal spelling the word is not a marker, and prose files (`.md`, `.mdx`, `.txt`) are out of scope (`#swe-dated-todos`) |
+
+Exit codes: `2` blocks and the message on stderr names the rule and the remedy; `0` allows silently; `1` allows and prints one line saying what the hook could not evaluate, the host's non-blocking channel.
+A block from any segment of a command wins over a notice, and a notice over a silent allow.
+A notice is raised when the git state cannot be read or times out, the directory is not a repository, no default branch resolves (no `origin/HEAD`, `init.defaultBranch`, `main`, or `master`), the command chooses its repository through `--git-dir`, `--work-tree`, `GIT_DIR`, `GIT_WORK_TREE`, or a non-literal `cd`, or a quote is unterminated.
+
+The git guards drop unquoted heredoc bodies and `#` comments, join backslash-continued lines, split a command on `&&`, `||`, `;`, `|`, `&`, newlines, parentheses, and standalone braces, honour quoting, read into `bash -c` strings (behind a wrapper too), `$(...)`, and backticks, follow `cd`, `pushd`, `chdir`, and `Set-Location` within the subshell or nested shell that runs them (a `popd` is undecidable), skip env words and the wrappers `env`, `command`, `exec`, `time`, `timeout`, `nice`, `ionice`, `nohup`, `setsid`, `stdbuf`, `sudo`, `doas`, `rtk` (and `rtk proxy`), `xargs`, and `find -exec`, skip git's global options, and treat an unambiguous abbreviation of a blocked long option as that option.
+The default branch is `origin/HEAD`, else the first of `init.defaultBranch`, `main`, `master` that exists as a local branch.
+They are a tripwire for the agent's own commands, not a sandbox.
+Not covered: git aliases; scripts and tools that call git (`gh`, `npm version`); wrappers outside that set; `eval`, a `$VAR` command head, and `cmd /c`; a `git pull` that merges; a second clone whose own HEAD carries an opt-out; commands typed by the user.
+
+**Opt-out.** A project switches a hook off in `.agentsmith/hooks.yaml`, read from the committed content at `HEAD` of the repository the command targets (found from its top level, so a subdirectory or a not-yet-created directory still names it), never from the working tree, so disabling a guard takes a commit the branch diff shows:
+
+```yaml
+# a project decision; names are the script names
+disabled:
+  - guard-default-branch
+```
+
+Only `#` comments, blank lines, one `disabled:` line, and indented `- <name>` lines are accepted; any other content is malformed, keeps every hook on, and is reported with the notice line.
+The opt-out file, `.claude/settings.json`, and the hook scripts are agent-editable; review of the commit that edits them is the control.
+Both README gitignore recipes re-admit the file, and the install plan warns when it is ignored (see `install`).
+
 ## Plugin coexistence
 
 agentsmith ships two independent delivery channels: this CLI generator, and the Claude Code plugin (`/plugin install agentsmith`).
 A user may run both; the CLI's `install` / `uninstall` is bounded so it never touches the plugin's files.
 
-- **Disjoint paths.** The plugin's skills/agents/commands/hook live under the plugin cache subtree (`~/.claude/plugins/...`), managed by `/plugin`. The CLI writes only under the install base's `.claude/{skills,agents,commands,hooks}/` (`~/.claude/...` for `--scope user`). The two subtrees do not overlap.
+- **Disjoint paths.** The plugin's skills/agents/commands/hooks live under the plugin cache subtree (`~/.claude/plugins/...`), managed by `/plugin`. The CLI writes only under the install base's `.claude/{skills,agents,commands,hooks}/` (`~/.claude/...` for `--scope user`). The two subtrees do not overlap.
 - **Manifest-bounded prune.** `uninstall` and the per-run orphan-prune delete only paths recorded in `.agentsmith/.install-manifest.json`; the plugin cache is never recorded there, so it is never a candidate for deletion. Uninstalling the CLI install cannot erase the plugin's tools. The prune's empty-parent-directory climb stops at any non-empty directory and at the base, so a populated sibling such as `.claude/plugins/` is never removed even when the CLI empties `.claude/skills/`.
-- **`settings.json` vs. `plugin.json`.** The plugin registers its `PreToolUse` hook through its own `plugin.json` (loaded by Claude Code directly), not the user's `settings.json`. The CLI's merge / un-merge ops edit only `settings.json`, using the ownership marker `/hooks/agentsmith/` to identify agentsmith-owned entries there; this neither adds to nor removes the plugin's hook registration.
-- **Explicit assumption.** This reasoning rests on one assumption: Claude Code keeps plugin hooks in `plugin.json` and never materializes them into `settings.json`. If that assumption ever fails -- or a user hand-copies the plugin hook command into `settings.json` -- the CLI's un-merge would remove that settings-resident entry. The plugin's *tools* remain protected regardless, by the disjoint-paths and manifest-bound guarantees above, which do not depend on this assumption.
+- **`settings.json` vs. `plugin.json`.** The plugin registers its `PreToolUse` hooks through its own `hooks/hooks.json`, which `plugin.json` points at (loaded by Claude Code directly), not the user's `settings.json`. The CLI's merge / un-merge ops edit only `settings.json`, using the ownership marker `/hooks/agentsmith/` to identify agentsmith-owned entries there; this neither adds to nor removes the plugin's hook registrations.
+- **Explicit assumption.** This reasoning rests on one assumption: Claude Code keeps plugin hooks in `plugin.json` and never materializes them into `settings.json`. If that assumption ever fails -- or a user hand-copies a plugin hook command into `settings.json` -- the CLI's un-merge would remove that settings-resident entry. The plugin's *tools* remain protected regardless, by the disjoint-paths and manifest-bound guarantees above, which do not depend on this assumption.
 - **Duplication, not erasure, is the real caveat.** A full CLI `install` alongside the plugin installs a second copy of every skill/agent/command under `.claude/`, duplicating the plugin's registrations -- harmless but redundant. Installing with `--no-tools` (instructions only) is the documented way to run the CLI beside the plugin.
 - **Plugin-only lifecycle commands.** The plugin ships two commands the CLI deliberately does **not** install: `/agentsmith:update-instructions` (generate/refresh the instruction set via `install --no-tools`) and `/agentsmith:remove-instructions` (clear it via `uninstall`). They exist because the plugin provides tools but not instructions, so a plugin user needs a generator entrypoint. They are excluded from the CLI adapter install (`PLUGIN_ONLY_COMMANDS` in `src/tools.js`) because their `--no-tools` install would prune the very adapters a full CLI install wrote -- a footgun for a CLI user, who instead just re-runs `install`. The plugin auto-discovers them from `tools/claude/commands/`; only the CLI-copy path skips them.
 
@@ -194,7 +228,7 @@ This is a tested guarantee: an install/uninstall run against a simulated plugin-
 | `--full` / `--inline` | `--mode single` | |
 | `--root` | `--placement root` | |
 | `--out PATH` | (removed) | zero in-repo consumers; use `--scope PATH` plus `--placement` |
-| `--no-tools` | `--no-tools` | unchanged; now also un-merges the hook |
+| `--no-tools` | `--no-tools` | unchanged; now also un-merges the hooks |
 | `--dev` | `--dev` | unchanged (an `install` modifier) |
 | `--stdout` | `--stdout` | unchanged; top-level query, verb-free |
 | `spec-index [--check]` | *(removed)* | the index it maintained no longer exists (`#ai-plan`) |

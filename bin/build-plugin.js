@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { HOOKS } from '../src/settings.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -17,13 +18,19 @@ const plugin = {
   version: pkg.version,
   description: pkg.description,
   // skills/commands/agents auto-discovered (A1) — intentionally not enumerated.
+  // One hook registration source: the manifest points at hooks/hooks.json rather than
+  // repeating it, so a host that reads both never fires a hook twice.
+  hooks: './hooks/hooks.json',
+};
+
+// hooks/hooks.json comes from the one list the settings merge also reads, so the two
+// install paths agree.
+const hooksFile = {
   hooks: {
-    PreToolUse: [
-      {
-        matcher: 'Agent',
-        hooks: [{ type: 'command', command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/agentsmith/require-explicit-model.mjs"' }],
-      },
-    ],
+    PreToolUse: HOOKS.map(({ script, matcher }) => ({
+      matcher,
+      hooks: [{ type: 'command', command: `node "\${CLAUDE_PLUGIN_ROOT}/hooks/agentsmith/${script}"` }],
+    })),
   },
 };
 
@@ -46,9 +53,10 @@ const marketplace = {
 
 const pluginJson = JSON.stringify(plugin, null, 2) + '\n';
 const marketJson = JSON.stringify(marketplace, null, 2) + '\n';
+const hooksJson = JSON.stringify(hooksFile, null, 2) + '\n';
 
 if (process.argv.includes('--stdout')) {
-  process.stdout.write(`${pluginJson}\n---\n${marketJson}`);
+  process.stdout.write(`${pluginJson}\n---\n${marketJson}\n---\n${hooksJson}`);
 } else {
   const write = (p, c) => {
     mkdirSync(dirname(p), { recursive: true });
@@ -57,4 +65,5 @@ if (process.argv.includes('--stdout')) {
   };
   write(join(root, 'tools/claude/.claude-plugin/plugin.json'), pluginJson);
   write(join(root, '.claude-plugin/marketplace.json'), marketJson);
+  write(join(root, 'tools/claude/hooks/hooks.json'), hooksJson);
 }

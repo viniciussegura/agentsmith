@@ -45,7 +45,6 @@ const CITATION = /\d{4}-\d{2}-\d{2}[^(]*\(in git history(?:, [^)]+)?\)/;
 const NON_CITATION_PROSE = [
   ['devtools/claude/skills/instruction-review-board/proposal-format.md', 'the dropped draft stays in git history'],
   ['docs/instruction-rules-decisions.md', 'Dropped drafts remain recoverable from git history'],
-  ['instructions/core/ai/ai-review-board.md', 'the tracker and git history carry cross-machine continuity'],
   ['instructions/core/swe/swe-technical-debts.md', 'git history preserves the record'],
   ['tools/claude/skills/code-review-board/issue-format.md', '**git history** (fixed commits)'],
 ];

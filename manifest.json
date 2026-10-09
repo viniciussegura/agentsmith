@@ -14,6 +14,11 @@
       "when": "Back-end, API, or service work"
     },
     {
+      "name": "process",
+      "title": "Process instructions",
+      "when": "Starting or planning a unit of work beyond a self-evident single-file edit, or any question about specs, plans, spec review, branch lifespan, epics, or branch close-out"
+    },
+    {
       "name": "authoring",
       "title": "Instruction-authoring instructions",
       "when": "Authoring or auditing an agentsmith-style instruction set (the instructions/ rule sources)"

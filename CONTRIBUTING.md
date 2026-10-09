@@ -10,12 +10,16 @@ project, the [README](README.md) is all you need.
 instructions/      rule sections (the portable source of truth)
   main.md          preamble, emitted first
   core/            ai/ git/ swe/ ...            always-loaded modules
+  process/         specs, plans, spec review, branch lifespan, epics   on-demand bundle
   frontend/        ui-guidelines/ ...           on-demand bundle
   backend/         ...                          on-demand bundle
   ownership.yaml   #tag -> owner map            repo config; NEVER exported
   roles.yaml       review-role metadata         repo config; NEVER exported
 tools/             tool-specific adapters, installed into .<ai>/ (shipped to consumers)
   claude/          agents/ skills/ commands/ hooks/   Claude Code adapter (-> .claude/)
+    hooks/agentsmith/  four PreToolUse hooks on one _lib.mjs; wired by src/settings.js (HOOKS) for the
+                       npx path and by bin/build-plugin.js for the plugin; a project switches one off in a
+                       committed .agentsmith/hooks.yaml (docs/reference-spec/cli.md, Hooks)
     .claude-plugin/plugin.json                        generated plugin manifest
 devtools/          maintainer-only dev tooling, never shipped to consumers
   claude/          authoring adapters (instruction-review/apply) installed only with --dev
@@ -30,7 +34,7 @@ src/bundles.js     on-demand index + #tag reference-integrity + ownership covera
 src/docslayout.js  the #swe-docs-layout table, the .agentsmith/docs-layout.yaml remap, the map-citation lint
 src/tools.js       pure: maps tools/<ai>/** and devtools/claude/** to .<ai>/** install paths
 bin/cli.js         verb-first CLI: install / uninstall, plus the --stdout query
-bin/build-plugin.js  generates plugin.json + marketplace.json from package.json
+bin/build-plugin.js  generates plugin.json + marketplace.json from package.json, and hooks/hooks.json from src/settings.js
 test/              tests for the generator
 test-helpers/      shared test scaffolding; skipped by `node --test` only while
                    outside test/ AND not named test.*/test-*/*-test.*/*_test.*/*.test.*
@@ -42,7 +46,9 @@ test-helpers/      shared test scaffolding; skipped by `node --test` only while
 - Rules follow their own `#code-markdown` convention: one sentence per line.
 - Rules are themselves artifacts, so they follow their own `#code-prose`: lead
   with the obligation, state each constraint once, and cite a neighbouring rule
-  rather than restating it.
+  rather than restating it. A core rule names a bundle-only rule in backticks
+  with its bundle (`` `#ai-plan` (process bundle) ``), never bare; see
+  [`docs/design-decisions/lean-split.md`](docs/design-decisions/lean-split.md).
 - A rule that asks for a **prose** artifact **cites** `#code-prose`, or cites a
   rule that does. That rule deliberately enumerates nothing, so the citation is
   the only registration, and the coverage is on the artifact rather than the
@@ -72,10 +78,14 @@ test-helpers/      shared test scaffolding; skipped by `node --test` only while
   that ownership in `instructions/ownership.yaml`; cross-reference the two.
   The map holds location, the owner rule holds lifecycle
   ([`docs/reference-spec/records.md`](docs/reference-spec/records.md)).
+- Every module has a word cap and the generated core a total cap; the numbers
+  live only in `test/word-budget.test.mjs`, which fails the suite when a rule or
+  the core outgrows them. Cut rationale or move an obligation to its home; the
+  caps are never raised to admit a rule.
 - To add a rule, drop a `.md` into a section group under `instructions/` (e.g.
   `core/swe/` or `backend/`); it is picked up automatically.
 - Every `#tag` has exactly one owner (a review role, the `swe` base lens, or the
-  `process` non-review marker) in `instructions/ownership.yaml`; adding a rule
+  `ai` and `git` meta lenses) in `instructions/ownership.yaml`; adding a rule
   means adding its one owner row, or `npm test`'s coverage lint fails on the
   orphan. Role metadata lives in `instructions/roles.yaml`; both are repo config
   and are never exported.
@@ -136,7 +146,7 @@ sites they constrain.
 ```bash
 npm test                     # node --test
 node bin/cli.js --stdout     # preview the forged AGENTS.md
-npm run build:plugin         # regenerate plugin.json + marketplace.json
+npm run build:plugin         # regenerate plugin.json + marketplace.json + hooks/hooks.json
 node bin/cli.js install --dev  # dogfood install, including the authoring tools
 ```
 

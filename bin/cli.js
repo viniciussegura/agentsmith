@@ -13,7 +13,7 @@ import { parseArgs } from '../src/args.js';
 import { buildInstallPlan, buildUninstallPlan, renderPlan } from '../src/plan.js';
 import { applyPlan } from '../src/execute.js';
 import { confirm, runWizard, makeSeam } from '../src/prompt.js';
-import { SETTINGS_REL, CLAUDE_MD_REL, hasOwnedHooks } from '../src/settings.js';
+import { SETTINGS_REL, CLAUDE_MD_REL, HOOKS_OPT_OUT_REL, hasOwnedHooks } from '../src/settings.js';
 import {
   applyLayoutOverrides,
   definesLayoutTag,
@@ -166,11 +166,12 @@ function readLayoutOverrides(base, moduleTexts) {
   catch (e) { die(e.message); }
 }
 
-// Warn when git reports the config ignored: the README's recipe ignores .agentsmith/
-// wholesale, so teammates would never receive the layout. Advisory only -- exit 0
-// (ignored) warns; exit 1 (not ignored), git missing, exit 128, a timeout or any
-// other failure is a silent skip. No shell: the path is a single argv element.
-function warnIfConfigIgnored(base, file) {
+// Warn when git reports a committed config ignored: the README's recipe ignores
+// .agentsmith/ wholesale, so the file would never reach the repository. `consequence`
+// says what that costs for this file. Advisory only -- exit 0 (ignored) warns; exit 1
+// (not ignored), git missing, exit 128, a timeout or any other failure is a silent
+// skip. No shell: the path is a single argv element.
+function warnIfConfigIgnored(base, file, consequence) {
   const configPath = join(base, file);
   if (!existsSync(configPath)) return;
   try {
@@ -179,9 +180,11 @@ function warnIfConfigIgnored(base, file) {
     });
   } catch { return; }
   process.stderr.write(
-    `agentsmith: warning -- ${file} is gitignored, so teammates will not get this layout. Add '!${file}' after '.agentsmith/*' in .gitignore (see README).\n`,
+    `agentsmith: warning -- ${file} is gitignored, so ${consequence}. Add '!${file}' after '.agentsmith/*' in .gitignore (see README).\n`,
   );
 }
+const LAYOUT_IGNORED_CONSEQUENCE = 'teammates will not get this layout';
+const OPT_OUT_IGNORED_CONSEQUENCE = 'it is never committed and the hooks ignore it';
 
 // computeAdapterPlan wraps listToolSources + planToolInstall (dev adds devtools/claude).
 function computeAdapterPlan(dev) {
@@ -270,6 +273,11 @@ async function main() {
       `agentsmith: warning -- unresolved #tag references: ${built.dangling.join(', ')}\n`,
     );
   }
+  if (built.unresolvedProse.length) {
+    process.stderr.write(
+      `agentsmith: warning -- core prose references an undefined #tag: ${built.unresolvedProse.join(', ')}\n`,
+    );
+  }
   if (built.crossBoundary.length) {
     const list = built.crossBoundary
       .map((c) => `#${c.from || '(core preamble)'} -> bundle-only #${c.tag}`)
@@ -333,7 +341,10 @@ async function main() {
   });
   // Install plans only (on --clean this is the second plan, the one that writes the
   // remapped map); --scope user never probes, since the user's home is not a repo.
-  if (!isUser) warnIfConfigIgnored(base, layoutFile);
+  if (!isUser) {
+    warnIfConfigIgnored(base, layoutFile, LAYOUT_IGNORED_CONSEQUENCE);
+    warnIfConfigIgnored(base, HOOKS_OPT_OUT_REL, OPT_OUT_IGNORED_CONSEQUENCE);
+  }
   const decision = await confirm({ plan: installPlan, seam, yes: cmd.flags.yes, dryRun: cmd.flags.dryRun, destructive: false, render: renderPlan });
   if (decision === 'skip') process.exit(0);
   applyPlan(installPlan, { pkgRoot });

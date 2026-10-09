@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
-import { mergeSettings, agentsmithHooks, HOOK_REL } from './settings.js';
+import { mergeSettings, agentsmithHooks, HOOKS_DIR_REL } from './settings.js';
 import { userImport, userUnimport } from './userimport.js';
 import { pruneOrphans } from './manifest.js';
 
@@ -43,8 +43,8 @@ export function applyPlan(plan, { pkgRoot, log = (m) => process.stderr.write(`${
         break;
       }
       case 'mergeSettings': {
-        const commandPath = absolute ? resolve(base, HOOK_REL) : HOOK_REL;
-        editSettings(resolve(base, op.path), agentsmithHooks(commandPath), log);
+        const hooksDir = absolute ? resolve(base, HOOKS_DIR_REL) : HOOKS_DIR_REL;
+        editSettings(resolve(base, op.path), agentsmithHooks(hooksDir), log);
         break;
       }
       case 'unmergeSettings':

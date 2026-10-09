@@ -1,8 +1,27 @@
 const norm = (p) => p.replace(/\\/g, '/');
 
-// Project-relative location of the model-enforcement hook script, installed as a
-// tool adapter under tools/claude/hooks/agentsmith/ -> .claude/hooks/agentsmith/.
-export const HOOK_REL = '.claude/hooks/agentsmith/require-explicit-model.mjs';
+// Project-relative directory of the hook scripts, installed as a tool adapter from
+// tools/claude/hooks/agentsmith/ -> .claude/hooks/agentsmith/.
+export const HOOKS_DIR_REL = '.claude/hooks/agentsmith';
+
+// The hooks agentsmith owns and the tool each one matches. The matcher is the tool the
+// rule's subject passes through: `Agent` is the model-capable dispatch tool (stock Claude
+// Code's `Task` exposes no `model` parameter, so matching it would block every dispatch);
+// the two git guards read a shell command from either shell tool; the marker guard reads
+// an edit. Order is the order the entries land in settings.json and plugin.json.
+export const HOOKS = [
+  { script: 'require-explicit-model.mjs', matcher: 'Agent' },
+  { script: 'guard-default-branch.mjs', matcher: 'Bash|PowerShell' },
+  { script: 'guard-git-flags.mjs', matcher: 'Bash|PowerShell' },
+  { script: 'guard-dated-todos.mjs', matcher: 'Write|Edit|MultiEdit' },
+];
+
+// Project-relative paths of the hook scripts.
+export const HOOK_FILES = HOOKS.map((h) => `${HOOKS_DIR_REL}/${h.script}`);
+
+// The committed per-project opt-out the hooks read at HEAD; `install` only probes that
+// it is not gitignored, since an ignored copy is never committed and does nothing.
+export const HOOKS_OPT_OUT_REL = '.agentsmith/hooks.yaml';
 
 // Base-relative locations of the two adapter files agentsmith edits (rather than
 // owns): the settings.json it merges its hook into, and the CLAUDE.md it wires a
@@ -20,29 +39,23 @@ export const CLAUDE_MD_REL = '.claude/CLAUDE.md';
 const OWNED_MARKER = '/hooks/agentsmith/';
 
 /**
- * The PreToolUse hooks agentsmith owns, with their command resolved to `commandPath`.
- * Project installs pass a project-relative path (Claude Code runs hooks from the
- * project root); user installs pass an absolute path (a user hook's cwd is whatever
+ * The PreToolUse hooks agentsmith owns, with each command resolved under `hooksDir`.
+ * Project installs pass the project-relative directory (Claude Code runs hooks from the
+ * project root); user installs pass an absolute one (a user hook's cwd is whatever
  * project is active, not the home dir). Pure.
  *
- * Matcher is `Agent` -- the model-capable dispatch tool. Stock Claude Code's `Task`
- * tool exposes no `model` parameter, so matching it would block every dispatch; we
- * deliberately do not.
- *
- * @param {string} commandPath  Path to the hook script (any slash form).
+ * @param {string} hooksDir  Directory holding the hook scripts (any slash form).
  * @returns {object}  event -> entry[] map.
  */
-export function agentsmithHooks(commandPath) {
+export function agentsmithHooks(hooksDir) {
   return {
-    PreToolUse: [
-      {
-        matcher: 'Agent',
-        // Quote the path: a user-scope install writes an absolute path, and a home
-        // dir with a space (`C:\Users\John Doe\...`, OneDrive-redirected paths) would
-        // otherwise split at the shell and the hook silently never fires.
-        hooks: [{ type: 'command', command: `node "${norm(commandPath)}"` }],
-      },
-    ],
+    PreToolUse: HOOKS.map(({ script, matcher }) => ({
+      matcher,
+      // Quote the path: a user-scope install writes an absolute path, and a home
+      // dir with a space (`C:\Users\John Doe\...`, OneDrive-redirected paths) would
+      // otherwise split at the shell and the hook silently never fires.
+      hooks: [{ type: 'command', command: `node "${norm(hooksDir)}/${script}"` }],
+    })),
   };
 }
 
