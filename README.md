@@ -185,7 +185,7 @@ Commands then surface as `/agentsmith:code-review-board`,
 | --- | --- | --- |
 | Instructions (`AGENTS.md` + bundles) | ✗ — run `/agentsmith:update-instructions` | ✓ (`install`) |
 | Tools (commands / agents / skills) | ✓ `/agentsmith:<name>` | ✓ `/agentsmith-<name>` (`install`, tools on) |
-| Hooks (model, default branch, git flags, dated markers) | ✓ via `plugin.json` | ✓ via `settings.json` |
+| Hooks (model, default branch, git flags, dated markers) | ✓ via the plugin's `hooks/hooks.json` | ✓ via `settings.json` |
 | Update | `/plugin` (version-aware) | re-run `npx … install` |
 | Teardown | disable/remove in `/plugin` (+ `/agentsmith:remove-instructions` for instructions) | `npx … uninstall` |
 

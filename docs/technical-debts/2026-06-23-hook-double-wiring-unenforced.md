@@ -2,7 +2,7 @@
 
 ## The debt
 
-The four agentsmith hooks are wired by the `npx` path via `settings.json` and by the plugin path via `plugin.json`.
+The four agentsmith hooks are wired by the `npx` path via `settings.json` and by the plugin path via its `hooks/hooks.json`.
 A user who installs the tools via both paths gets every hook wired twice, so each fires twice per matched tool call, and two copies of every command.
 
 ## Why accepted

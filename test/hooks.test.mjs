@@ -12,7 +12,7 @@ const HOOKS_DIR = join(root, 'tools', 'claude', 'hooks', 'agentsmith');
 const hook = (name) => join(HOOKS_DIR, `${name}.mjs`);
 
 // Marker words are assembled from parts so the installed guard never trips on this file.
-const M = { todo: ['TO', 'DO'].join(''), fixme: ['FIX', 'ME'].join(''), hack: ['HA', 'CK'].join('') };
+const M = { todo: ['TO', 'DO'].join(''), fixme: ['FIX', 'ME'].join(''), hack: ['HA', 'CK'].join(''), xxx: ['XX', 'X'].join(''), bug: ['B', 'UG'].join('') };
 
 const BLOCK = 2;
 const NOTICE = 1;
@@ -559,12 +559,62 @@ test('merge --ff-only exempts only an operand that is an existing remote-trackin
   expectBlock(run('guard-default-branch', bash('git rebase origin/main', dir)), '#git-branch-workflow');
 });
 
+test('an option value is never read as a flag', (t) => {
+  const main = repo(t, { branch: 'main' });
+  pointOriginHeadAt(main, 'main');
+  expectBlock(run('guard-default-branch', bash('git commit -m "--abort" -m real', main)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash('git commit -m --quit', main)), '#git-branch-workflow');
+  expectSilent(run('guard-default-branch', bash('git rebase --abort', main)));
+  expectSilent(run('guard-default-branch', bash('git merge -q --abort', main)));
+  const feature = repo(t);
+  expectSilent(run('guard-git-flags', bash('git commit -m "--no-verify"', feature)));
+  expectSilent(run('guard-git-flags', bash('git commit --message --no-verify', feature)));
+  expectSilent(run('guard-git-flags', bash('git push -o --force origin main', feature)));
+  expectBlock(run('guard-git-flags', bash('git commit -m x --no-verify', feature)), '#git-branch-workflow');
+  expectBlock(run('guard-git-flags', bash('git commit "--no-verify"', feature)), '#git-branch-workflow');
+});
+
+test('guard-dated-todos needs a comment boundary around a # marker', (t) => {
+  const dir = repo(t);
+  const file = join(dir, 'src', 'c.js');
+  for (const line of [`color: #${M.xxx};`, `this.#${M.bug} = 1;`, `const u = "https://x/#${M.todo}";`, `echo "#${M.todo}"`, `x = 1 // see http://${M.todo}`]) {
+    expectSilent(run('guard-dated-todos', write(file, `${line}\n`, dir)));
+  }
+  for (const line of [`#${M.todo}`, `#${M.todo}: later`, `x = 1  # ${M.todo} later`, `x = 1 //${M.fixme}`]) {
+    expectBlock(run('guard-dated-todos', write(file, `${line}\n`, dir)), '#swe-dated-todos');
+  }
+});
+
+test('a command substitution runs before its segment, so a later cd does not move it', (t) => {
+  const main = repo(t, { branch: 'main' });
+  pointOriginHeadAt(main, 'main');
+  const feature = featureRepo(t);
+  expectBlock(run('guard-default-branch', bash(`echo "$(cd "${main}" && git commit -m x)"; cd sub`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash(`cd "${main}" && echo $(git commit -m x); cd sub`, feature)), '#git-branch-workflow');
+  expectSilent(run('guard-default-branch', bash(`echo "$(cd "${main}")" && git commit -m x`, feature)));
+});
+
+test('env -C moves the git command like git -C', (t) => {
+  const main = repo(t, { branch: 'main' });
+  pointOriginHeadAt(main, 'main');
+  const feature = featureRepo(t);
+  expectBlock(run('guard-default-branch', bash(`env -C "${main}" git commit -m x`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash(`env --chdir="${main}" git commit -m x`, feature)), '#git-branch-workflow');
+  expectBlock(run('guard-default-branch', bash(`env X=1 --chdir "${main}" git commit -m x`, feature)), '#git-branch-workflow');
+  expectNotice(run('guard-default-branch', bash('env -C $D git commit -m x', feature)));
+});
+
+test('the Agent hook lets a fork dispatch through, since a fork ignores model', (t) => {
+  const dir = repo(t);
+  expectSilent(run('require-explicit-model', { tool_name: 'Agent', tool_input: { prompt: 'x', subagent_type: 'fork' }, cwd: dir }));
+  expectBlock(run('require-explicit-model', { tool_name: 'Agent', tool_input: { prompt: 'x', subagent_type: 'Explore' }, cwd: dir }), '#ai-conversational');
+});
+
 const scriptsOf = (entries) => entries.flatMap((e) => e.hooks.map((h) => h.command.match(/\/hooks\/agentsmith\/([a-z-]+\.mjs)/)[1])).sort();
 
 test('plugin.json, hooks.json, the settings merge, and the directory agree on the hook scripts', () => {
   const onDisk = readdirSync(HOOKS_DIR).filter((f) => f.endsWith('.mjs') && !f.startsWith('_')).sort();
-  const plugin = JSON.parse(readFileSync(join(root, 'tools/claude/.claude-plugin/plugin.json'), 'utf8'));
-  const hooksJson = JSON.parse(readFileSync(join(root, 'tools/claude', plugin.hooks), 'utf8'));
+  const hooksJson = JSON.parse(readFileSync(join(root, 'tools/claude/hooks/hooks.json'), 'utf8'));
   const merged = agentsmithHooks('.claude/hooks/agentsmith');
   assert.deepEqual(scriptsOf(hooksJson.hooks.PreToolUse), onDisk);
   assert.deepEqual(scriptsOf(merged.PreToolUse), onDisk);

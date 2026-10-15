@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,9 +23,10 @@ test('plugin.json mirrors package.json name/version/description and omits compon
   assert.equal(plugin.version, pkg.version);
   assert.equal(plugin.description, pkg.description);
   for (const k of ['commands', 'agents', 'skills']) assert.ok(!(k in plugin), `${k} must be auto-discovered, not enumerated`);
-  // One registration source: plugin.json points at hooks/hooks.json instead of repeating it,
-  // so a host that loads both never fires a hook twice.
-  assert.equal(plugin.hooks, './hooks/hooks.json');
+  // One registration source: Claude Code loads hooks/hooks.json by default and merges a
+  // manifest `hooks` key into it, so naming that file again would fire every hook twice.
+  assert.ok(!('hooks' in plugin), 'hooks must come from hooks/hooks.json alone');
+  assert.ok(existsSync(join(root, 'tools/claude/hooks/hooks.json')));
 });
 
 test('hooks/hooks.json is byte-equal to the generator output', () => {

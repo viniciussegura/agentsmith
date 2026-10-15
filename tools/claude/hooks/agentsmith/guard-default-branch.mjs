@@ -3,7 +3,7 @@
 // default branch is blocked. Matched on the Bash and PowerShell tools. Parsing contract, exit
 // codes, opt-out, and non-coverage are in _lib.mjs.
 import { resolve } from 'node:path';
-import { runHook, parseCommand, gitInvocation, resolveDir, runGit, notice } from './_lib.mjs';
+import { runHook, parseCommand, gitInvocation, gitArgs, resolveDir, runGit, notice } from './_lib.mjs';
 
 const HOOK = 'guard-default-branch';
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
@@ -20,11 +20,11 @@ const UPSTREAM_OPERAND = /^(?:@\{u(?:pstream)?\}|FETCH_HEAD)$/;
 const REMOTE_REF_PREFIX = 'refs/remotes/';
 const DIR_ENV = ['GIT_DIR', 'GIT_WORK_TREE'];
 
-// Whether `git merge` with `args` fast-forwards from remote-tracking operands only, read in
+// Whether a `git merge` invocation fast-forwards from remote-tracking operands only, read in
 // `dir`: true, false, or { timedOut: true }.
-function fastForwardsFromRemote(args, dir) {
-  if (!args.includes('--ff-only')) return false;
-  const operands = args.filter((a) => !a.startsWith('-'));
+function fastForwardsFromRemote(inv, dir) {
+  const { options, operands } = gitArgs(inv);
+  if (!options.includes('--ff-only')) return false;
   if (operands.length === 0) return false;
   for (const operand of operands) {
     if (UPSTREAM_OPERAND.test(operand)) continue;
@@ -67,7 +67,7 @@ runHook(HOOK, (payload, verdict) => {
     if (!inv) return;
     sawGit = true;
     if (!COMMIT_CREATING.has(inv.sub)) return;
-    if (inv.args.some((a) => COMMIT_FREE_FLAGS.has(a))) return;
+    if (gitArgs(inv).options.some((a) => COMMIT_FREE_FLAGS.has(a))) return;
     if (inv.dirOverride || DIR_ENV.some((k) => parsed.env.has(k))) {
       verdict.notices.push(notice(HOOK, 'a git command whose repository is chosen by --git-dir, --work-tree, or their environment variables'));
       return;
@@ -91,7 +91,7 @@ runHook(HOOK, (payload, verdict) => {
     if (!def.name) { verdict.notices.push(notice(HOOK, 'the default branch (no origin/HEAD, init.defaultBranch, main, or master)')); return; }
     if (head.out !== def.name) return;
     if (inv.sub === 'merge') {
-      const remote = fastForwardsFromRemote(inv.args, dir);
+      const remote = fastForwardsFromRemote(inv, dir);
       if (remote === true) return;
       if (remote.timedOut) { verdict.notices.push(notice(HOOK, 'the merge operand (git timed out)')); return; }
     }

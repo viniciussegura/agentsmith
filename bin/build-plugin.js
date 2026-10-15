@@ -18,13 +18,12 @@ const plugin = {
   version: pkg.version,
   description: pkg.description,
   // skills/commands/agents auto-discovered (A1) — intentionally not enumerated.
-  // One hook registration source: the manifest points at hooks/hooks.json rather than
-  // repeating it, so a host that reads both never fires a hook twice.
-  hooks: './hooks/hooks.json',
+  // No `hooks` key: Claude Code loads hooks/hooks.json by default and merges a manifest
+  // `hooks` value into it, so naming that file here would fire every hook twice.
 };
 
-// hooks/hooks.json comes from the one list the settings merge also reads, so the two
-// install paths agree.
+// hooks/hooks.json, the plugin's one hook registration, comes from the list the settings
+// merge also reads, so the two install paths agree.
 const hooksFile = {
   hooks: {
     PreToolUse: HOOKS.map(({ script, matcher }) => ({

@@ -55,21 +55,22 @@ const DOUBLE_QUOTE_ESCAPES = new Set(['$', '`', '"', '\\', '\n']);
 // `<<<` is a here-string, one word on the same line.
 const HEREDOC_START = /^<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
 
-// Tokenize one shell command into words and separators. A word is { text, literal };
-// literal is false when the word carries a variable, a substitution, or a leading tilde.
-// A separator carries `open` or `close` when it is a subshell parenthesis.
+// Tokenize one shell command into words and separators. A word is { text, literal, nested };
+// literal is false when the word carries a variable, a substitution, or a leading tilde, and
+// nested holds the `$(...)` and backtick scripts the word expands, which run before its
+// command. A separator carries `open` or `close` when it is a subshell parenthesis.
 function tokenize(command, powershell) {
   const items = [];
-  const nested = [];
   const heredocs = [];
   let buf = '';
   let started = false;
   let literal = true;
+  let nested = [];
   let inSingle = false;
   let inDouble = false;
   const flush = () => {
-    if (started) items.push({ kind: 'word', text: buf, literal });
-    buf = ''; started = false; literal = true;
+    if (started) items.push({ kind: 'word', text: buf, literal, nested });
+    buf = ''; started = false; literal = true; nested = [];
   };
   const push = (ch) => { buf += ch; started = true; };
   const escapeChar = powershell ? '`' : '\\';
@@ -136,7 +137,7 @@ function tokenize(command, powershell) {
     push(ch); i++;
   }
   flush();
-  return { items, nested, unterminated: inSingle || inDouble };
+  return { items, unterminated: inSingle || inDouble };
 }
 
 // The index just past the heredoc body starting at `from`: lines up to and including the
@@ -166,7 +167,7 @@ function matchingParen(command, open) {
 // left unterminated anywhere. A segment's `depth` counts the subshells and child shells it
 // runs under: a directory change inside one does not reach segments outside it.
 export function parseCommand(command, { powershell = false } = {}) {
-  const { items, nested, unterminated } = tokenize(String(command), powershell);
+  const { items, unterminated } = tokenize(String(command), powershell);
   const segments = [];
   let current = [];
   let depth = 0;
@@ -190,6 +191,7 @@ export function parseCommand(command, { powershell = false } = {}) {
     for (const [k, v] of parsed.env) result.env.set(k, v);
   };
   for (const seg of segments) {
+    for (const w of seg) for (const text of w.nested) absorb(parseCommand(text, { powershell }), seg.depth);
     result.segments.push(seg);
     const words = seg.map((w) => w.text);
     for (const w of words) {
@@ -206,7 +208,6 @@ export function parseCommand(command, { powershell = false } = {}) {
     const script = nestedShellScript(words);
     if (script !== null) absorb(parseCommand(script, { powershell: false }), seg.depth);
   }
-  for (const text of nested) absorb(parseCommand(text, { powershell }), 0);
   return result;
 }
 
@@ -281,13 +282,31 @@ const GLOBAL_WITH_ARG = new Set(['-C', '-c', '--config-env', '--git-dir', '--wor
 const GLOBAL_FLAGS = new Set(['-p', '--paginate', '-P', '--no-pager', '--bare', '--no-replace-objects', '--literal-pathspecs',
   '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--no-optional-locks', '--no-lazy-fetch', '--no-advice']);
 
+// The directories an `env -C` / `--chdir` wrapper before `start` moves into, in order.
+function envDirs(segment, words, start) {
+  const dirs = [];
+  const dir = (k) => ({ text: words[k], literal: segment[k]?.literal !== false });
+  for (let j = 0; j < start; j++) {
+    if (words[j].split(/[\\/]/).pop() !== 'env') continue;
+    for (let k = j + 1; k < start; k++) {
+      const w = words[k];
+      if (w === '-C' || w === '--chdir') { if (k + 1 < start) dirs.push(dir(k + 1)); k++; }
+      else if (w.startsWith('--chdir=')) dirs.push({ text: w.slice('--chdir='.length), literal: segment[k]?.literal !== false });
+      else if (/^-C./.test(w)) dirs.push({ text: w.slice(2), literal: segment[k]?.literal !== false });
+      else if (!w.startsWith('-') && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(w)) break;
+    }
+  }
+  return dirs;
+}
+
 // The git invocation a segment makes, or null. `dir` is the -C operand (a word, with its
-// literal flag); `dirOverride` is set when --git-dir or --work-tree was passed.
+// literal flag), `envDirs` the `env -C` operands before the head; `dirOverride` is set when
+// --git-dir or --work-tree was passed.
 export function gitInvocation(segment) {
   const words = segment.map((w) => w.text);
   const start = headIndex(words);
   if (start >= words.length || !isGitHead(words[start])) return null;
-  const inv = { sub: null, args: [], dir: null, dirOverride: false, configs: [], configEnv: [] };
+  const inv = { sub: null, args: [], dir: null, envDirs: envDirs(segment, words, start), dirOverride: false, configs: [], configEnv: [] };
   let i = start + 1;
   while (i < words.length) {
     const w = words[i];
@@ -320,6 +339,38 @@ export function matchesLong(token, option) {
   return t.length >= LONG_PREFIX_MIN && option.startsWith(t);
 }
 
+// Per subcommand, the options that take the next word as their value: that word is data,
+// never a flag. The letters differ by subcommand (`-s` is a strategy for merge and a sign-off
+// for commit), so the sets are not shared.
+const STRATEGY_OPTIONS = ['-s', '--strategy', '-X', '--strategy-option'];
+const VALUE_OPTIONS = {
+  commit: ['-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message', '--reedit-message', '--fixup', '--squash', '--author', '--date', '-t', '--template', '--cleanup', '--trailer'],
+  merge: ['-m', '--message', '-F', '--file', ...STRATEGY_OPTIONS],
+  rebase: ['--onto', '-x', '--exec', ...STRATEGY_OPTIONS],
+  'cherry-pick': ['-X', '--strategy-option', '--strategy'],
+  revert: ['-X', '--strategy-option', '--strategy'],
+  am: ['--whitespace', '--directory', '--exclude', '--include', '--patch-format'],
+  push: ['-o', '--push-option', '--receive-pack', '--exec', '--repo'],
+  config: ['-f', '--file', '--blob', '--default', '--type'],
+};
+
+// A subcommand's arguments split into { options, operands }: the words git reads as options
+// and the rest, with each option value and everything after `--` among the operands.
+export function gitArgs(inv) {
+  const valued = new Set(VALUE_OPTIONS[inv.sub] ?? []);
+  const options = [];
+  const operands = [];
+  let data = false;
+  for (let i = 0; i < inv.args.length; i++) {
+    const a = inv.args[i];
+    if (data || !a.startsWith('-')) { operands.push(a); continue; }
+    if (a === '--') { data = true; continue; }
+    options.push(a);
+    if (valued.has(a) && i + 1 < inv.args.length) operands.push(inv.args[++i]);
+  }
+  return { options, operands };
+}
+
 // `git config` flags and subcommands that read or remove a key rather than set it.
 const CONFIG_READ_OR_UNSET = new Set(['--get', '--get-all', '--get-regexp', '--get-urlmatch', '-l', '--list', '--unset', '--unset-all', '--show-origin', '--show-scope']);
 const CONFIG_READ_SUBCOMMANDS = new Set(['get', 'list', 'unset']);
@@ -328,8 +379,8 @@ const CONFIG_READ_SUBCOMMANDS = new Set(['get', 'list', 'unset']);
 // is present; the bare key is a read.
 function configSetsHooksPath(inv) {
   if (inv.sub !== 'config') return false;
-  if (inv.args.some((a) => CONFIG_READ_OR_UNSET.has(a))) return false;
-  const operands = inv.args.filter((a) => !a.startsWith('-'));
+  const { options, operands } = gitArgs(inv);
+  if (options.some((a) => CONFIG_READ_OR_UNSET.has(a))) return false;
   if (CONFIG_READ_SUBCOMMANDS.has(operands[0])) return false;
   const key = operands.findIndex((a) => /^core\.hookspath$/i.test(a));
   return key !== -1 && key < operands.length - 1;
@@ -357,13 +408,13 @@ export function gitFlagsViolation(inv, env) {
   if (/core\.hookspath/i.test(env.get('GIT_CONFIG_PARAMETERS') ?? '')) return 'a core.hooksPath override';
   for (const [k, v] of env) if (/^GIT_CONFIG_KEY_\d+$/.test(k) && /^core\.hookspath$/i.test(v)) return 'a core.hooksPath override';
   if (configSetsHooksPath(inv)) return 'a core.hooksPath override';
-  for (const a of inv.args) {
-    if (a === '--') break;
+  const { options, operands } = gitArgs(inv);
+  if (inv.sub === 'push' && operands.some((a) => a.startsWith('+'))) return 'a forced refspec';
+  for (const a of options) {
     if (matchesLong(a, '--no-verify')) return 'a hook-skipping flag';
     if (inv.sub === 'push') {
       if (PUSH_FORCE_LONG.some((o) => matchesLong(a, o))) return 'a force push flag';
       if (a === '-f' || clusterHas(a, 'f', PUSH_ARG_LETTERS)) return 'a force push flag';
-      if (a.startsWith('+')) return 'a forced refspec';
     }
     if (inv.sub === 'commit' && (a === '-n' || clusterHas(a, 'n', COMMIT_ARG_LETTERS))) return 'a hook-skipping flag';
   }
@@ -398,6 +449,10 @@ export function resolveDir(inv, segmentIndex, segments, cwd, pathResolve) {
   }
   enter(segments[segmentIndex]?.depth ?? 0);
   let dir = stack[stack.length - 1];
+  for (const envDir of inv.envDirs) {
+    if (!envDir.literal) return { undecidable: 'an env -C directory the hook cannot read' };
+    dir = pathResolve(dir, envDir.text);
+  }
   if (inv.dir) {
     if (!inv.dir.literal) return { undecidable: 'a -C directory the hook cannot read' };
     dir = pathResolve(dir, inv.dir.text);

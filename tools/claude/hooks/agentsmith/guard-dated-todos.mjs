@@ -13,10 +13,12 @@ const PROSE_EXTENSIONS = new Set(['.md', '.mdx', '.txt']);
 // Assembled from parts so the installed guard never trips on this file.
 const MARKER_WORDS = [['TO', 'DO'], ['FIX', 'ME'], ['HA', 'CK'], ['XX', 'X'], ['B', 'UG']].map((p) => p.join(''));
 // A deferral marker lives in a comment: the word follows a comment introducer (`//`, `#`,
-// `/*`, a block comment's ` *`, `--`, `<!--`), so an enum member or a string literal spelling
-// the same word is not one. It is dated when `(` and a YYYY-MM-DD date immediately follow.
-const COMMENT_INTRODUCER = '(?:\\/\\/|#|\\/\\*|^\\s*\\*|--|<!--)';
-const UNDATED_MARKER = new RegExp(`${COMMENT_INTRODUCER}\\s*\\b(${MARKER_WORDS.join('|')})\\b(?!\\(\\d{4}-\\d{2}-\\d{2})`, 'm');
+// `/*`, a block comment's ` *`, `--`, `<!--`) that starts the line or follows whitespace, and
+// is followed by `(`, `:`, whitespace, or the line end. A hex colour, a private field, a URL
+// fragment, or a string literal spelling the word is not one. It is dated when `(` and a
+// YYYY-MM-DD date immediately follow.
+const COMMENT_INTRODUCER = '(?:(?:^|\\s)(?:\\/\\/|#|--)|\\/\\*|^\\s*\\*|<!--)';
+const UNDATED_MARKER = new RegExp(`${COMMENT_INTRODUCER}\\s*\\b(${MARKER_WORDS.join('|')})\\b(?=[(:\\s]|$)(?!\\(\\d{4}-\\d{2}-\\d{2})`, 'm');
 
 const lines = (text) => String(text ?? '').split(/\r?\n/);
 
