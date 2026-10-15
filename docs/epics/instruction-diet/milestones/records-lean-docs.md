@@ -6,7 +6,7 @@
 **Depends on.** `readme-diet`
 **Blocks.** `rule-rewrite`
 **Acceptance.** The reference spec holds one document about record types and every inbound link resolves.
-**State.** in-progress
+**State.** shipped ([#28](https://github.com/viniciussegura/agentsmith/pull/28))
 
 ## records-2 `readme-diet`
 
@@ -14,7 +14,7 @@
 **Depends on.** --
 **Blocks.** `records-merge`
 **Acceptance.** The README is under 200 lines and the changelog carries the current pre-release.
-**State.** in-progress
+**State.** shipped ([#28](https://github.com/viniciussegura/agentsmith/pull/28))
 
 ## records-3 `note-template`
 
@@ -22,7 +22,7 @@
 **Depends on.** --
 **Blocks.** `note-cap`
 **Acceptance.** The owner rules name the template and every existing note conforms.
-**State.** in-progress
+**State.** shipped ([#28](https://github.com/viniciussegura/agentsmith/pull/28))
 
 ## records-4 `note-cap`
 
@@ -30,4 +30,4 @@
 **Depends on.** `note-template`
 **Blocks.** --
 **Acceptance.** The suite includes the cap and every existing note passes.
-**State.** in-progress
+**State.** shipped ([#28](https://github.com/viniciussegura/agentsmith/pull/28))

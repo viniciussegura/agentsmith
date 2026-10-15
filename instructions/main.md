@@ -10,7 +10,7 @@ This set's own process vocabulary, fixed at three altitudes:
 | term | what it names |
 | --- | --- |
 | `deliverable` | what a branch delivers, at merge -- its scope of work, provisional and rarely written down in full |
-| `unit of work` | one working spec, or a request landed without one (#ai-plan, #ai-multiple-requests) |
+| `unit of work` | one working spec, or a request landed without one (`#ai-plan` in the process bundle, #ai-multiple-requests) |
 | `plan step` | an execution chunk inside a unit of work -- a step, a workstream, a commit |
 
 Two verbs name the transitions between those altitudes:

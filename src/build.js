@@ -1,6 +1,6 @@
 import { posix as ppath } from 'node:path';
 import { generate } from './generate.js';
-import { onDemandIndex, danglingTags, coreToBundleRefs } from './bundles.js';
+import { onDemandIndex, danglingTags, coreToBundleRefs, unresolvedProseRefs } from './bundles.js';
 
 const BUNDLE_DIR = '.agentsmith/agents';
 
@@ -67,8 +67,9 @@ export function buildOutputs({
   const bundleTexts = bundleFiles.map((f) => f.content);
   const dangling = danglingTags({ coreText: coreContent, bundleTexts });
   const crossBoundary = coreToBundleRefs({ coreText: coreContent, bundleTexts });
+  const unresolvedProse = unresolvedProseRefs({ coreText: coreContent, bundleTexts });
 
   const stub = placement === 'nested' ? { path: 'AGENTS.md', content: STUB } : null;
 
-  return { corePath, coreContent, bundles: bundleFiles, stub, dangling, crossBoundary };
+  return { corePath, coreContent, bundles: bundleFiles, stub, dangling, crossBoundary, unresolvedProse };
 }

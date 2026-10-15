@@ -690,6 +690,29 @@ test('C7: a present, gitignored config warns on stderr and exits 0', (t) => {
   assert.ok(!r.stdout.includes('gitignored'), 'not on stdout');
 });
 
+const OPT_OUT_REL = '.agentsmith/hooks.yaml';
+const OPT_OUT_IGNORE_WARNING = "agentsmith: warning -- .agentsmith/hooks.yaml is gitignored, so it is never committed and the hooks ignore it. Add '!.agentsmith/hooks.yaml' after '.agentsmith/*' in .gitignore (see README).";
+
+test('C7: a present, gitignored hooks opt-out warns with its own text; a re-admitted one is silent', (t) => {
+  const home = makeTempDir(t, 'agentsmith-home-');
+  const env = isolatedEnv(t, home);
+  const ignored = gitRepo(t, 'agentsmith-c7h-', env, '.agentsmith/*\n');
+  mkdirSync(join(ignored, '.agentsmith'), { recursive: true });
+  writeFileSync(join(ignored, OPT_OUT_REL), 'disabled:\n  - guard-dated-todos\n');
+
+  const r = agentsmith(ignored, NO_CONFIG_ARGS, env);
+  assert.equal(r.status, 0, 'a warning never fails the run');
+  assert.equal(countOf(r.stderr, OPT_OUT_IGNORE_WARNING), 1, 'the exact opt-out warning, once');
+  assert.equal(countOf(r.stderr, IGNORE_WARNING), 0, 'the layout warning is not borrowed for the other file');
+
+  const readmitted = gitRepo(t, 'agentsmith-c7i-', env, `.agentsmith/*\n!${OPT_OUT_REL}\n`);
+  mkdirSync(join(readmitted, '.agentsmith'), { recursive: true });
+  writeFileSync(join(readmitted, OPT_OUT_REL), 'disabled:\n  - guard-dated-todos\n');
+  const r2 = agentsmith(readmitted, NO_CONFIG_ARGS, env);
+  assert.equal(r2.status, 0);
+  assert.ok(!r2.stderr.includes('hooks.yaml is gitignored'), 'silent once re-admitted');
+});
+
 test('C7: the warning precedes the confirmation, so --dry-run shows it without writing', (t) => {
   const home = makeTempDir(t, 'agentsmith-home-');
   const env = isolatedEnv(t, home);

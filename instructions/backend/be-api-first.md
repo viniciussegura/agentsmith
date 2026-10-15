@@ -1,6 +1,6 @@
 # #be-api-first API first
 
-The API is the contract between providers and consumers, so treat it with special care.
+The API is the contract between providers and consumers.
 Design a consistent API following established best practices for its style (REST, GraphQL, gRPC); the entity-variation rules below hold whatever the style.
 
 The same entity **MUST NOT** have multiple shapes across endpoints.
@@ -14,7 +14,6 @@ Keep entity variations to a small, fixed set:
 When returning an instance -- including the top-level response and any `EntityRef` sub-shapes embedded within it -- the data structure **MUST NOT** have optional fields.
 A field may be nullable, but never optional.
 This constraint applies at every nesting depth: an `EntityRef` embedded inside a response carries only required fields, each typed either as `T` or `T | null`, never `T | undefined` or marked `?`.
-This surfaces backend issues earlier: it is always clear when a value should have been returned.
 
 **Identifiers** -- every entity's `id` is stable, opaque, and never reused after deletion; do not expose internal auto-increment integers as public ids. Changing the id strategy for a live entity is a breaking change (#be-api-versioning).
 

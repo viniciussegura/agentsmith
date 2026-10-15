@@ -12,6 +12,7 @@ tmp/
 # recipe the README gives consumers, applied to this repo too.
 .agentsmith/*
 !.agentsmith/docs-layout.yaml
+!.agentsmith/hooks.yaml
 
 # caveman /compress backups
 *.original.md

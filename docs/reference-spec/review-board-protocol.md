@@ -30,6 +30,8 @@ and the round stops. Both drivers run this guard.
 
 ## The round (seven steps)
 
+Three adversarial filters gate every finding into team work: the per-finding verify, the reduce-stage consolidation, and human acceptance; the last is never skipped, whichever board runs.
+
 A **round** is a fixed seven-step choreography with **no inner loop**:
 
 1. **Kickstart** — the main thread writes a kickstart file: the cheap facts the

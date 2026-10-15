@@ -2,6 +2,15 @@
 
 A `<target>-rc.<pr>` heading is an unpublished pre-release, one per pull request, collapsed into the dated release heading when the release is cut (`#local-pr-version` in `AGENTS.md`); `## Earlier` covers the pull requests merged before versions were assigned.
 
+## 1.0.0-rc.29
+
+- Lean core, process bundle, rule caps, and guard hooks (#29)
+- **Breaking.** `#ai-plan`, `#ai-plan-deviation`, `#ai-preflight`, `#ai-spec-review`, `#swe-branch-lifespan`, `#swe-epic`, and `#swe-consolidation-audit` leave the generated core for the on-demand `process` bundle; a project instruction file citing them resolves once the bundle is installed.
+- **Breaking.** The degraded non-Claude review mode leaves the four review-tooling rules; a host without the Claude tooling gets their intent and human gates, and the protocol is the repository's reference spec plus the skills.
+- **Breaking.** Every rule over its word cap was rewritten to its obligations (fourteen modules); tags and headings did not change.
+- **Breaking.** A Claude install wires four PreToolUse hooks instead of one: the three new ones block a commit-creating `git` command on the default branch, a force or hook-skipping `git` flag, and an undated `TODO`-style marker on an added line.
+- **Upgrade.** Re-run `install`; the process bundle lands as `.agentsmith/agents/process.md`. To switch a hook off for a project, commit `.agentsmith/hooks.yaml` with a `disabled:` list of hook names and add `!.agentsmith/hooks.yaml` to `.gitignore`; the install plan warns when that file is ignored.
+
 ## 1.0.0-rc.28
 
 - One records document, a lean README, and capped notes (#28)

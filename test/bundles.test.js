@@ -7,6 +7,7 @@ import {
   onDemandIndex,
   danglingTags,
   coreToBundleRefs,
+  unresolvedProseRefs,
   parseOwnership,
   parseRoles,
   ownershipCoverage,
@@ -96,6 +97,31 @@ test('coreToBundleRefs ignores a tag defined nowhere (that is danglingTags job)'
     bundleTexts: ['## #front-a11y Accessibility'],
   });
   assert.deepEqual(result, [], 'a wholly undefined tag is not a cross-boundary case');
+});
+
+// The layout map's owner column registers a record type under its rule tag; the parser
+// requires the bare tag and consumer configs key on it, so that one cell shape is exempt
+// from the lean-split gate. Everything else stays reported.
+const EPIC_BUNDLE = '## #swe-epic Epics\n\nAn epic.';
+const layoutMap = (cell) =>
+  `## #swe-docs-layout Layout\n\n| path | description | owner |\n| --- | --- | --- |\n| \`docs/epics/<slug>/\` | an initiative | ${cell} |\n`;
+
+test('coreToBundleRefs exempts a sole-tag cell of the layout map and nothing else', () => {
+  const refs = (coreText) => coreToBundleRefs({ coreText, bundleTexts: [EPIC_BUNDLE] });
+  assert.deepEqual(refs(layoutMap('#swe-epic')), [], 'the owner cell is a registration');
+  assert.deepEqual(refs(layoutMap('#swe-epic owner')), [{ tag: 'swe-epic', from: 'swe-docs-layout' }], 'a tag plus words is a citation');
+  assert.deepEqual(refs(layoutMap('#swe-epic #swe-epic')), [{ tag: 'swe-epic', from: 'swe-docs-layout' }], 'two tags in one cell are citations');
+  assert.deepEqual(refs(`${layoutMap('-')}\nAn epic is planned per #swe-epic.\n`), [{ tag: 'swe-epic', from: 'swe-docs-layout' }], 'the same tag in a paragraph is a citation');
+  const otherTable = '## #swe-other Other\n\n| a | owner |\n| --- | --- |\n| x | #swe-epic |\n';
+  assert.deepEqual(refs(otherTable), [{ tag: 'swe-epic', from: 'swe-other' }], 'a sole-tag cell in another rule is a citation, and the report names that rule');
+});
+
+test('unresolvedProseRefs resolves backticked references and ignores placeholders and globs', () => {
+  const bundleTexts = ['## #swe-epic Epics'];
+  assert.deepEqual(unresolvedProseRefs({ coreText: '## #swe-x X\n\nSee `#swe-epic` (process bundle) and `#swe-x`.', bundleTexts }), []);
+  assert.deepEqual(unresolvedProseRefs({ coreText: '## #swe-x X\n\nSee `#swe-epix` (process bundle).', bundleTexts }), ['swe-epix']);
+  assert.deepEqual(unresolvedProseRefs({ coreText: '## #swe-x X\n\nEach rule carries a `#tag`; cite the `#token` by name; `#ui-*` is a glob.', bundleTexts }), []);
+  assert.deepEqual(unresolvedProseRefs({ coreText: '## #swe-x X\n\n```text\n`#swe-nope`\n```\n', bundleTexts }), [], 'fenced text is not prose');
 });
 
 test('parseOwnership reads rows in order and preserves duplicate keys', () => {

@@ -8,15 +8,15 @@ Breaking for consumers: rules move between core and bundles and every rule's tex
 **Depends on.** --
 **Blocks.** `tooling-rules`
 **Acceptance.** The generated core lists the bundle among the on-demand ones and carries none of the moved rules' bodies.
-**State.** planned
+**State.** in-progress
 
 ## diet-2 `tooling-rules`
 
 **Outcome.** `#ai-review-engine`, `#ai-review-board`, `#ai-spec-review`, and `#ai-instruction-review` each state intent, human gate, and a pointer; the full protocol lives with the skills.
 **Depends on.** `process-bundle`
 **Blocks.** `rule-rewrite`
-**Acceptance.** Each of the four rules is under the per-rule word cap and the skill documents carry every removed obligation.
-**State.** planned
+**Acceptance.** Each of the four rules is at or under the tooling-rule word cap and every removed obligation has a named home.
+**State.** in-progress
 
 ## diet-3 `rule-rewrite`
 
@@ -24,15 +24,15 @@ Breaking for consumers: rules move between core and bundles and every rule's tex
 **Depends on.** `tooling-rules`, `records-merge`
 **Blocks.** `word-budget`
 **Acceptance.** Every rule is under the per-rule cap, the core under the core cap, and the integrity and ownership tests pass.
-**State.** planned
+**State.** in-progress
 
 ## diet-4 `word-budget`
 
 **Outcome.** Tests fail when a rule exceeds its word cap or the generated core exceeds its total.
 **Depends on.** `rule-rewrite`
 **Blocks.** --
-**Acceptance.** The suite includes both caps and passes.
-**State.** planned
+**Acceptance.** The suite includes the caps and passes.
+**State.** in-progress
 
 ## diet-5 `more-hooks`
 
@@ -40,4 +40,4 @@ Breaking for consumers: rules move between core and bundles and every rule's tex
 **Depends on.** --
 **Blocks.** --
 **Acceptance.** Each hook has a test and both install paths wire it.
-**State.** planned
+**State.** in-progress
